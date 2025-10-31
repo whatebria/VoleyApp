@@ -38,12 +38,17 @@ class FirestoreService {
       name: name,
       role: app_user.UserRole.player,
       createdAt: DateTime.now(),
+      coachId: coachId,
     );
 
     await _db.collection('users').doc(user.id).set(user.toJson());
 
-    // Create permission link with coach
-    await createPermission(coachId: coachId, playerId: userId);
+    // Create permission link with coach (already accepted)
+    await createPermission(
+      coachId: coachId,
+      playerId: userId,
+      initialStatus: PermissionStatus.accepted,
+    );
 
     return user;
   }
@@ -74,17 +79,21 @@ class FirestoreService {
     required String coachId,
 
     required String playerId,
+
+    PermissionStatus initialStatus = PermissionStatus.pending,
   }) async {
     final permission = CoachPlayerPermission(
-      id: _uuid.v4(),
+      id: '${coachId}_$playerId',
 
       coachId: coachId,
 
       playerId: playerId,
 
-      status: PermissionStatus.pending,
+      status: initialStatus,
 
       createdAt: DateTime.now(),
+
+      updatedAt: initialStatus != PermissionStatus.pending ? DateTime.now() : null,
     );
 
     await _db
@@ -226,6 +235,13 @@ class FirestoreService {
 
   Future<void> deletePermission(String permissionId) async {
     await _db.collection('coach_player_permissions').doc(permissionId).delete();
+  }
+
+  /// Update user's coachId field
+  Future<void> updateUserCoachId(String userId, String? coachId) async {
+    await _db.collection('users').doc(userId).update({
+      'coachId': coachId,
+    });
   }
 
   // ========== Existing Player Profile Methods ==========

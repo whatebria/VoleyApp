@@ -80,6 +80,18 @@ service cloud.firestore {
 
       
 
+      // Coaches can create player users (for creating linked players)
+
+      allow create: if isAuthenticated() 
+
+        && isCoach() 
+
+        && request.resource.data.role == 'player'
+
+        && request.resource.data.coachId == request.auth.uid;
+
+      
+
       // Coaches can read player user documents if they have permission
 
       allow read: if isCoach() && resource.data.role == 'player';
@@ -98,7 +110,7 @@ service cloud.firestore {
 
     match /coach_player_permissions/{permissionId} {
 
-      // Coaches can create permission requests
+      // Coaches can create permission requests (including accepted ones for linked players)
 
       allow create: if isAuthenticated() 
 
@@ -125,6 +137,16 @@ service cloud.firestore {
         && resource.data.playerId == request.auth.uid
 
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+      
+
+      // Coaches can update permissions they created
+
+      allow update: if isAuthenticated() 
+
+        && resource.data.coachId == request.auth.uid
+
+        && isCoach();
 
       
 

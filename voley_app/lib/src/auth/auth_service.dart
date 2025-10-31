@@ -12,8 +12,9 @@ class AuthService {
     String email,
     String password,
     String name,
-    app_user.UserRole role,
-  ) async {
+    app_user.UserRole role, {
+    String? coachId,
+  }) async {
     try {
       // 1. Crear usuario en Firebase Auth
       final userCredential = await _auth.createUserWithEmailAndPassword(
@@ -28,14 +29,31 @@ class AuthService {
         name: name,
         role: role,
         createdAt: DateTime.now(),
+        coachId: coachId,
       );
 
       // 3. Guardar el usuario en la colección 'users' de Firestore
       await _firestore.collection('users').doc(user.id).set(user.toJson());
 
+      // 4. Si se proporciona coachId y el rol es player, crear permiso aceptado
+      if (coachId != null && role == app_user.UserRole.player) {
+        final permission = {
+          'id': '${coachId}_${user.id}',
+          'coachId': coachId,
+          'playerId': user.id,
+          'status': 'accepted',
+          'createdAt': Timestamp.fromDate(DateTime.now()),
+          'updatedAt': Timestamp.fromDate(DateTime.now()),
+        };
+        await _firestore
+            .collection('coach_player_permissions')
+            .doc(permission['id'] as String)
+            .set(permission);
+      }
+
       return "success";
     } on FirebaseAuthException catch (e) {
-      // 4. Manejo de errores de REGISTRO (eran de login)
+      // 5. Manejo de errores de REGISTRO (eran de login)
       switch (e.code) {
         case 'email-already-in-use':
           return "El correo ya está en uso.";
