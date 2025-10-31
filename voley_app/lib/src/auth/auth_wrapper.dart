@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/auth_provider.dart';
 import 'package:voley_app/src/auth/login_screen.dart';
+import 'package:voley_app/src/screens/home_screen.dart';
 import 'package:voley_app/src/screens/onboarding/evaluation_screen.dart';
 
 class AuthWrapper extends ConsumerWidget {
@@ -18,7 +19,7 @@ class AuthWrapper extends ConsumerWidget {
         // Si el usuario está autenticado, mostrar la pantalla principal
 
         if (user != null) {
-          return EvaluationScreen();
+          return const HomeScreen();
         }
 
         // Si no está autenticado, mostrar login

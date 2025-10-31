@@ -18,12 +18,15 @@ final playerProfileProvider = StateProvider<PlayerProfile?>((ref) => null);
 final generatedProgramProvider = StateProvider<Program?>((ref) => null);
 
 // Acción para generar programa
+// En tu provider programGeneratorAction
 final programGeneratorAction = Provider((ref) {
   final svc = ref.read(firestoreProvider);
   return (PlayerProfile profile, List<Exercise> exercises) async {
     final program = generateProgram(profile, exercises);
-    // guardar
+    
+
     await svc.saveProgram(profile.id, program);
+    
     ref.read(generatedProgramProvider.notifier).state = program;
     return program;
   };
