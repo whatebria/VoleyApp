@@ -6,8 +6,7 @@ import 'package:voley_app/src/screens/admin/athlete_form_screen.dart';
 import 'package:voley_app/src/screens/admin/exercise_form_screen.dart';
 import 'package:voley_app/src/screens/admin/base/generic_list_screen.dart';
 import 'package:voley_app/src/screens/admin/injury_form_screen.dart';
-import 'package:voley_app/src/screens/admin/objective_form_screen.dart';
-import 'package:voley_app/src/screens/admin/progression_type_form_screen.dart';
+import 'package:voley_app/src/screens/admin/tags_form_screen.dart';
 import 'package:voley_app/src/screens/admin/test_form_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -39,17 +38,7 @@ class DashboardScreen extends StatelessWidget {
         "titleBuilder": (data) => Text(data['name'] ?? ''),
         "subtitleBuilder": (data) => Text('Duración: ${data['duration'] ?? 0} sem.'),
       },
-      {
-        "title": "Tipos de Progresión",
-        "icon": Icons.auto_graph_outlined, // <-- ICONO
-        "collection": FirebaseFirestore.instance.collection('progression_types'),
-        "formBuilder": ({doc}) => ProgressionTypeFormScreen(
-          id: doc?.id,
-          existing: doc?.data() as Map<String, dynamic>?,
-        ),
-        "titleBuilder": (data) => Text(data['name'] ?? ''),
-        "subtitleBuilder": (data) => Text(data['description'] ?? '', overflow: TextOverflow.ellipsis),
-      },
+
       {
         "title": "Tests (Catálogo)",
         "icon": Icons.rule_outlined, // <-- ICONO

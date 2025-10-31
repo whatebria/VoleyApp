@@ -1,8 +1,9 @@
+// exercise.dart
 class Exercise {
   final String name;
   final List<String> tags;
-  final String level; // beginner, intermediate, advanced
-  final String positionFocus; // all, setter, middle, opposite, libero, outside
+  final String level;
+  final String positionFocus;
   final String videoUrl;
   final String equipment;
   final List<String> contraindicatedFor;
@@ -17,17 +18,23 @@ class Exercise {
     required this.contraindicatedFor,
   });
 
-  /// Método para convertir un objeto Exercise a un Map<String, dynamic>
-  /// Esto es necesario para subir los datos a Firestore.
-  Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'tags': tags,
-      'level': level,
-      'positionFocus': positionFocus,
-      'videoUrl': videoUrl,
-      'equipment': equipment,
-      'contraindicatedFor': contraindicatedFor,
-    };
-  }
+  Map<String, dynamic> toMap() => {
+        'name': name,
+        'tags': tags,
+        'level': level,
+        'positionFocus': positionFocus,
+        'videoUrl': videoUrl,
+        'equipment': equipment,
+        'contraindicatedFor': contraindicatedFor,
+      };
+
+  factory Exercise.fromMap(Map<String, dynamic> map) => Exercise(
+        name: map['name'],
+        tags: List<String>.from(map['tags']),
+        level: map['level'],
+        positionFocus: map['positionFocus'],
+        videoUrl: map['videoUrl'],
+        equipment: map['equipment'],
+        contraindicatedFor: List<String>.from(map['contraindicatedFor']),
+      );
 }

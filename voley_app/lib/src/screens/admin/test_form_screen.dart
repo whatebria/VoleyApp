@@ -5,11 +5,9 @@ import 'package:voley_app/src/screens/admin/base/base_form_screen.dart';
 import 'package:voley_app/src/widgets/firestore_multi_selector.dart';
 
 class TestFormScreen extends BaseFormScreen {
-  TestFormScreen({super.key, String? id, Map<String, dynamic>? existing})
+  TestFormScreen({super.key, super.id, super.existing})
       : super(
           collectionRef: FirebaseFirestore.instance.collection('tests'),
-          id: id,
-          existing: existing,
         );
 
   @override
@@ -17,15 +15,12 @@ class TestFormScreen extends BaseFormScreen {
 }
 
 class _TestFormScreenState extends BaseFormScreenState<TestFormScreen> {
-  // --- Variables locales ---
+  // --- Variables locales (adaptadas al modelo) ---
   String name = '';
-  String instructions = '';
+  String description = '';
   String measure = '';
-  String good = '';
-  String average = '';
-  String weak = '';
-  List<String> measuresObjectiveIds = [];
-  List<String> improvementObjectiveIds = [];
+  String objective = '';
+  List<String> recommendedTags = []; // IDs de 'objectives'
 
   @override
   String getScreenTitle() => "Agregar/Editar Test";
@@ -34,13 +29,10 @@ class _TestFormScreenState extends BaseFormScreenState<TestFormScreen> {
   void initializeData(Map<String, dynamic>? data) {
     if (data != null) {
       name = data['name'] ?? '';
-      instructions = data['instructions'] ?? '';
+      description = data['description'] ?? '';
       measure = data['measure'] ?? '';
-      good = data['good'] ?? '';
-      average = data['average'] ?? '';
-      weak = data['weak'] ?? '';
-      measuresObjectiveIds = List<String>.from(data['measuresObjectiveIds'] ?? []);
-      improvementObjectiveIds = List<String>.from(data['improvementObjectiveIds'] ?? []);
+      objective = data['objective'] ?? '';
+      recommendedTags = List<String>.from(data['recommendedTags'] ?? []);
     }
   }
 
@@ -48,13 +40,10 @@ class _TestFormScreenState extends BaseFormScreenState<TestFormScreen> {
   Map<String, dynamic> buildDataMap() {
     return {
       'name': name,
-      'instructions': instructions,
+      'description': description,
       'measure': measure,
-      'good': good,
-      'average': average,
-      'weak': weak,
-      'measuresObjectiveIds': measuresObjectiveIds,
-      'improvementObjectiveIds': improvementObjectiveIds,
+      'objective': objective,
+      'recommendedTags': recommendedTags,
     };
   }
 
@@ -68,10 +57,10 @@ class _TestFormScreenState extends BaseFormScreenState<TestFormScreen> {
         onSaved: (v) => name = v!,
       ),
       TextFormField(
-        initialValue: instructions,
-        decoration: const InputDecoration(labelText: "Instrucciones"),
-        maxLines: 8,
-        onSaved: (v) => instructions = v!,
+        initialValue: description,
+        decoration: const InputDecoration(labelText: "Descripción"),
+        maxLines: 3,
+        onSaved: (v) => description = v!,
       ),
       TextFormField(
         initialValue: measure,
@@ -79,37 +68,22 @@ class _TestFormScreenState extends BaseFormScreenState<TestFormScreen> {
         onSaved: (v) => measure = v!,
       ),
       TextFormField(
-        initialValue: good,
-        decoration: const InputDecoration(labelText: "Resultado Bueno"),
-        onSaved: (v) => good = v!,
-      ),
-      TextFormField(
-        initialValue: average,
-        decoration: const InputDecoration(labelText: "Resultado Promedio"),
-        onSaved: (v) => average = v!,
-      ),
-      TextFormField(
-        initialValue: weak,
-        decoration: const InputDecoration(labelText: "Resultado Débil"),
-        onSaved: (v) => weak = v!,
+        initialValue: objective,
+        decoration: const InputDecoration(labelText: "Objetivo del Test"),
+        maxLines: 2,
+        onSaved: (v) => objective = v!,
       ),
 
-      // --- 5. Añadir widgets de chips ---
       const SizedBox(height: 16),
-      FirestoreMultiSelector(
-        label: "Qué Mide (Objetivos)",
-        collectionRef: FirebaseFirestore.instance.collection('tags'),
-        filterCategory: "Rendimiento Físico", // <-- FILTRO
-        selectedIds: measuresObjectiveIds,
-        onUpdate: (newList) => setState(() => measuresObjectiveIds = newList),
-      ),
 
+      // Selector para 'recommendedTags' (Qué mejorar)
       FirestoreMultiSelector(
-        label: "Qué Mejorar (Objetivos)",
+        label: "Tags Recomendados (Qué mejorar)",
+        // Apunta a la colección correcta de 'objectives'
         collectionRef: FirebaseFirestore.instance.collection('tags'),
-        filterCategory: "Rendimiento Físico", // <-- FILTRO
-        selectedIds: improvementObjectiveIds,
-        onUpdate: (newList) => setState(() => improvementObjectiveIds = newList),
+        filterCategory: "Rendimiento Físico", // O la categoría que corresponda
+        selectedIds: recommendedTags,
+        onUpdate: (newList) => setState(() => recommendedTags = newList),
       ),
     ];
   }

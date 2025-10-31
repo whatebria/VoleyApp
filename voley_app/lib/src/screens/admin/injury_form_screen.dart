@@ -3,13 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:voley_app/src/screens/admin/base/base_form_screen.dart';
+import 'package:voley_app/src/widgets/firestore_multi_selector.dart';
 
 class InjuryFormScreen extends BaseFormScreen {
-  InjuryFormScreen({super.key, String? id, Map<String, dynamic>? existing})
+  InjuryFormScreen({super.key, super.id, super.existing})
       : super(
           collectionRef: FirebaseFirestore.instance.collection('injuries'),
-          id: id,
-          existing: existing,
         );
 
   @override
@@ -17,27 +16,20 @@ class InjuryFormScreen extends BaseFormScreen {
 }
 
 class _InjuryFormScreenState extends BaseFormScreenState<InjuryFormScreen> {
-  // --- Variables locales ---
+  // --- Variables locales (adaptadas al modelo simple) ---
   String name = '';
-  String description = '';
-  String precautions = '';
-  String severity = 'leve'; // Valor por defecto
+  String notes = '';
   
-  // Lista de valores válidos para el dropdown
-  final List<String> validSeverities = ["leve", "moderada", "grave"];
-  
-  // Controlador para el número
-  final TextEditingController _recoveryTimeController = TextEditingController();
+  // Controlador para el número (duration)
+  final TextEditingController _durationController = TextEditingController();
 
-  // Listas de IDs
-  List<String> excludeObjectiveIds = [];
-  List<String> recommendObjectiveIds = [];
-  List<String> zonaCuerpoIds = [];
-  List<String> condicionesIds = [];
+  // Listas de IDs (usando los nombres del modelo)
+  List<String> excludeTags = [];
+  List<String> recommendTags = [];
 
   @override
   void dispose() {
-    _recoveryTimeController.dispose();
+    _durationController.dispose();
     super.dispose();
   }
 
@@ -48,27 +40,12 @@ class _InjuryFormScreenState extends BaseFormScreenState<InjuryFormScreen> {
   void initializeData(Map<String, dynamic>? data) {
     if (data != null) {
       name = data['name'] ?? '';
-      description = data['description'] ?? '';
-      precautions = data['precautions'] ?? '';
-      _recoveryTimeController.text = data['recoveryTime']?.toString() ?? '0';
-
-      // --- ¡AQUÍ SE EVITA EL ERROR DEL DROPDOWN! ---
-      // 1. Carga el valor de Firebase
-      String loadedSeverity = data['severity'] ?? 'leve';
+      notes = data['notes'] ?? ''; // Campo 'notes' del modelo
+      _durationController.text = data['duration']?.toString() ?? '0'; // Campo 'duration' del modelo
       
-      // 2. Comprueba si es un valor válido de la lista
-      if (!validSeverities.contains(loadedSeverity)) {
-        // 3. Si no lo es (ej. es "" o un valor antiguo), lo resetea
-        loadedSeverity = 'leve';
-      }
-      severity = loadedSeverity;
-      // --- FIN DE LA CORRECCIÓN ---
-
-      // Carga las listas de IDs
-      excludeObjectiveIds = List<String>.from(data['excludeObjectiveIds'] ?? []);
-      recommendObjectiveIds = List<String>.from(data['recommendObjectiveIds'] ?? []);
-      zonaCuerpoIds = List<String>.from(data['zonaCuerpoIds'] ?? []);
-      condicionesIds = List<String>.from(data['condicionesIds'] ?? []);
+      // Carga las listas de IDs (usando los nombres del modelo)
+      excludeTags = List<String>.from(data['excludeTags'] ?? []);
+      recommendTags = List<String>.from(data['recommendTags'] ?? []);
     }
   }
 
@@ -76,14 +53,10 @@ class _InjuryFormScreenState extends BaseFormScreenState<InjuryFormScreen> {
   Map<String, dynamic> buildDataMap() {
     return {
       'name': name,
-      'description': description,
-      'precautions': precautions,
-      'severity': severity,
-      'recoveryTime': int.tryParse(_recoveryTimeController.text) ?? 0,
-      'excludeObjectiveIds': excludeObjectiveIds,
-      'recommendObjectiveIds': recommendObjectiveIds,
-      'zonaCuerpoIds': zonaCuerpoIds,
-      'condicionesIds': condicionesIds,
+      'notes': notes,
+      'duration': int.tryParse(_durationController.text) ?? 0,
+      'excludeTags': excludeTags,
+      'recommendTags': recommendTags,
     };
   }
 
@@ -96,39 +69,44 @@ class _InjuryFormScreenState extends BaseFormScreenState<InjuryFormScreen> {
         validator: (v) => v!.isEmpty ? "Campo requerido" : null,
         onSaved: (v) => name = v!,
       ),
+      
+      // Campo 'notes' (String)
       TextFormField(
-        initialValue: description,
-        decoration: const InputDecoration(labelText: "Descripción / Síntomas"),
-        maxLines: 2,
-        onSaved: (v) => description = v!,
+        initialValue: notes,
+        decoration: const InputDecoration(labelText: "Notas"),
+        maxLines: 3,
+        onSaved: (v) => notes = v!,
       ),
       
-      // --- Campos nuevos ---
-      DropdownButtonFormField(
-        value: severity, // Garantizado que este valor está en la lista
-        decoration: const InputDecoration(labelText: "Nivel de Severidad"),
-        items: const [
-          DropdownMenuItem(value: "leve", child: Text("Leve")),
-          DropdownMenuItem(value: "moderada", child: Text("Moderada")),
-          DropdownMenuItem(value: "grave", child: Text("Grave")),
-        ],
-        onChanged: (val) => setState(() => severity = val!),
-      ),
+      // Campo 'duration' (int)
       TextFormField(
-        controller: _recoveryTimeController,
-        decoration: const InputDecoration(labelText: "Tiempo de Recup. (semanas)"),
+        controller: _durationController,
+        decoration: const InputDecoration(labelText: "Duración (semanas)"),
         keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],),
-      TextFormField(
-        initialValue: precautions,
-        decoration: const InputDecoration(labelText: "Precauciones"),
-        maxLines: 2,
-        onSaved: (v) => precautions = v!,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       ),
       
       const Divider(height: 30),
 
+      // --- Selectores de Tags ---
+      // (Asumiendo que 'excludeTags' y 'recommendTags' siguen siendo IDs 
+      // de la colección 'objectives' como en nuestra arquitectura)
+
+      FirestoreMultiSelector(
+        label: "Tags a Excluir (Qué evitar)",
+        collectionRef: FirebaseFirestore.instance.collection('tags'),
+        filterCategory: "Condición", // Asigna la categoría correcta
+        selectedIds: excludeTags,
+        onUpdate: (newList) => setState(() => excludeTags = newList),
+      ),
       
+      FirestoreMultiSelector(
+        label: "Tags Recomendados (Priorizar)",
+        collectionRef: FirebaseFirestore.instance.collection('tags'),
+        filterCategory: "Terapéutico", // Asigna la categoría correcta
+        selectedIds: recommendTags,
+        onUpdate: (newList) => setState(() => recommendTags = newList),
+      ),
     ];
   }
 }

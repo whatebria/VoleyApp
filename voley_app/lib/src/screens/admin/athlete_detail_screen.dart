@@ -5,12 +5,6 @@ import 'package:voley_app/src/models/athlete/athlete.dart';
 import 'package:voley_app/src/models/evaluation.dart';
 import 'package:voley_app/src/screens/admin/base/generic_list_screen.dart';
 import 'package:voley_app/src/screens/admin/evaluation_form_screen.dart';
-import 'package:voley_app/src/screens/admin/program_detail_screen.dart';
-import 'package:voley_app/src/screens/admin/program_form_screen.dart';
-import 'package:voley_app/src/widgets/generate_program_button.dart';
-// (Importa los formularios de Program y Session cuando los tengas)
-// import 'package:voley_app/src/screens/admin/forms/program_form_screen.dart';
-// import 'package:voley_app/src/screens/admin/forms/session_form_screen.dart';
 
 class AthleteDetailScreen extends StatelessWidget {
   final DocumentSnapshot athleteDoc;
@@ -174,38 +168,6 @@ class AthleteDetailScreen extends StatelessWidget {
           ListTile(
             title: const Text("Programas"),
             trailing: const Icon(Icons.calendar_month),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => GenericListScreen(
-                  collectionRef: programsRef,
-                  title: "Programas de ${athlete.name}",
-                  fabLabel: "Programa",
-                  formBuilder: ({doc}) {
-                    // Puedes usar tu propio generador de programa automático
-                    // return GenerateProgramButton(athlete: athlete);
-                    // O, si prefieres crearlo manualmente:
-                    return ProgramFormScreen(
-                      id: doc?.id,
-                      existing: doc?.data() as Map<String, dynamic>?,
-                    );
-                  },
-                  tileTitleBuilder: (data) =>
-                      Text(data['name'] ?? 'Sin nombre'),
-                  tileSubtitleBuilder: (data) => Text(
-                    'Fase: ${data['phase'] ?? 'N/A'} | Foco: ${data['focus'] ?? 'N/A'}',
-                  ),
-                  onItemTap: (doc) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ProgramDetailScreen(programDoc: doc),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
           ),
 
           ListTile(
