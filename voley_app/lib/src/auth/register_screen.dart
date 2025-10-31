@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:voley_app/providers/auth_provider.dart';
+import 'package:voley_app/src/models/user.dart' as app_user;
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -15,6 +16,7 @@ class RegisterScreen extends ConsumerStatefulWidget {
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
 
   final _emailController = TextEditingController();
 
@@ -27,14 +29,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscurePassword = true;
 
   bool _obscureConfirmPassword = true;
+  app_user.UserRole _selectedRole = app_user.UserRole.player;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
 
     _passwordController.dispose();
 
     _confirmPasswordController.dispose();
+    _nameController.text.trim();
+
+    _selectedRole;
 
     super.dispose();
   }
@@ -50,6 +57,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       _emailController.text.trim(),
 
       _passwordController.text,
+
+      _nameController.text.trim(),
+
+      _selectedRole,
     );
 
     if (!mounted) return;
@@ -143,6 +154,33 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                   const SizedBox(height: 48),
 
+                  // Campo de nombre
+                  TextFormField(
+                    controller: _nameController,
+
+                    keyboardType: TextInputType.name,
+
+                    decoration: InputDecoration(
+                      labelText: 'Nombre completo',
+
+                      prefixIcon: const Icon(Icons.person_outlined),
+
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Por favor ingresa tu nombre';
+                      }
+
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
                   // Campo de email
                   TextFormField(
                     controller: _emailController,
@@ -170,6 +208,66 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                       return null;
                     },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Selector de rol
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade400),
+
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+
+                    padding: const EdgeInsets.all(16),
+
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+
+                      children: [
+                        Text(
+                          'Tipo de usuario',
+
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        RadioListTile<app_user.UserRole>(
+                          title: const Text('Jugador'),
+
+                          subtitle: const Text('Quiero entrenar y mejorar'),
+
+                          value: app_user.UserRole.player,
+
+                          groupValue: _selectedRole,
+
+                          onChanged: (value) {
+                            setState(() => _selectedRole = value!);
+                          },
+
+                          contentPadding: EdgeInsets.zero,
+                        ),
+
+                        RadioListTile<app_user.UserRole>(
+                          title: const Text('Entrenador'),
+
+                          subtitle: const Text('Quiero entrenar a jugadores'),
+
+                          value: app_user.UserRole.coach,
+
+                          groupValue: _selectedRole,
+
+                          onChanged: (value) {
+                            setState(() => _selectedRole = value!);
+                          },
+
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ],
+                    ),
                   ),
 
                   const SizedBox(height: 16),

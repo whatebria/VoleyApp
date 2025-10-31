@@ -1,0 +1,251 @@
+rules_version = '2';
+
+service cloud.firestore {
+
+  match /databases/{database}/documents {
+
+    
+
+    // Helper function to check if user is authenticated
+
+    function isAuthenticated() {
+
+      return request.auth != null;
+
+    }
+
+    
+
+    // Helper function to get user role
+
+    function getUserRole() {
+
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+
+    }
+
+    
+
+    // Helper function to check if user is a coach
+
+    function isCoach() {
+
+      return isAuthenticated() && getUserRole() == 'coach';
+
+    }
+
+    
+
+    // Helper function to check if user is a player
+
+    function isPlayer() {
+
+      return isAuthenticated() && getUserRole() == 'player';
+
+    }
+
+    
+
+    // Helper function to check if coach has permission to access player
+
+    function hasPermission(playerId) {
+
+      return exists(/databases/$(database)/documents/coach_player_permissions/$(request.auth.uid  '_'  playerId))
+
+        && get(/databases/$(database)/documents/coach_player_permissions/$(request.auth.uid  '_'  playerId)).data.status == 'accepted';
+
+    }
+
+    
+
+    // Users collection
+
+    match /users/{userId} {
+
+      // Anyone authenticated can read their own user document
+
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+
+      
+
+      // Only the user can update their own document
+
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+
+      
+
+      // User creation is handled by the backend/auth service
+
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+
+      
+
+      // Coaches can read player user documents if they have permission
+
+      allow read: if isCoach() && resource.data.role == 'player';
+
+      
+
+      // Players can read coach user documents
+
+      allow read: if isPlayer() && resource.data.role == 'coach';
+
+    }
+
+    
+
+    // Coach-Player Permissions collection
+
+    match /coach_player_permissions/{permissionId} {
+
+      // Coaches can create permission requests
+
+      allow create: if isAuthenticated() 
+
+        && request.resource.data.coachId == request.auth.uid
+
+        && isCoach();
+
+      
+
+      // Both coach and player can read their permissions
+
+      allow read: if isAuthenticated() 
+
+        && (resource.data.coachId == request.auth.uid 
+
+            || resource.data.playerId == request.auth.uid);
+
+      
+
+      // Players can update status (accept/reject)
+
+      allow update: if isAuthenticated() 
+
+        && resource.data.playerId == request.auth.uid
+
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+      
+
+      // Both coach and player can delete the permission
+
+      allow delete: if isAuthenticated() 
+
+        && (resource.data.coachId == request.auth.uid 
+
+            || resource.data.playerId == request.auth.uid);
+
+    }
+
+    
+
+    // Players collection (player profiles)
+
+    match /players/{playerId} {
+
+      // Players can read and write their own profile
+
+      allow read, write: if isAuthenticated() && request.auth.uid == playerId;
+
+      
+
+      // Coaches can read player profiles if they have permission
+
+      allow read: if isCoach() && hasPermission(playerId);
+
+      
+
+      // Subcollections (programs, feedback)
+
+      match /programs/{programId} {
+
+        // Players can read and write their own programs
+
+        allow read, write: if isAuthenticated() && request.auth.uid == playerId;
+
+        
+
+        // Coaches can read and write programs for players they have permission for
+
+        allow read, write: if isCoach() && hasPermission(playerId);
+
+      }
+
+      
+
+      match /feedback/{sessionId} {
+
+        // Players can read and write their own feedback
+
+        allow read, write: if isAuthenticated() && request.auth.uid == playerId;
+
+        
+
+        // Coaches can read feedback for players they have permission for
+
+        allow read: if isCoach() && hasPermission(playerId);
+
+      }
+
+    }
+
+    
+
+    // Exercises collection (read-only for all authenticated users)
+
+    match /exercises/{exerciseId} {
+
+      allow read: if isAuthenticated();
+
+      // Only admins can write (handle via Firebase Admin SDK)
+
+      allow write: if false;
+
+    }
+
+    
+
+    // Injuries collection (read-only for all authenticated users)
+
+    match /injuries/{injuryId} {
+
+      allow read: if isAuthenticated();
+
+      // Only admins can write (handle via Firebase Admin SDK)
+
+      allow write: if false;
+
+    }
+
+    
+
+    // Tests collection (read-only for all authenticated users)
+
+    match /tests/{testId} {
+
+      allow read: if isAuthenticated();
+
+      // Only admins can write (handle via Firebase Admin SDK)
+
+      allow write: if false;
+
+    }
+
+    
+
+    // Phases collection (read-only for all authenticated users)
+
+    match /phases/{phaseId} {
+
+      allow read: if isAuthenticated();
+
+      // Only admins can write (handle via Firebase Admin SDK)
+
+      allow write: if false;
+
+    }
+
+  }
+
+}

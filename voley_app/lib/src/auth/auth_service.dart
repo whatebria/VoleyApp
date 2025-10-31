@@ -1,33 +1,67 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:voley_app/src/models/user.dart' as app_user;
 
 class AuthService {
+  // --- Definiciones de las instancias ---
   final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance; // <-- ARREGLO 1
 
-  Future<String?> register(String email, String password) async {
+  // --- Método de Registro ---
+  Future<String?> register(
+    String email,
+    String password,
+    String name,
+    app_user.UserRole role,
+  ) async {
     try {
-      await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      // 1. Crear usuario en Firebase Auth
+      final userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      // 2. Crear el objeto de usuario para Firestore
+      final user = app_user.User(
+        id: userCredential.user!.uid, // Usar el UID de Auth
+        email: email,
+        name: name,
+        role: role,
+        createdAt: DateTime.now(),
+      );
+
+      // 3. Guardar el usuario en la colección 'users' de Firestore
+      await _firestore.collection('users').doc(user.id).set(user.toJson());
+
       return "success";
     } on FirebaseAuthException catch (e) {
+      // 4. Manejo de errores de REGISTRO (eran de login)
       switch (e.code) {
         case 'email-already-in-use':
-          return "Este correo ya está registrado.";
-        case 'invalid-email':
-          return "El formato del correo no es válido.";
+          return "El correo ya está en uso.";
         case 'weak-password':
-          return "La contraseña debe tener al menos 6 caracteres.";
+          return "Contraseña muy débil.";
+        case 'invalid-email':
+          return "Correo no válido.";
         default:
-          return "Error desconocido: ${e.message}";
+          return "Error: ${e.message}";
       }
     } catch (e) {
       return "Error: $e";
     }
   }
 
+  // --- Método de Login (separado) ---
   Future<String?> login(String email, String password) async {
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      // Iniciar sesión con Auth
+      await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
       return "success";
     } on FirebaseAuthException catch (e) {
+      // Manejo de errores de LOGIN
       switch (e.code) {
         case 'user-not-found':
           return "No existe una cuenta con este correo.";
@@ -43,5 +77,8 @@ class AuthService {
     }
   }
 
-  Future<void> logout() async => await _auth.signOut();
+  // --- Método de Logout (separado) ---
+  Future<void> logout() async {
+    await _auth.signOut();
+  }
 }
