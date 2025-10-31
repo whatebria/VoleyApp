@@ -1,10 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:voley_app/src/models/player_profile/availability.dart';
 import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
 
 class PlayerProfile {
   final String id;
+  final String? userId; // Link to User document
   final String name;
   final String position;
   final String level; // "recreativo", "competitivo", "semiprofesional"
@@ -16,6 +16,7 @@ class PlayerProfile {
 
   PlayerProfile({
     required this.id,
+    this.userId,
     required this.name,
     required this.position,
     required this.level,
@@ -28,6 +29,7 @@ class PlayerProfile {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'userId': userId,
         'name': name,
         'position': position,
         'level': level,
@@ -40,6 +42,7 @@ class PlayerProfile {
 
   static PlayerProfile fromJson(Map<String, dynamic> json) => PlayerProfile(
         id: json['id'],
+        userId: json['userId'],
         name: json['name'],
         position: json['position'],
         level: json['level'],

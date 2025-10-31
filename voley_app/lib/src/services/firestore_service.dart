@@ -24,6 +24,30 @@ class FirestoreService {
     return app_user.User.fromJson(doc.data()!);
   }
 
+  /// Create a new player user and automatically link with coach
+  Future<app_user.User> createPlayerWithCoachLink({
+    required String userId,
+    required String email,
+    required String name,
+    required String coachId,
+  }) async {
+    // Create user document
+    final user = app_user.User(
+      id: userId,
+      email: email,
+      name: name,
+      role: app_user.UserRole.player,
+      createdAt: DateTime.now(),
+    );
+
+    await _db.collection('users').doc(user.id).set(user.toJson());
+
+    // Create permission link with coach
+    await createPermission(coachId: coachId, playerId: userId);
+
+    return user;
+  }
+
   Future<List<app_user.User>> getAllCoaches() async {
     final snap = await _db
         .collection('users')
