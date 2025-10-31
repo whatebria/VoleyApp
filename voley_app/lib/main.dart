@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:voley_app/src/auth/auth_wrapper.dart';
 import 'package:voley_app/src/screens/auth/login_screen.dart';
 import 'package:voley_app/src/screens/auth/register_screen.dart';
+import 'package:voley_app/src/screens/home_screen.dart';
 import 'package:voley_app/src/screens/onboarding/evaluation_screen.dart';
 import 'package:voley_app/src/screens/generate_program_screen.dart';
 import 'package:voley_app/src/screens/program_view_screen.dart';
@@ -34,6 +35,7 @@ class MyApp extends StatelessWidget {
         '/': (c) => const AuthWrapper(),
         '/login': (c) => const LoginScreen(),
         '/register': (c) => const RegisterScreen(),
+        '/home': (c) => const HomeScreen(),
         '/evaluation': (c) => EvaluationScreen(),
         '/generate': (c) => GenerateProgramScreen(),
         '/program': (c) => ProgramViewScreen(),
