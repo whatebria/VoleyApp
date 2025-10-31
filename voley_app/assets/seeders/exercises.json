@@ -1,0 +1,755 @@
+[
+    {
+        "id": "ex_001",
+        "name": "Sentadilla con Salto (Squat Jump)",
+        "tags": [
+            "salto",
+            "explosivo",
+            "pliometria baja",
+            "fuerza general",
+            "rodilla"
+        ],
+        "level": "principiante",
+        "category": "Pliometría",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [
+            "dolor de rodilla agudo"
+        ],
+        "description": "Realiza una sentadilla y explota hacia arriba en un salto vertical."
+    },
+    {
+        "id": "ex_002",
+        "name": "Salto al Cajón (Box Jump)",
+        "tags": [
+            "salto",
+            "explosivo",
+            "pliometria alta"
+        ],
+        "level": "intermedio",
+        "category": "Pliometría",
+        "videoUrl": "",
+        "equipment": [
+            "cajón"
+        ],
+        "contraindicatedFor": [
+            "dolor de rodilla",
+            "poca movilidad de cadera"
+        ],
+        "description": "Salta con ambos pies sobre un cajón, aterrizando suavemente en posición de sentadilla."
+    },
+    {
+        "id": "ex_003",
+        "name": "Sentadilla Goblet",
+        "tags": [
+            "fuerza",
+            "fuerza general",
+            "rodilla",
+            "estabilidad",
+            "core"
+        ],
+        "level": "principiante",
+        "category": "Fuerza Tren Inferior",
+        "videoUrl": "",
+        "equipment": [
+            "mancuerna",
+            "kettlebell"
+        ],
+        "contraindicatedFor": [],
+        "description": "Sostén una mancuerna verticalmente contra tu pecho y realiza una sentadilla profunda."
+    },
+    {
+        "id": "ex_004",
+        "name": "Sentadilla con Barra (Trasera)",
+        "tags": [
+            "fuerza",
+            "fuerza general"
+        ],
+        "level": "avanzado",
+        "category": "Fuerza Tren Inferior",
+        "videoUrl": "",
+        "equipment": [
+            "barra"
+        ],
+        "contraindicatedFor": [
+            "dolor de espalda baja",
+            "lesión de hombro"
+        ],
+        "description": "Sentadilla profunda con una barra apoyada en los trapecios."
+    },
+    {
+        "id": "ex_005",
+        "name": "Peso Muerto Rumano (RDL)",
+        "tags": [
+            "fuerza",
+            "estabilidad",
+            "fuerza general"
+        ],
+        "level": "intermedio",
+        "category": "Fuerza Tren Inferior",
+        "videoUrl": "",
+        "equipment": [
+            "mancuerna",
+            "barra"
+        ],
+        "contraindicatedFor": [
+            "dolor de espalda baja"
+        ],
+        "description": "Flexión de cadera con rodillas semi-rígidas, enfocada en los isquiotibiales."
+    },
+    {
+        "id": "ex_006",
+        "name": "Plancha (Plank)",
+        "tags": [
+            "core",
+            "estabilidad",
+            "fuerza general"
+        ],
+        "level": "principiante",
+        "category": "Core",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [],
+        "description": "Mantén una línea recta desde los hombros hasta los talones, contrayendo el abdomen."
+    },
+    {
+        "id": "ex_007",
+        "name": "Press Pallof",
+        "tags": [
+            "core",
+            "estabilidad",
+            "anti-rotación"
+        ],
+        "level": "intermedio",
+        "category": "Core",
+        "videoUrl": "",
+        "equipment": [
+            "banda elástica",
+            "polea"
+        ],
+        "contraindicatedFor": [],
+        "description": "Resiste la rotación de una banda elástica o polea extendiendo los brazos al frente."
+    },
+    {
+        "id": "ex_008",
+        "name": "Estocadas con Salto (Lunge Jumps)",
+        "tags": [
+            "salto",
+            "explosivo",
+            "pliometria alta",
+            "rodilla"
+        ],
+        "level": "avanzado",
+        "category": "Pliometría",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [
+            "dolor de rodilla"
+        ],
+        "description": "Alterna las piernas en el aire en un salto explosivo desde una posición de estocada."
+    },
+    {
+        "id": "ex_009",
+        "name": "Rotaciones Externas (Hombro)",
+        "tags": [
+            "hombro",
+            "movilidad",
+            "prevención"
+        ],
+        "level": "principiante",
+        "category": "Movilidad y Prevención",
+        "videoUrl": "",
+        "equipment": [
+            "banda elástica"
+        ],
+        "contraindicatedFor": [],
+        "description": "Con el codo a 90 grados, rota el hombro hacia afuera contra una leve resistencia."
+    },
+    {
+        "id": "ex_010",
+        "name": "Face Pulls",
+        "tags": [
+            "hombro",
+            "movilidad",
+            "prevención",
+            "fuerza"
+        ],
+        "level": "principiante",
+        "category": "Movilidad y Prevención",
+        "videoUrl": "",
+        "equipment": [
+            "banda elástica",
+            "polea"
+        ],
+        "contraindicatedFor": [],
+        "description": "Tira de una banda o cuerda hacia tu cara, separando las manos y rotando los hombros."
+    },
+    {
+        "id": "ex_011",
+        "name": "Salto Amplio (Broad Jump)",
+        "tags": [
+            "salto",
+            "explosivo",
+            "pliometria baja",
+            "velocidad"
+        ],
+        "level": "principiante",
+        "category": "Pliometría",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [],
+        "description": "Salta tan lejos como puedas hacia adelante, aterrizando suavemente."
+    },
+    {
+        "id": "ex_012",
+        "name": "Estocada (Lunge) Estática",
+        "tags": [
+            "fuerza",
+            "fuerza general",
+            "rodilla",
+            "estabilidad"
+        ],
+        "level": "principiante",
+        "category": "Fuerza Tren Inferior",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight",
+            "mancuerna"
+        ],
+        "contraindicatedFor": [],
+        "description": "Da un paso adelante y baja la rodilla trasera hacia el suelo, manteniendo el equilibrio."
+    },
+    {
+        "id": "ex_013",
+        "name": "Press de Hombro (Overhead Press)",
+        "tags": [
+            "fuerza",
+            "hombro",
+            "estabilidad",
+            "core"
+        ],
+        "level": "intermedio",
+        "category": "Fuerza Tren Superior",
+        "videoUrl": "",
+        "equipment": [
+            "mancuerna",
+            "barra"
+        ],
+        "contraindicatedFor": [
+            "lesión de hombro",
+            "dolor de espalda baja"
+        ],
+        "description": "Empuja el peso desde los hombros hasta por encima de la cabeza, manteniendo el core apretado."
+    },
+    {
+        "id": "ex_014",
+        "name": "Remo con Mancuerna (a una mano)",
+        "tags": [
+            "fuerza",
+            "fuerza general",
+            "estabilidad"
+        ],
+        "level": "intermedio",
+        "category": "Fuerza Tren Superior",
+        "videoUrl": "",
+        "equipment": [
+            "mancuerna",
+            "banco"
+        ],
+        "contraindicatedFor": [],
+        "description": "Con una rodilla y mano en el banco, rema una mancuerna pesada hacia tu cadera."
+    },
+    {
+        "id": "ex_015",
+        "name": "Bird-Dog",
+        "tags": [
+            "core",
+            "estabilidad",
+            "movilidad",
+            "prevención"
+        ],
+        "level": "principiante",
+        "category": "Core",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [],
+        "description": "En posición de cuatro patas, extiende brazo y pierna opuestos, manteniendo la pelvis estable."
+    },
+    {
+        "id": "ex_016",
+        "name": "Skater Jumps (Saltos de patinador)",
+        "tags": [
+            "salto",
+            "explosivo",
+            "pliometria baja",
+            "velocidad",
+            "agilidad"
+        ],
+        "level": "intermedio",
+        "category": "Pliometría",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [],
+        "description": "Salta de lado a lado, aterrizando en un solo pie y manteniendo el equilibrio."
+    },
+    {
+        "id": "ex_017",
+        "name": "Push-ups (Flexiones)",
+        "tags": [
+            "fuerza",
+            "fuerza general",
+            "hombro",
+            "core"
+        ],
+        "level": "principiante",
+        "category": "Fuerza Tren Superior",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [
+            "lesión de muñeca",
+            "lesión de hombro"
+        ],
+        "description": "Baja el pecho hacia el suelo manteniendo el cuerpo recto y el core apretado."
+    },
+    {
+        "id": "ex_018",
+        "name": "Sentadilla Búlgara",
+        "tags": [
+            "fuerza",
+            "rodilla",
+            "estabilidad"
+        ],
+        "level": "intermedio",
+        "category": "Fuerza Tren Inferior",
+        "videoUrl": "",
+        "equipment": [
+            "mancuerna",
+            "banco"
+        ],
+        "contraindicatedFor": [
+            "dolor de rodilla agudo"
+        ],
+        "description": "Sentadilla a una pierna con el pie trasero elevado en un banco."
+    },
+    {
+        "id": "ex_019",
+        "name": "Plancha Lateral (Side Plank)",
+        "tags": [
+            "core",
+            "estabilidad"
+        ],
+        "level": "principiante",
+        "category": "Core",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [],
+        "description": "Sostén el cuerpo lateralmente apoyado en un antebrazo, manteniendo la cadera elevada."
+    },
+    {
+        "id": "ex_020",
+        "name": "Dominadas (Pull-ups)",
+        "tags": [
+            "fuerza",
+            "fuerza general"
+        ],
+        "level": "avanzado",
+        "category": "Fuerza Tren Superior",
+        "videoUrl": "",
+        "equipment": [
+            "barra",
+            "banda elástica"
+        ],
+        "contraindicatedFor": [
+            "lesión de hombro"
+        ],
+        "description": "Suspéndete de una barra y jala tu cuerpo hasta que la barbilla supere la barra."
+    },
+    {
+        "id": "ex_021",
+        "name": "Gato-Vaca (Cat-Cow)",
+        "tags": [
+            "movilidad",
+            "prevención",
+            "espalda"
+        ],
+        "level": "principiante",
+        "category": "Movilidad y Prevención",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [],
+        "description": "Moviliza la columna vertebral arqueando y redondeando la espalda."
+    },
+    {
+        "id": "ex_022",
+        "name": "Puente de Glúteo (Glute Bridge)",
+        "tags": [
+            "fuerza",
+            "fuerza general",
+            "core",
+            "activación"
+        ],
+        "level": "principiante",
+        "category": "Fuerza Tren Inferior",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [
+            "dolor de espalda baja agudo"
+        ],
+        "description": "Eleva la cadera del suelo apretando los glúteos."
+    },
+    {
+        "id": "ex_023",
+        "name": "Salto Vertical (Max Vertical Jump)",
+        "tags": [
+            "salto",
+            "explosivo",
+            "pliometria alta",
+            "velocidad"
+        ],
+        "level": "intermedio",
+        "category": "Pliometría",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [],
+        "description": "Salta tan alto como puedas, enfocándote en la altura máxima."
+    },
+    {
+        "id": "ex_024",
+        "name": "Lanzamiento de Balón Medicinal (Sobre cabeza)",
+        "tags": [
+            "explosivo",
+            "hombro",
+            "core",
+            "velocidad"
+        ],
+        "level": "intermedio",
+        "category": "Fuerza Tren Superior",
+        "videoUrl": "",
+        "equipment": [
+            "balón medicinal"
+        ],
+        "contraindicatedFor": [
+            "lesión de hombro"
+        ],
+        "description": "Lanza un balón medicinal explosivamente contra el suelo o una pared."
+    },
+    {
+        "id": "ex_025",
+        "name": "Movilidad 90/90 (Cadera)",
+        "tags": [
+            "movilidad",
+            "cadera",
+            "prevención"
+        ],
+        "level": "principiante",
+        "category": "Movilidad y Prevención",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [],
+        "description": "Sentado, rota internamente y externamente las caderas para mejorar el rango."
+    },
+    {
+        "id": "ex_026",
+        "name": "Salto de Profundidad (Depth Jump)",
+        "tags": [
+            "salto",
+            "explosivo",
+            "pliometria alta"
+        ],
+        "level": "avanzado",
+        "category": "Pliometría",
+        "videoUrl": "",
+        "equipment": [
+            "cajón"
+        ],
+        "contraindicatedFor": [
+            "dolor de rodilla",
+            "tendinitis"
+        ],
+        "description": "Baja de un cajón e inmediatamente salta verticalmente lo más alto posible."
+    },
+    {
+        "id": "ex_027",
+        "name": "Sentadilla Frontal (Front Squat)",
+        "tags": [
+            "fuerza",
+            "core",
+            "estabilidad",
+            "rodilla"
+        ],
+        "level": "avanzado",
+        "category": "Fuerza Tren Inferior",
+        "videoUrl": "",
+        "equipment": [
+            "barra"
+        ],
+        "contraindicatedFor": [
+            "dolor de muñeca",
+            "poca movilidad dorsal"
+        ],
+        "description": "Sentadilla con la barra apoyada en los deltoides frontales, requiere un core fuerte."
+    },
+    {
+        "id": "ex_028",
+        "name": "Dead Bug",
+        "tags": [
+            "core",
+            "estabilidad",
+            "prevención",
+            "fuerza general"
+        ],
+        "level": "principiante",
+        "category": "Core",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [],
+        "description": "Boca arriba, extiende brazo y pierna opuestos sin que la espalda baja se arquee."
+    },
+    {
+        "id": "ex_029",
+        "name": "Activación de Serrato (Wall Slides)",
+        "tags": [
+            "hombro",
+            "movilidad",
+            "prevención"
+        ],
+        "level": "principiante",
+        "category": "Movilidad y Prevención",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [],
+        "description": "Desliza los antebrazos por una pared activando el serrato anterior."
+    },
+    {
+        "id": "ex_030",
+        "name": "Remo Invertido (Inverted Row)",
+        "tags": [
+            "fuerza",
+            "fuerza general"
+        ],
+        "level": "intermedio",
+        "category": "Fuerza Tren Superior",
+        "videoUrl": "",
+        "equipment": [
+            "barra",
+            "TRX"
+        ],
+        "contraindicatedFor": [],
+        "description": "Colgado bajo una barra, rema tu pecho hacia la barra. Una regresión de la dominada."
+    },
+    {
+        "id": "ex_031",
+        "name": "Step-Up Explosivo",
+        "tags": [
+            "fuerza",
+            "explosivo",
+            "rodilla",
+            "salto"
+        ],
+        "level": "intermedio",
+        "category": "Fuerza Tren Inferior",
+        "videoUrl": "",
+        "equipment": [
+            "cajón",
+            "mancuerna"
+        ],
+        "contraindicatedFor": [],
+        "description": "Sube a un cajón de forma explosiva, llevando la rodilla opuesta hacia arriba."
+    },
+    {
+        "id": "ex_032",
+        "name": "Movilidad de Tobillo (en pared)",
+        "tags": [
+            "movilidad",
+            "rodilla",
+            "prevención",
+            "tobillo"
+        ],
+        "level": "principiante",
+        "category": "Movilidad y Prevención",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [],
+        "description": "Intenta tocar la pared con la rodilla sin levantar el talón del suelo."
+    },
+    {
+        "id": "ex_033",
+        "name": "Elevación de Piernas (Colgado)",
+        "tags": [
+            "core",
+            "fuerza"
+        ],
+        "level": "intermedio",
+        "category": "Core",
+        "videoUrl": "",
+        "equipment": [
+            "barra"
+        ],
+        "contraindicatedFor": [
+            "dolor de espalda baja"
+        ],
+        "description": "Colgado de una barra, eleva las piernas (rectas o flexionadas) hacia el pecho."
+    },
+    {
+        "id": "ex_034",
+        "name": "Nordic Curls (Asistido)",
+        "tags": [
+            "fuerza",
+            "prevención",
+            "rodilla"
+        ],
+        "level": "avanzado",
+        "category": "Fuerza Tren Inferior",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight",
+            "banda elástica"
+        ],
+        "contraindicatedFor": [
+            "lesión de isquiotibiales reciente"
+        ],
+        "description": "Ejercicio excéntrico de isquiotibiales. Baja el torso controladamente."
+    },
+    {
+        "id": "ex_035",
+        "name": "Pogo Hops (Saltos de tobillo)",
+        "tags": [
+            "salto",
+            "pliometria baja",
+            "velocidad"
+        ],
+        "level": "principiante",
+        "category": "Pliometría",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [
+            "tendinitis aquilea"
+        ],
+        "description": "Saltos rápidos y cortos usando principalmente los tobillos, minimizando la flexión de rodilla."
+    },
+    {
+        "id": "ex_036",
+        "name": "World's Greatest Stretch (WGS)",
+        "tags": [
+            "movilidad",
+            "general",
+            "cadera",
+            "espalda"
+        ],
+        "level": "intermedio",
+        "category": "Movilidad y Prevención",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [],
+        "description": "Estiramiento dinámico que combina una estocada profunda con rotación torácica."
+    },
+    {
+        "id": "ex_037",
+        "name": "Fondos (Dips) en banco",
+        "tags": [
+            "fuerza",
+            "fuerza general"
+        ],
+        "level": "principiante",
+        "category": "Fuerza Tren Superior",
+        "videoUrl": "",
+        "equipment": [
+            "banco"
+        ],
+        "contraindicatedFor": [
+            "lesión de hombro"
+        ],
+        "description": "Flexión de codos apoyando las manos en un banco, trabajando tríceps y pecho."
+    },
+    {
+        "id": "ex_038",
+        "name": "Salto a una pierna (Single Leg Hop)",
+        "tags": [
+            "salto",
+            "explosivo",
+            "pliometria baja",
+            "estabilidad",
+            "rodilla"
+        ],
+        "level": "intermedio",
+        "category": "Pliometría",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [
+            "dolor de rodilla"
+        ],
+        "description": "Salta y aterriza en el mismo pie, enfocándote en la estabilidad."
+    },
+    {
+        "id": "ex_039",
+        "name": "Rueda Abdominal (Ab Wheel)",
+        "tags": [
+            "core",
+            "estabilidad",
+            "anti-extensión"
+        ],
+        "level": "avanzado",
+        "category": "Core",
+        "videoUrl": "",
+        "equipment": [
+            "rueda ab"
+        ],
+        "contraindicatedFor": [
+            "dolor de espalda baja"
+        ],
+        "description": "Rueda hacia adelante sin dejar que la espalda baja se arquee."
+    },
+    {
+        "id": "ex_040",
+        "name": "Sentadilla Isométrica (Wall Sit)",
+        "tags": [
+            "fuerza",
+            "estabilidad",
+            "rodilla"
+        ],
+        "level": "principiante",
+        "category": "Fuerza Tren Inferior",
+        "videoUrl": "",
+        "equipment": [
+            "bodyweight"
+        ],
+        "contraindicatedFor": [],
+        "description": "Sostén una posición de sentadilla a 90 grados apoyado en una pared."
+    }
+]
