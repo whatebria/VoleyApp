@@ -14,7 +14,15 @@ class EvaluationScreen extends ConsumerStatefulWidget {
 
 class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
   final nameCtrl = TextEditingController();
+  final positionCtrl = TextEditingController();
+  final levelCtrl = TextEditingController();
+  final testScoreCtrl = TextEditingController();
+  final tournamentCtrl = TextEditingController();
   final uuid = Uuid();
+
+  String selectedPosition = 'Central';
+  String selectedLevel = 'Competitivo';
+  List<String> selectedDays = [];
 
   @override
   Widget build(BuildContext context) {
@@ -24,21 +32,90 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
         padding: const EdgeInsets.all(12.0),
         child: Column(children: [
           TextField(controller: nameCtrl, decoration: InputDecoration(labelText: 'Nombre')),
-          // aquí agregarías campos complejos para tests, nivel, posición, disponibilidad, torneos...
+          DropdownButtonFormField<String>(
+            value: selectedPosition,
+            items: ['Central', 'Libero', 'Punta', 'Opuesto'].map((String value) {
+              return DropdownMenuItem<String>(
+                value: value,
+                child: Text(value),
+              );
+            }).toList(),
+            onChanged: (newValue) {
+              setState(() {
+                selectedPosition = newValue!;
+              });
+            },
+            decoration: InputDecoration(labelText: 'Posición'),
+          ),
+          DropdownButtonFormField<String>(
+            value: selectedLevel,
+            items: ['Competitivo', 'Recreativo'].map((String value) {
+              return DropdownMenuItem<String>(
+                value: value,
+                child: Text(value),
+              );
+            }).toList(),
+            onChanged: (newValue) {
+              setState(() {
+                selectedLevel = newValue!;
+              });
+            },
+            decoration: InputDecoration(labelText: 'Nivel'),
+          ),
+          CheckboxListTile(
+            title: const Text('Lunes'),
+            value: selectedDays.contains('Lunes'),
+            onChanged: (bool? value) {
+              setState(() {
+                if (value == true) {
+                  selectedDays.add('Lunes');
+                } else {
+                  selectedDays.remove('Lunes');
+                }
+              });
+            },
+          ),
+          CheckboxListTile(
+            title: const Text('Miércoles'),
+            value: selectedDays.contains('Miércoles'),
+            onChanged: (bool? value) {
+              setState(() {
+                if (value == true) {
+                  selectedDays.add('Miércoles');
+                } else {
+                  selectedDays.remove('Miércoles');
+                }
+              });
+            },
+          ),
+          CheckboxListTile(
+            title: const Text('Viernes'),
+            value: selectedDays.contains('Viernes'),
+            onChanged: (bool? value) {
+              setState(() {
+                if (value == true) {
+                  selectedDays.add('Viernes');
+                } else {
+                  selectedDays.remove('Viernes');
+                }
+              });
+            },
+          ),
+          TextField(controller: tournamentCtrl, decoration: InputDecoration(labelText: 'Torneos')),
+          TextField(controller: testScoreCtrl, decoration: InputDecoration(labelText: 'Puntuación de Test')),
           const SizedBox(height: 12),
           ElevatedButton(
             onPressed: () {
-              // crear un profile demo rápido (reemplazar por inputs reales)
               final profile = PlayerProfile(
                 id: uuid.v4(),
                 name: nameCtrl.text.isEmpty ? 'Jugadora Demo' : nameCtrl.text,
-                position: 'Central',
-                level: 'Competitivo',
+                position: selectedPosition,
+                level: selectedLevel,
                 goals: ['salto', 'fuerza'],
                 injuries: [],
-                availability: Availability(trainingDays: ['Lunes', 'Miércoles', 'Viernes'], sessionMinutes: 90),
-                evaluation: EvaluationResult(testScores: {'salto': 34.0}, strengths: ['potencia'], weaknesses: ['resistencia']),
-                tournaments: [],
+                availability: Availability(trainingDays: selectedDays, sessionMinutes: 90),
+                evaluation: EvaluationResult(testScores: {'salto': double.tryParse(testScoreCtrl.text) ?? 0.0}, strengths: ['potencia'], weaknesses: ['resistencia']),
+                tournaments: tournamentCtrl.text.split(','),
               );
               ref.read(playerProfileProvider.notifier).state = profile;
               Navigator.pushNamed(context, '/generate');
