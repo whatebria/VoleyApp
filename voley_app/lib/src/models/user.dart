@@ -27,6 +27,8 @@ class User {
 
   final DateTime createdAt;
 
+  final List<int> testScores;
+
   User({
     required this.id,
 
@@ -37,6 +39,8 @@ class User {
     required this.role,
 
     required this.createdAt,
+
+    this.testScores = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -49,6 +53,7 @@ class User {
     'role': role.toJson(),
 
     'createdAt': Timestamp.fromDate(createdAt),
+    'testScores': testScores,
   };
 
   static User fromJson(Map<String, dynamic> json) {
@@ -62,6 +67,7 @@ class User {
       role: UserRole.fromJson(json['role'] as String),
 
       createdAt: (json['createdAt'] as Timestamp).toDate(),
+      testScores: List<int>.from(json['testScores'] ?? []),
     );
   }
 
