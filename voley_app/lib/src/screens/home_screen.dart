@@ -123,20 +123,19 @@ class HomeScreen extends ConsumerWidget {
                   _buildMenuCard(
                     context,
 
-                    icon: Icons.sports_volleyball,
+                    icon: Icons.person,
 
-                    title: 'Ejercicios',
+                    title: 'User Management',
 
-                    subtitle: 'Base de datos',
+                    subtitle: 'Manage users',
 
-                    color: Colors.purple,
+                    color: Colors.teal,
 
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Próximamente: Base de datos de ejercicios',
-                          ),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => UserManagementScreen(),
                         ),
                       );
                     },
