@@ -1,1 +1,43 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"voleyapp-77661","appId":"1:404732078035:android:5900663de485ea164ff126","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"voleyapp-77661","configurations":{"android":"1:404732078035:android:5900663de485ea164ff126","ios":"1:404732078035:ios:dfff5423e35a48df4ff126","macos":"1:404732078035:ios:dfff5423e35a48df4ff126","web":"1:404732078035:web:f556d772ae0b29034ff126","windows":"1:404732078035:web:63e4d3ac7425a4344ff126"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "voleyapp-77661",
+          "appId": "1:404732078035:android:5900663de485ea164ff126",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "voleyapp-77661",
+          "configurations": {
+            "android": "1:404732078035:android:5900663de485ea164ff126",
+            "ios": "1:404732078035:ios:dfff5423e35a48df4ff126",
+            "macos": "1:404732078035:ios:dfff5423e35a48df4ff126",
+            "web": "1:404732078035:web:f556d772ae0b29034ff126",
+            "windows": "1:404732078035:web:63e4d3ac7425a4344ff126"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ]
+}
