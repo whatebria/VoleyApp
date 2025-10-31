@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:voley_app/src/screens/admin/base/base_form_screen.dart';
-import 'package:voley_app/src/widgets/firestore_multi_selector.dart';
 
 class InjuryFormScreen extends BaseFormScreen {
   InjuryFormScreen({super.key, String? id, Map<String, dynamic>? existing})

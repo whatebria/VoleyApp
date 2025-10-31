@@ -5,6 +5,9 @@ import 'package:voley_app/src/models/athlete/athlete.dart';
 import 'package:voley_app/src/models/evaluation.dart';
 import 'package:voley_app/src/screens/admin/base/generic_list_screen.dart';
 import 'package:voley_app/src/screens/admin/evaluation_form_screen.dart';
+import 'package:voley_app/src/screens/admin/program_detail_screen.dart';
+import 'package:voley_app/src/screens/admin/program_form_screen.dart';
+import 'package:voley_app/src/widgets/generate_program_button.dart';
 // (Importa los formularios de Program y Session cuando los tengas)
 // import 'package:voley_app/src/screens/admin/forms/program_form_screen.dart';
 // import 'package:voley_app/src/screens/admin/forms/session_form_screen.dart';
@@ -15,7 +18,7 @@ class AthleteDetailScreen extends StatelessWidget {
 
   // Recibe el snapshot del atleta y lo parsea
   AthleteDetailScreen({super.key, required this.athleteDoc})
-      : athlete = Athlete.fromSnapshot(athleteDoc);
+    : athlete = Athlete.fromSnapshot(athleteDoc);
 
   @override
   Widget build(BuildContext context) {
@@ -30,8 +33,14 @@ class AthleteDetailScreen extends StatelessWidget {
         children: [
           // --- SECCIÓN DE INFORMACIÓN PERSONAL ---
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Text("Información Personal", style: Theme.of(context).textTheme.titleLarge),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
+            child: Text(
+              "Información Personal",
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.email),
@@ -58,17 +67,25 @@ class AthleteDetailScreen extends StatelessWidget {
             title: Text(athlete.level),
             subtitle: const Text("Nivel"),
           ),
-          
+
           // --- SECCIÓN DE PLANIFICACIÓN ---
           const Divider(),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Text("Planificación", style: Theme.of(context).textTheme.titleLarge),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
+            child: Text(
+              "Planificación",
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.calendar_view_week),
             title: Text("${athlete.availability.daysPerWeek} días por semana"),
-            subtitle: Text("Disponibilidad: ${athlete.availability.preferredDays.join(', ')}"),
+            subtitle: Text(
+              "Disponibilidad: ${athlete.availability.preferredDays.join(', ')}",
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.flag),
@@ -80,23 +97,35 @@ class AthleteDetailScreen extends StatelessWidget {
             title: Text(athlete.priority),
             subtitle: const Text("Prioridad Actual"),
           ),
-          
+
           // --- ESTADO ACTUAL ---
           const Divider(),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Text("Estado Actual", style: Theme.of(context).textTheme.titleLarge),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
+            child: Text(
+              "Estado Actual",
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.run_circle_outlined),
             title: Text(athlete.currentPhase),
-            subtitle: Text("Fase Actual (Programa: ${athlete.currentProgramId})"),
+            subtitle: Text(
+              "Fase Actual (Programa: ${athlete.currentProgramId})",
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.healing),
-            title: Text(athlete.injuries.isEmpty 
-              ? "Sin lesiones activas" 
-              : athlete.injuries.map((e) => "${e.type} (${e.status})").join(', ')),
+            title: Text(
+              athlete.injuries.isEmpty
+                  ? "Sin lesiones activas"
+                  : athlete.injuries
+                        .map((e) => "${e.type} (${e.status})")
+                        .join(', '),
+            ),
             subtitle: const Text("Lesiones"),
           ),
           if (athlete.hasTournamentSoon)
@@ -105,12 +134,18 @@ class AthleteDetailScreen extends StatelessWidget {
               title: const Text("Torneo Próximo"),
               subtitle: Text("Fecha: ${athlete.tournamentDate}"),
             ),
-          
+
           // --- NAVEGACIÓN A SUB-COLECCIONES ---
           const Divider(),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Text("Gestión", style: Theme.of(context).textTheme.titleLarge),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
+            child: Text(
+              "Gestión",
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ),
           ListTile(
             title: const Text("Gestionar Evaluaciones"),
@@ -124,10 +159,14 @@ class AthleteDetailScreen extends StatelessWidget {
                   fabLabel: "Nueva",
                   formBuilder: ({doc}) => EvaluationFormScreen(
                     collectionRef: evaluationsRef,
-                    evaluation: doc != null ? Evaluation.fromSnapshot(doc) : null,
+                    evaluation: doc != null
+                        ? Evaluation.fromSnapshot(doc)
+                        : null,
                   ),
-                  tileTitleBuilder: (data) => Text("Fecha: ${data['date'] ?? 'N/A'}"),
-                  tileSubtitleBuilder: (data) => Text("Prioridad: ${data['generatedPriority'] ?? 'N/A'}"),
+                  tileTitleBuilder: (data) =>
+                      Text("Fecha: ${data['date'] ?? 'N/A'}"),
+                  tileSubtitleBuilder: (data) =>
+                      Text("Prioridad: ${data['generatedPriority'] ?? 'N/A'}"),
                 ),
               ),
             ),
@@ -141,22 +180,34 @@ class AthleteDetailScreen extends StatelessWidget {
                 builder: (_) => GenericListScreen(
                   collectionRef: programsRef,
                   title: "Programas de ${athlete.name}",
-                  fabLabel: "Nuevo",
+                  fabLabel: "Programa",
                   formBuilder: ({doc}) {
-                    // DEBES CREAR ESTE FORMULARIO
-                    // return ProgramFormScreen(
-                    //   collectionRef: programsRef,
-                    //   program: doc != null ? Program.fromSnapshot(doc) : null,
-                    // );
-                    return const Scaffold(body: Center(child: Text("ProgramFormScreen no implementado")));
+                    // Puedes usar tu propio generador de programa automático
+                    // return GenerateProgramButton(athlete: athlete);
+                    // O, si prefieres crearlo manualmente:
+                    return ProgramFormScreen(
+                      id: doc?.id,
+                      existing: doc?.data() as Map<String, dynamic>?,
+                    );
                   },
-                  tileTitleBuilder: (data) => Text("Prioridad: ${data['priority'] ?? 'N/A'}"),
-                  tileSubtitleBuilder: (data) => Text("Estado: ${data['status'] ?? 'N/A'}"),
+                  tileTitleBuilder: (data) =>
+                      Text(data['name'] ?? 'Sin nombre'),
+                  tileSubtitleBuilder: (data) => Text(
+                    'Fase: ${data['phase'] ?? 'N/A'} | Foco: ${data['focus'] ?? 'N/A'}',
+                  ),
+                  onItemTap: (doc) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ProgramDetailScreen(programDoc: doc),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
           ),
-          
+
           ListTile(
             title: const Text("Sesiones"),
             trailing: const Icon(Icons.fitness_center),
@@ -173,10 +224,16 @@ class AthleteDetailScreen extends StatelessWidget {
                     //   collectionRef: sessionsRef,
                     //   session: doc != null ? Session.fromSnapshot(doc) : null,
                     // );
-                    return const Scaffold(body: Center(child: Text("SessionFormScreen no implementado")));
+                    return const Scaffold(
+                      body: Center(
+                        child: Text("SessionFormScreen no implementado"),
+                      ),
+                    );
                   },
-                  tileTitleBuilder: (data) => Text("Foco: ${data['focus'] ?? 'N/A'}"),
-                  tileSubtitleBuilder: (data) => Text("Fecha: ${data['date'] ?? 'N/A'}"),
+                  tileTitleBuilder: (data) =>
+                      Text("Foco: ${data['focus'] ?? 'N/A'}"),
+                  tileSubtitleBuilder: (data) =>
+                      Text("Fecha: ${data['date'] ?? 'N/A'}"),
                 ),
               ),
             ),
