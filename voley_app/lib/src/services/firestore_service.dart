@@ -234,6 +234,23 @@ class FirestoreService {
     return _db.collection('players').doc(profile.id).set(profile.toJson());
   }
 
+  Stream<Program?> getLatestProgramStream(String profileId) {
+    return _db
+        .collection('users')
+        .doc(profileId)
+        .collection('programs')
+        .orderBy('startDate', descending: true) // Obtener el más nuevo primero
+        .limit(1) // Solo queremos el último
+        .snapshots() // Escucha cambios en tiempo real
+        .map((snapshot) {
+      if (snapshot.docs.isEmpty) {
+        return null; // No hay programas
+      }
+      // Convierte el documento de Firestore al modelo Program
+      return Program.fromFirestore(snapshot.docs.first); 
+    });
+  }
+
   Future<PlayerProfile?> getPlayerProfile(String id) async {
     final doc = await _db.collection('players').doc(id).get();
     if (!doc.exists) return null;
