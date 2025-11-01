@@ -40,7 +40,6 @@ class Test {
     );
   }
 
-  /// Convierte un objeto Test a un Map<String, dynamic> para Firebase.
   Map<String, dynamic> toJson() {
     return {
       'name': name,

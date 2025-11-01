@@ -39,7 +39,6 @@ class Injury {
     );
   }
 
-  /// Convierte un objeto Injury a un Map<String, dynamic> para Firebase.
   Map<String, dynamic> toJson() {
     return {
       'name': name,

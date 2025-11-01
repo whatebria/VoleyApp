@@ -54,10 +54,10 @@ class Program {
   Program copyWith({String? id}) {
     return Program(
       id: id ?? this.id,
-      source: this.source,
-      startDate: this.startDate,
-      endDate: this.endDate,
-      mesocycles: this.mesocycles,
+      source: source,
+      startDate: startDate,
+      endDate: endDate,
+      mesocycles: mesocycles,
     );
   }
 }

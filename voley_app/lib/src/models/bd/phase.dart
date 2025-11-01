@@ -67,7 +67,6 @@ class Phase {
     );
   }
 
-  /// Convierte un objeto Phase a un Map<String, dynamic> para Firebase.
   Map<String, dynamic> toJson() {
     return {
       'name': name,

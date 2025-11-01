@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
 
 class GenerateProgramScreen extends ConsumerWidget {
+  const GenerateProgramScreen({super.key});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // 1. Ya no necesitamos 'exercisesAsync'

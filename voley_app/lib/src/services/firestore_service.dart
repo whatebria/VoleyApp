@@ -228,27 +228,69 @@ class FirestoreService {
     await _db.collection('coach_player_permissions').doc(permissionId).delete();
   }
 
-  // ========== Existing Player Profile Methods ==========
+  Future<List<Program>> getProgramsByPlayer(String playerId) async {
+    final snap = await _db
+        .collection('players')
+        .doc(playerId)
+        .collection('programs')
+        .orderBy('startDate', descending: true)
+        .get();
 
-  Future<void> savePlayerProfile(PlayerProfile profile) {
-    return _db.collection('players').doc(profile.id).set(profile.toJson());
+    return snap.docs.map((d) => Program.fromJson(d.data())).toList();
   }
 
+  Stream<List<Program>> getAllProgramsStream(String profileId) {
+    // IMPORTANTE: Esta lógica asume que tu `profileId` es el ID del *documento*
+    // en la colección 'users' (el UUID que generas), NO el Auth UID.
+    // Esto coincide con la lógica que vimos en tu 'EvaluationScreen'.
+    
+    return _db
+        .collection('users')
+        .doc(profileId)
+        .collection('programs')
+        .orderBy('startDate', descending: true) // Muestra los más nuevos primero
+        .snapshots() // Esto devuelve un Stream<QuerySnapshot>
+        .map((snapshot) {
+          // Convierte el QuerySnapshot en un List<Program>
+          return snapshot.docs
+              .map((doc) => Program.fromFirestore(doc)) // Usa el constructor que creamos
+              .toList();
+        });
+  }
+
+  // (Asegúrate de que también tienes este)
   Stream<Program?> getLatestProgramStream(String profileId) {
     return _db
         .collection('users')
         .doc(profileId)
         .collection('programs')
-        .orderBy('startDate', descending: true) // Obtener el más nuevo primero
-        .limit(1) // Solo queremos el último
-        .snapshots() // Escucha cambios en tiempo real
+        .orderBy('startDate', descending: true)
+        .limit(1)
+        .snapshots()
         .map((snapshot) {
       if (snapshot.docs.isEmpty) {
-        return null; // No hay programas
+        return null;
       }
-      // Convierte el documento de Firestore al modelo Program
-      return Program.fromFirestore(snapshot.docs.first); 
+      return Program.fromFirestore(snapshot.docs.first);
     });
+  }
+
+  Future<PlayerProfile?> getPlayerProfileByUserId(String userId) async {
+    final snap = await _db
+        .collection('players')
+        .where('userId', isEqualTo: userId)
+        .limit(1)
+        .get();
+
+    if (snap.docs.isEmpty) return null;
+
+    return PlayerProfile.fromJson(snap.docs.first.data());
+  }
+
+  // ========== Existing Player Profile Methods ==========
+
+  Future<void> savePlayerProfile(PlayerProfile profile) {
+    return _db.collection('players').doc(profile.id).set(profile.toJson());
   }
 
   Future<PlayerProfile?> getPlayerProfile(String id) async {
