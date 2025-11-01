@@ -266,6 +266,28 @@ class FirestoreService {
         .set(program.toJson());
   }
 
+  Future<List<Program>> getProgramsByPlayer(String playerId) async {
+    final snap = await _db
+        .collection('players')
+        .doc(playerId)
+        .collection('programs')
+        .orderBy('startDate', descending: true)
+        .get();
+    
+    return snap.docs.map((d) => Program.fromJson(d.data())).toList();
+  }
+
+  Future<PlayerProfile?> getPlayerProfileByUserId(String userId) async {
+    final snap = await _db
+        .collection('players')
+        .where('userId', isEqualTo: userId)
+        .limit(1)
+        .get();
+    
+    if (snap.docs.isEmpty) return null;
+    return PlayerProfile.fromJson(snap.docs.first.data());
+  }
+
   Future<List<Exercise>> getAllExercises() async {
     final snap = await _db.collection('exercises').get();
     return snap.docs.map((d) => Exercise.fromJson(d.data())).toList();

@@ -33,6 +33,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
   String selectedPosition = 'Central';
   String selectedLevel = 'Competitivo';
   List<String> selectedDays = [];
+  List<String> selectedInjuries = [];
   List<Tournament> _selectedTournaments = [];
 
   // User selection state
@@ -493,6 +494,64 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
             // --- FIN DE LA UI DE DISPONIBILIDAD MODIFICADA ---
             const SizedBox(height: 12),
 
+            // Card de Lesiones
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Lesiones',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8.0,
+                      runSpacing: 4.0,
+                      children: [
+                        'Rodilla',
+                        'Tobillo',
+                        'Hombro',
+                        'Espalda',
+                        'Muñeca',
+                        'Dedo',
+                        'Ninguna',
+                      ].map((injury) {
+                        final isSelected = selectedInjuries.contains(injury);
+                        return FilterChip(
+                          label: Text(injury),
+                          selected: isSelected,
+                          onSelected: (bool selected) {
+                            setState(() {
+                              if (injury == 'Ninguna') {
+                                // Si selecciona "Ninguna", limpiar todas las demás
+                                if (selected) {
+                                  selectedInjuries.clear();
+                                  selectedInjuries.add('Ninguna');
+                                } else {
+                                  selectedInjuries.remove('Ninguna');
+                                }
+                              } else {
+                                // Si selecciona otra lesión, quitar "Ninguna"
+                                selectedInjuries.remove('Ninguna');
+                                if (selected) {
+                                  selectedInjuries.add(injury);
+                                } else {
+                                  selectedInjuries.remove(injury);
+                                }
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
             // ... (Card de Torneos y Evaluación - sin cambios) ...
             Card(
               child: Padding(
@@ -683,7 +742,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
         position: selectedPosition,
         level: selectedLevel,
         goals: ['salto', 'fuerza'],
-        injuries: [],
+        injuries: selectedInjuries,
         availability: availability, // <-- USA EL OBJETO CREADO
         evaluation: EvaluationResult(
           testScores: {'salto': double.tryParse(testScoreCtrl.text) ?? 0.0},
