@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/src/models/user.dart';
+import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/services/firestore_service.dart';
 import 'package:voley_app/providers/auth_provider.dart';
+import 'package:intl/intl.dart';
 
 class UserManagementScreen extends ConsumerStatefulWidget {
   const UserManagementScreen({Key? key}) : super(key: key);
@@ -22,6 +24,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
   bool _isLoading = false;
   User? _currentUser;
   List<User> _linkedPlayers = [];
+  Map<String, PlayerProfile?> _playerProfiles = {};
 
   @override
   void initState() {
@@ -48,6 +51,12 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
       
       if (_currentUser != null && _currentUser!.isCoach) {
         _linkedPlayers = await _firestoreService.getPlayersByCoach(_currentUser!.id);
+        
+        // Fetch player profiles for each linked player
+        for (final player in _linkedPlayers) {
+          final profile = await _firestoreService.getPlayerProfileByUserId(player.id);
+          _playerProfiles[player.id] = profile;
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -299,28 +308,123 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                   ),
                 )
               else
-                ..._linkedPlayers.map((player) => Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.blue,
-                          child: Text(
-                            player.name[0].toUpperCase(),
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
-                        title: Text(player.name),
-                        subtitle: Text(player.email),
-                        trailing: Icon(
-                          Icons.check_circle,
-                          color: Colors.green,
+                ..._linkedPlayers.map((player) {
+                  final profile = _playerProfiles[player.id];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    elevation: 2,
+                    child: ExpansionTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.blue,
+                        child: Text(
+                          player.name[0].toUpperCase(),
+                          style: const TextStyle(color: Colors.white),
                         ),
                       ),
-                    )),
+                      title: Text(
+                        player.name,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text(player.email),
+                      trailing: const Icon(Icons.expand_more),
+                      children: [
+                        if (profile == null)
+                          const Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Text(
+                              'No hay perfil de jugador disponible. Realiza una evaluación primero.',
+                              style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+                            ),
+                          )
+                        else
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildInfoRow(Icons.sports_volleyball, 'Posición', profile.position),
+                                const SizedBox(height: 8),
+                                _buildInfoRow(Icons.bar_chart, 'Nivel', profile.level),
+                                const SizedBox(height: 8),
+                                _buildInfoRow(
+                                  Icons.healing,
+                                  'Lesiones',
+                                  profile.injuries.isEmpty
+                                      ? 'Ninguna'
+                                      : profile.injuries.join(', '),
+                                ),
+                                const SizedBox(height: 8),
+                                _buildInfoRow(
+                                  Icons.calendar_today,
+                                  'Días de Entrenamiento',
+                                  profile.availability.trainingDays.isEmpty
+                                      ? 'No especificado'
+                                      : profile.availability.trainingDays.join(', '),
+                                ),
+                                const SizedBox(height: 8),
+                                _buildInfoRow(
+                                  Icons.timer,
+                                  'Duración de Sesión',
+                                  '${profile.availability.sessionMinutes} minutos',
+                                ),
+                                const SizedBox(height: 8),
+                                if (profile.tournaments.isNotEmpty) ...[
+                                  const Divider(),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: const [
+                                      Icon(Icons.emoji_events, size: 20, color: Colors.orange),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Torneos:',
+                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ...profile.tournaments.map((tournament) => Padding(
+                                        padding: const EdgeInsets.only(left: 28, bottom: 4),
+                                        child: Text(
+                                          '• ${tournament.name} - ${DateFormat('dd/MM/yyyy').format(tournament.date)}',
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      )),
+                                ],
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: Colors.blue),
+        const SizedBox(width: 8),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
+              children: [
+                TextSpan(
+                  text: '$label: ',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                TextSpan(text: value),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
