@@ -103,5 +103,15 @@ final explorerProgramsProvider = StreamProvider<List<Program>>((ref) async* {
   }
 });
 
+final selectedPlayerProfileProvider = FutureProvider<PlayerProfile?>((ref) async {
+  final selectedPlayer = ref.watch(explorerSelectedPlayerProvider);
+  if (selectedPlayer == null) {
+    return null; // Si no hay jugador, no hay perfil
+  }
+  // Observa el provider de firestore y obtiene el perfil
+  return ref.watch(firestoreProvider).getPlayerProfileByUserId(selectedPlayer.id);
+});
+
 /// Almacena el programa (Program) que el coach selecciona en el 2do Dropdown.
 final explorerSelectedProgramProvider = StateProvider<Program?>((ref) => null);
+final isGeneratingProgramProvider = StateProvider<bool>((ref) => false);

@@ -1,34 +1,29 @@
 // lib/screens/evaluation_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:voley_app/providers/evaluation_provider.dart'; // <-- ¡EL NUEVO PROVIDER!
 import 'package:voley_app/providers/providers.dart';
-import 'package:voley_app/providers/auth_provider.dart';
-import 'package:voley_app/src/models/player_profile/availability.dart';
-import 'package:voley_app/src/models/player_profile/player_profile.dart';
-import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
 import 'package:voley_app/src/models/user.dart' as app_user;
-import 'package:voley_app/src/screens/program_editor_screen.dart';
-import 'package:voley_app/src/services/firestore_service.dart';
-import 'package:voley_app/src/auth/auth_service.dart';
-import 'package:uuid/uuid.dart';
+import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:intl/intl.dart';
 
 class EvaluationScreen extends ConsumerStatefulWidget {
+  const EvaluationScreen({super.key});
+
   @override
   ConsumerState<EvaluationScreen> createState() => _EvaluationScreenState();
 }
 
 class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
-  // Controladores
+  // Estado de la UI: El Stepper
+  int _currentStep = 0;
+
+  // Controladores de formulario (Estado efímero, se queda en la UI)
+  final _formKey = GlobalKey<FormState>();
   final nameCtrl = TextEditingController();
   final emailCtrl = TextEditingController();
   final passwordCtrl = TextEditingController();
-  final uuid = Uuid();
-
-  // Instancias de servicios
-  late final FirestoreService _firestoreService;
-  late final AuthService _authService;
 
   // Estado del formulario
   String selectedPosition = 'Central';
@@ -36,8 +31,10 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
   List<Tournament> _selectedTournaments = [];
   List<String> selectedInjuries = [];
   Map<String, double> _testScores = {};
+  List<String> selectedDays = [];
+  int _selectedDurationMinutes = 60;
 
-  // Estado de Disponibilidad
+  // Listas de opciones
   final List<String> _allDays = [
     'Lunes',
     'Martes',
@@ -47,7 +44,6 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
     'Sábado',
     'Domingo',
   ];
-  List<String> selectedDays = [];
   final Map<String, int> _durationOptions = {
     '30-45 minutos': 45,
     '45-60 minutos': 60,
@@ -55,24 +51,50 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
     '75-90 minutos': 90,
     '90+ minutos': 120,
   };
-  int _selectedDurationMinutes = 60;
 
-  // Estado de la pantalla
-  bool _isCreatingNewUser = true; // El Coach ve esto por defecto
-  app_user.User? _selectedUser;
-  PlayerProfile? _loadedProfile;
-  bool _isSubmitting = false;
-  String? _currentCoachId;
-  bool _profileLoaded = false; // Flag para evitar recargas
+  /// Rellena el formulario cuando se carga un perfil
+  void _populateForm(PlayerProfile? p) {
+    if (p == null) {
+      // Limpia el formulario (excepto datos de auth)
+      setState(() {
+        selectedPosition = 'Central';
+        selectedLevel = 'Competitivo';
+        selectedDays = [];
+        _selectedDurationMinutes = 60;
+        selectedInjuries = [];
+        _selectedTournaments = [];
+        _testScores = {};
+      });
+    } else {
+      // Rellena el formulario
+      setState(() {
+        nameCtrl.text = p.name;
+        selectedPosition = p.position;
+        selectedLevel = p.level.isNotEmpty
+            ? p.level[0].toUpperCase() + p.level.substring(1)
+            : 'Competitivo';
+        selectedDays = p.availability.trainingDays;
+        _selectedDurationMinutes = p.availability.sessionMinutes;
+        selectedInjuries = p.injuries.isEmpty ? ['Ninguna'] : p.injuries;
+        _selectedTournaments = p.tournaments;
+        _testScores = p.evaluation.testScores;
+      });
+    }
+  }
 
-  /// Getter para saber si estamos en modo edición (y bloquear campos)
-  bool get _isExistingUser => !_isCreatingNewUser && _selectedUser != null;
+  /// Limpia los campos de Auth (usado al cambiar de modo)
+  void _clearAuthFields() {
+    nameCtrl.clear();
+    emailCtrl.clear();
+    passwordCtrl.clear();
+  }
 
   @override
   void initState() {
     super.initState();
-    _firestoreService = ref.read(firestoreProvider);
-    _authService = ref.read(authServiceProvider);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(evaluationControllerProvider.notifier).init();
+    });
   }
 
   @override
@@ -83,78 +105,620 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
     super.dispose();
   }
 
-  void _clearForm() {
-    // Limpia los controladores
-    nameCtrl.clear();
-    emailCtrl.clear();
-    passwordCtrl.clear();
-    // Resetea el estado
-    setState(() {
-      selectedPosition = 'Central';
-      selectedLevel = 'Competitivo';
-      selectedDays = [];
-      _selectedDurationMinutes = 60;
-      selectedInjuries = [];
-      _selectedTournaments = [];
-      _testScores = {};
-      _loadedProfile = null;
-      _profileLoaded = false;
-    });
-  }
-
-  Future<void> _loadProfileForUser(String userId) async {
-    // Evita recargar si ya está cargado
-    if (_profileLoaded) return;
-
-    setState(() {
-      _isSubmitting = true;
-      _profileLoaded = true; // Marca que hemos intentado cargar
-    });
-
-    try {
-      final profile = await _firestoreService.getPlayerProfileByUserId(userId);
-      if (profile != null && mounted) {
-        final p = profile;
-        setState(() {
-          _loadedProfile = p; // Almacena el perfil cargado
-          // Rellena el formulario
-          nameCtrl.text = p.name;
-          selectedPosition = p.position;
-          selectedLevel = p.level.isNotEmpty
-              ? p.level[0].toUpperCase() + p.level.substring(1)
-              : 'Competitivo';
-          selectedDays = p.availability.trainingDays;
-          _selectedDurationMinutes = p.availability.sessionMinutes;
-          selectedInjuries = p.injuries;
-          _selectedTournaments = p.tournaments;
-          _testScores = p.evaluation.testScores;
-        });
-      }
-    } catch (e) {
-      _showError('Error al cargar perfil: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
+  void _showError(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
     }
   }
 
-  void _onUserSelected(app_user.User? user) {
-    setState(() {
-      _selectedUser = user;
-      _clearForm(); // Limpia todo
-
-      if (user != null) {
-        // Rellena los datos básicos
-        nameCtrl.text = user.name;
-        emailCtrl.text = user.email;
-        // Carga el resto
-        _loadProfileForUser(user.id);
-      }
-    });
+  void _showSuccess(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.green, // El verde de éxito suele estar bien
+        ),
+      );
+    }
   }
 
-  // ... (Diálogos _showAddTournamentDialog y _showAddTestDialog - sin cambios) ...
+  /// --- LÓGICA DE ENVÍO SIMPLIFICADA ---
+  /// Recoge los datos de la UI y los pasa al controlador
+  Future<void> _handleSubmit() async {
+    // Validación básica
+    if (_formKey.currentState?.validate() == false) return;
+
+    // Obtenemos la referencia al controlador
+    final controller = ref.read(evaluationControllerProvider.notifier);
+
+    // Llamamos al método del controlador con los datos locales
+    await controller.handleSubmit(
+      name: nameCtrl.text.trim(),
+      email: emailCtrl.text.trim(),
+      password: passwordCtrl.text.trim(),
+      position: selectedPosition,
+      level: selectedLevel,
+      injuries: selectedInjuries,
+      availabilityDays: selectedDays,
+      availabilityMinutes: _selectedDurationMinutes,
+      tournaments: _selectedTournaments,
+      testScores: _testScores,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // --- GESTIÓN DE ESTADO REACTIVA ---
+    final state = ref.watch(evaluationControllerProvider);
+    final controller = ref.read(evaluationControllerProvider.notifier);
+    final theme = Theme.of(context);
+
+    // Escucha los cambios de estado para acciones "de una sola vez"
+    ref.listen(evaluationControllerProvider, (previous, next) {
+      // 1. Mostrar Errores
+      if (next.errorMessage != null) {
+        _showError(next.errorMessage!);
+        controller.clearMessages(); // Limpia para no volver a mostrar
+      }
+
+      // 2. Mostrar Éxito
+      if (next.successMessage != null) {
+        _showSuccess(next.successMessage!);
+        controller.clearMessages();
+      }
+
+      // 3. Rellenar el formulario cuando 'loadedProfile' cambia
+      final oldProfile = previous?.loadedProfile.value;
+      final newProfile = next.loadedProfile.value;
+      if (oldProfile != newProfile) {
+        _populateForm(newProfile);
+      }
+
+      // 4. Rellenar/limpiar campos de auth cuando 'selectedUser' cambia
+      if (previous?.selectedUser != next.selectedUser) {
+        if (next.selectedUser != null) {
+          nameCtrl.text = next.selectedUser!.name;
+          emailCtrl.text = next.selectedUser!.email;
+        } else {
+          _clearAuthFields();
+        }
+      }
+    });
+
+    // Getter para saber si los campos están bloqueados
+    // Bloqueado si: El perfil está cargado (editando) Y NO es el coach
+    final isPlayerViewing = !(state.currentUser.valueOrNull?.isCoach ?? true);
+    final isFormLocked = (state.loadedProfile.value != null && isPlayerViewing);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Evaluación de Jugador'),
+        // Botón para limpiar formulario (solo para coach en modo 'crear')
+        actions: [
+          if (state.currentUser.valueOrNull?.isCoach == true &&
+              state.isCreatingNewUser)
+            IconButton(
+              icon: const Icon(Icons.clear_all),
+              tooltip: 'Limpiar Formulario',
+              onPressed: () {
+                _clearAuthFields();
+                _populateForm(null); // Limpia el resto
+              },
+            ),
+        ],
+      ),
+      body: state.currentUser.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, s) => Center(child: Text('Error al cargar usuario: $e')),
+        data: (currentUser) {
+          if (currentUser == null) {
+            return const Center(child: Text("Usuario no encontrado."));
+          }
+
+          // --- UI Principal: El Stepper ---
+          return Form(
+            key: _formKey,
+            child: Stepper(
+              type: StepperType.horizontal,
+              currentStep: _currentStep,
+              onStepTapped: (step) => setState(() => _currentStep = step),
+              onStepContinue: () {
+                if (_currentStep < 2) {
+                  setState(() => _currentStep += 1);
+                } else {
+                  // Estamos en el último paso, enviar
+                  _handleSubmit();
+                }
+              },
+              onStepCancel: () {
+                if (_currentStep > 0) {
+                  setState(() => _currentStep -= 1);
+                }
+              },
+              // --- Builder para los botones Siguiente/Atrás/Guardar ---
+              controlsBuilder: (context, details) {
+                final isLastStep = _currentStep == 2;
+                return Padding(
+                  padding: const EdgeInsets.only(top: 24.0),
+                  child: state.isSubmitting
+                      ? const Center(child: CircularProgressIndicator())
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            if (_currentStep > 0)
+                              TextButton.icon(
+                                icon: const Icon(Icons.arrow_back),
+                                label: const Text('Atrás'),
+                                onPressed: details.onStepCancel,
+                              ),
+                            const Spacer(),
+                            // Botón principal
+                            ElevatedButton.icon(
+                              icon: Icon(
+                                isLastStep ? Icons.save : Icons.arrow_forward,
+                              ),
+                              label: Text(isLastStep ? 'Guardar' : 'Siguiente'),
+                              onPressed: details.onStepContinue,
+                            ),
+                          ],
+                        ),
+                );
+              },
+              // --- CONTENIDO DE LOS PASOS ---
+              steps: [
+                _buildStep1Usuario(theme, state, controller, isPlayerViewing),
+                _buildStep2Perfil(theme, state, isFormLocked),
+                _buildStep3Evaluacion(
+                  theme,
+                  state,
+                  isPlayerViewing,
+                ), // Evaluación siempre editable
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// --- PASO 1: Selección de Usuario ---
+  Step _buildStep1Usuario(
+    ThemeData theme,
+    EvaluationState state,
+    EvaluationController controller,
+    bool isPlayerViewing,
+  ) {
+    return Step(
+      title: const Text('Usuario'),
+      isActive: _currentStep >= 0,
+      state: _currentStep > 0 ? StepState.complete : StepState.indexed,
+      content: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          children: [
+            if (!isPlayerViewing) ...[
+              // --- Selector de Modo (Solo Coach) ---
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(
+                    value: false,
+                    label: Text('Existente'),
+                    icon: Icon(Icons.person_search),
+                  ),
+                  ButtonSegment(
+                    value: true,
+                    label: Text('Crear Nuevo'),
+                    icon: Icon(Icons.person_add),
+                  ),
+                ],
+                selected: {state.isCreatingNewUser},
+                onSelectionChanged: (Set<bool> newSelection) {
+                  controller.setMode(newSelection.first);
+                },
+              ),
+              const SizedBox(height: 24),
+
+              // --- Opciones de Modo (Solo Coach) ---
+              if (state.isCreatingNewUser)
+                _buildCreateNewUserFields() // Campos para crear
+              else
+                _buildSelectExistingUser(state), // Dropdown para seleccionar
+            ] else ...[
+              // --- Vista para el Jugador ---
+              TextFormField(
+                controller: nameCtrl,
+                enabled: false,
+                decoration: const InputDecoration(labelText: 'Nombre'),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: emailCtrl,
+                enabled: false,
+                decoration: const InputDecoration(labelText: 'Email'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Campos para "Crear Nuevo" (Solo Coach)
+  Widget _buildCreateNewUserFields() {
+    return Column(
+      children: [
+        TextFormField(
+          controller: nameCtrl,
+          decoration: const InputDecoration(labelText: 'Nombre Completo *'),
+          validator: (value) =>
+              (value?.isEmpty ?? true) ? 'El nombre es requerido' : null,
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: emailCtrl,
+          decoration: const InputDecoration(labelText: 'Email *'),
+          keyboardType: TextInputType.emailAddress,
+          validator: (value) =>
+              (value?.isEmpty ?? true) ? 'El email es requerido' : null,
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: passwordCtrl,
+          decoration: const InputDecoration(labelText: 'Contraseña Temporal *'),
+          obscureText: true,
+          validator: (value) =>
+              (value?.isEmpty ?? true) ? 'La contraseña es requerida' : null,
+        ),
+      ],
+    );
+  }
+
+  /// Dropdown para "Usuario Existente" (Solo Coach)
+  Widget _buildSelectExistingUser(EvaluationState state) {
+    return state.availablePlayers.when(
+      loading: () => const CircularProgressIndicator(),
+      error: (e, s) => Text('Error al cargar jugadores: $e'),
+      data: (players) => DropdownButtonFormField<app_user.User>(
+        value: state.selectedUser,
+        decoration: const InputDecoration(labelText: 'Seleccionar Jugador'),
+        items: players
+            .map(
+              (user) => DropdownMenuItem(value: user, child: Text(user.name)),
+            )
+            .toList(),
+        onChanged: (user) =>
+            ref.read(evaluationControllerProvider.notifier).selectUser(user),
+        validator: (value) =>
+            value == null ? 'Debes seleccionar un jugador' : null,
+      ),
+    );
+  }
+
+  /// --- PASO 2: Perfil y Disponibilidad ---
+  Step _buildStep2Perfil(
+    ThemeData theme,
+    EvaluationState state,
+    bool isFormLocked,
+  ) {
+    // Un jugador no puede editar su propio nombre
+    final isPlayerEditingName = !state.currentUser.valueOrNull!.isCoach;
+
+    // El formulario de perfil está bloqueado si:
+    // 1. Es un jugador (no coach) Y
+    // 2. Ya tiene un perfil cargado
+    final bool isProfileFieldsLocked =
+        isPlayerEditingName && state.loadedProfile.value != null;
+
+    return Step(
+      title: const Text('Perfil'),
+      isActive: _currentStep >= 1,
+      state: _currentStep > 1 ? StepState.complete : StepState.indexed,
+      content: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Nombre (solo editable si es coach creando, o jugador sin perfil aún)
+            TextFormField(
+              controller: nameCtrl,
+              enabled: !isPlayerEditingName, // Jugador no edita su nombre
+              decoration: InputDecoration(
+                labelText: 'Nombre',
+                filled: isPlayerEditingName,
+                fillColor: isPlayerEditingName
+                    ? theme.colorScheme.surfaceVariant.withOpacity(0.5)
+                    : null,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // --- Posición ---
+            DropdownButtonFormField<String>(
+              value: selectedPosition,
+              decoration: InputDecoration(
+                labelText: 'Posición',
+                filled: isProfileFieldsLocked,
+                fillColor: isProfileFieldsLocked
+                    ? theme.colorScheme.surfaceVariant.withOpacity(0.5)
+                    : null,
+              ),
+              items: ['Central', 'Libero', 'Punta', 'Opuesto', 'Armadora']
+                  .map(
+                    (String value) => DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    ),
+                  )
+                  .toList(),
+              onChanged: isProfileFieldsLocked
+                  ? null
+                  : (newValue) {
+                      setState(() => selectedPosition = newValue!);
+                    },
+            ),
+            const SizedBox(height: 16),
+            // --- Nivel ---
+            DropdownButtonFormField<String>(
+              value: selectedLevel,
+              decoration: InputDecoration(
+                labelText: 'Nivel',
+                filled: isProfileFieldsLocked,
+                fillColor: isProfileFieldsLocked
+                    ? theme.colorScheme.surfaceVariant.withOpacity(0.5)
+                    : null,
+              ),
+              items: ['Competitivo', 'Recreativo']
+                  .map(
+                    (String value) => DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    ),
+                  )
+                  .toList(),
+              onChanged: isProfileFieldsLocked
+                  ? null
+                  : (newValue) {
+                      setState(() => selectedLevel = newValue!);
+                    },
+            ),
+            const SizedBox(height: 24),
+            // --- Disponibilidad ---
+            Text('Disponibilidad', style: theme.textTheme.titleMedium),
+            const Divider(),
+            Wrap(
+              spacing: 4.0,
+              runSpacing: 0.0,
+              children: _allDays
+                  .map(
+                    (day) => SizedBox(
+                      width: 160, // Acomoda 2 por fila
+                      child: CheckboxListTile(
+                        title: Text(day),
+                        value: selectedDays.contains(day),
+                        onChanged: isProfileFieldsLocked
+                            ? null
+                            : (bool? value) {
+                                setState(() {
+                                  if (value == true) {
+                                    selectedDays.add(day);
+                                  } else {
+                                    selectedDays.remove(day);
+                                  }
+                                });
+                              },
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<int>(
+              value: _selectedDurationMinutes,
+              decoration: InputDecoration(
+                labelText: 'Duración por Sesión',
+                filled: isProfileFieldsLocked,
+                fillColor: isProfileFieldsLocked
+                    ? theme.colorScheme.surfaceVariant.withOpacity(0.5)
+                    : null,
+              ),
+              items: _durationOptions.entries
+                  .map(
+                    (entry) => DropdownMenuItem<int>(
+                      value: entry.value,
+                      child: Text(entry.key),
+                    ),
+                  )
+                  .toList(),
+              onChanged: isProfileFieldsLocked
+                  ? null
+                  : (newValue) {
+                      if (newValue != null) {
+                        setState(() => _selectedDurationMinutes = newValue);
+                      }
+                    },
+            ),
+            const SizedBox(height: 24),
+            // --- Lesiones ---
+            Text('Lesiones', style: theme.textTheme.titleMedium),
+            const Divider(),
+            Wrap(
+              spacing: 8.0,
+              runSpacing: 4.0,
+              children:
+                  [
+                    'Rodilla',
+                    'Tobillo',
+                    'Hombro',
+                    'Espalda',
+                    'Muñeca',
+                    'Dedo',
+                    'Ninguna',
+                  ].map((injury) {
+                    return FilterChip(
+                      label: Text(injury),
+                      selected: selectedInjuries.contains(injury),
+                      onSelected: isProfileFieldsLocked
+                          ? null
+                          : (bool selected) {
+                              setState(() {
+                                if (injury == 'Ninguna') {
+                                  selectedInjuries.clear();
+                                  if (selected) selectedInjuries.add('Ninguna');
+                                } else {
+                                  selectedInjuries.remove('Ninguna');
+                                  if (selected) {
+                                    selectedInjuries.add(injury);
+                                  } else {
+                                    selectedInjuries.remove(injury);
+                                  }
+                                }
+                              });
+                            },
+                    );
+                  }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// --- PASO 3: Evaluación y Torneos ---
+  /// ¡ESTOS CAMPOS SIEMPRE SON EDITABLES! (Un coach actualiza tests, un jugador añade sus torneos)
+  Step _buildStep3Evaluacion(
+    ThemeData theme,
+    EvaluationState state,
+    bool isPlayerViewing,
+  ) {
+    // Los torneos NO son editables si ya se cargó un perfil (son históricos)
+    // PERO los tests SIEMPRE son editables.
+    final bool canEditTournaments = state.loadedProfile.value == null;
+
+    return Step(
+      title: const Text('Evaluación'),
+      isActive: _currentStep >= 2,
+      state: StepState.indexed,
+      content: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- Torneos ---
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Torneos', style: theme.textTheme.titleMedium),
+                IconButton(
+                  icon: Icon(
+                    Icons.add_circle,
+                    color: theme.colorScheme.secondary,
+                  ),
+                  tooltip: 'Añadir Torneo',
+                  // Solo habilitado si NO hay perfil cargado (o sea, es nuevo)
+                  onPressed: canEditTournaments
+                      ? _showAddTournamentDialog
+                      : null,
+                ),
+              ],
+            ),
+            const Divider(),
+            if (_selectedTournaments.isEmpty)
+              Text(
+                canEditTournaments
+                    ? 'Añade torneos jugados...'
+                    : 'Historial de torneos del jugador.',
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+              )
+            else
+              Wrap(
+                spacing: 8.0,
+                runSpacing: 4.0,
+                children: _selectedTournaments.map((tournament) {
+                  return Chip(
+                    label: Text(
+                      '${tournament.name} (${DateFormat('dd/MM/yy').format(tournament.date)})',
+                    ),
+                    deleteIcon: const Icon(Icons.cancel, size: 18),
+                    onDeleted: canEditTournaments
+                        ? () => setState(
+                            () => _selectedTournaments.remove(tournament),
+                          )
+                        : null,
+                  );
+                }).toList(),
+              ),
+            const SizedBox(height: 24),
+            // --- Puntuaciones de Test ---
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Puntuaciones de Test',
+                  style: theme.textTheme.titleMedium,
+                ),
+                IconButton(
+                  icon: Icon(
+                    Icons.add_circle_outline,
+                    color: theme.colorScheme.primary,
+                  ),
+                  tooltip: 'Añadir Test',
+                  onPressed: _showAddTestDialog, // ¡SIEMPRE HABILITADO!
+                ),
+              ],
+            ),
+            const Divider(),
+            if (_testScores.isEmpty)
+              Text(
+                'Añade puntuaciones (Ej: Salto Vertical).',
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+              )
+            else
+              ..._testScores.entries.map((entry) {
+                return ListTile(
+                  title: Text(entry.key),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        entry.value.toString(),
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.remove_circle_outline,
+                          color: theme.colorScheme.error,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _testScores.remove(entry.key);
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                );
+              }).toList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- Diálogos (Sin cambios, pero ahora bloquean campos si es necesario) ---
+  // (He añadido lógica de bloqueo a los onDeleted/onPressed de los widgets)
+
   Future<void> _showAddTournamentDialog() async {
     final nameController = TextEditingController();
     DateTime? pickedDate;
@@ -187,8 +751,8 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                       final date = await showDatePicker(
                         context: context,
                         initialDate: DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 730)),
+                        firstDate: DateTime(2010), // Histórico
+                        lastDate: DateTime.now(),
                       );
                       if (date != null) {
                         setDialogState(() {
@@ -231,20 +795,54 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
   Future<void> _showAddTestDialog() async {
     final nameController = TextEditingController();
     final scoreController = TextEditingController();
+
+    // Autocompletar con el nombre de un test existente para editarlo
+    String? existingTestToEdit;
+
     await showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Añadir Puntuación de Test'),
+          title: const Text('Añadir/Editar Puntuación'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre del Test (Ej: Salto Vertical)',
-                ),
-                autofocus: true,
+              // --- Autocompletar ---
+              Autocomplete<String>(
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  if (textEditingValue.text == '') {
+                    return _testScores.keys; // Sugiere tests existentes
+                  }
+                  return _testScores.keys.where((String option) {
+                    return option.toLowerCase().contains(
+                      textEditingValue.text.toLowerCase(),
+                    );
+                  });
+                },
+                onSelected: (String selection) {
+                  // Rellena ambos campos si se selecciona uno existente
+                  nameController.text = selection;
+                  scoreController.text = _testScores[selection].toString();
+                  existingTestToEdit = selection;
+                },
+                fieldViewBuilder:
+                    (
+                      context,
+                      textEditingController,
+                      focusNode,
+                      onFieldSubmitted,
+                    ) {
+                      nameController.text =
+                          textEditingController.text; // Sincroniza
+                      return TextField(
+                        controller: textEditingController,
+                        focusNode: focusNode,
+                        decoration: const InputDecoration(
+                          labelText: 'Nombre del Test (Ej: Salto Vertical)',
+                        ),
+                        autofocus: true,
+                      );
+                    },
               ),
               const SizedBox(height: 16),
               TextField(
@@ -268,671 +866,17 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                 final score = double.tryParse(scoreController.text);
                 if (nameController.text.isNotEmpty && score != null) {
                   setState(() {
-                    _testScores[nameController.text] = score;
+                    _testScores[nameController.text.trim()] =
+                        score; // Añade o sobrescribe
                   });
                   Navigator.pop(context);
                 }
               },
-              child: const Text('Añadir'),
+              child: Text(existingTestToEdit != null ? 'Actualizar' : 'Añadir'),
             ),
           ],
         );
       },
     );
-  }
-
-  void _showError(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Carga reactiva
-    final coachUserAsync = ref.watch(currentUserAppUserProvider);
-    final availablePlayersAsync = ref.watch(coachPlayersProvider);
-
-    final loadingOverlay = _isSubmitting
-        ? Container(
-            color: Colors.black.withOpacity(0.3),
-            child: const Center(child: CircularProgressIndicator()),
-          )
-        : const SizedBox.shrink();
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Evaluación Inicial')),
-      body: Stack(
-        children: [
-          // Espera a que el usuario (coach) esté cargado
-          coachUserAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, s) => Center(child: Text("Error al cargar usuario: $e")),
-            data: (currentUser) {
-              if (currentUser == null) {
-                return const Center(
-                  child: Text("No se pudo cargar el usuario."),
-                );
-              }
-
-              // --- LÓGICA DE ROL ---
-              if (currentUser.isCoach) {
-                // Es COACH
-                _currentCoachId = currentUser.id;
-                return availablePlayersAsync.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (e, s) =>
-                      Center(child: Text("Error al cargar jugadores: $e")),
-                  data: (players) =>
-                      _buildForm(context, players, isCoach: true),
-                );
-              } else {
-                // Es JUGADOR
-                _currentCoachId = currentUser.coachId; // ID del coach asignado
-
-                // Forzamos el modo "edición" para el jugador actual
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (!_profileLoaded && !_isSubmitting) {
-                    setState(() {
-                      _isCreatingNewUser = false;
-                      _selectedUser = currentUser;
-                    });
-                    _loadProfileForUser(currentUser.id);
-                  }
-                });
-
-                return _buildForm(context, [], isCoach: false);
-              }
-              // --- FIN LÓGICA DE ROL ---
-            },
-          ),
-          loadingOverlay,
-        ],
-      ),
-    );
-  }
-
-  /// --- WIDGET QUE CONSTRUYE EL FORMULARIO ---
-  Widget _buildForm(
-    BuildContext context,
-    List<app_user.User> availablePlayers, {
-    required bool isCoach,
-  }) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // --- ESTA SECCIÓN SOLO SE MUESTRA SI ES COACH ---
-          if (isCoach) ...[
-            // Card de Selección de Usuario
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Seleccionar Usuario',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SegmentedButton<bool>(
-                      segments: const [
-                        ButtonSegment(
-                          value: false,
-                          label: Text('Usuario Existente'),
-                          icon: Icon(Icons.person),
-                        ),
-                        ButtonSegment(
-                          value: true,
-                          label: Text('Crear Nuevo'),
-                          icon: Icon(Icons.person_add),
-                        ),
-                      ],
-                      selected: {_isCreatingNewUser},
-                      onSelectionChanged: (Set<bool> newSelection) {
-                        setState(() {
-                          _isCreatingNewUser = newSelection.first;
-                          _onUserSelected(null);
-                          passwordCtrl.clear();
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Campos de Usuario Existente/Nuevo (Solo para Coach)
-            if (!_isCreatingNewUser) ...[
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: DropdownButtonFormField<app_user.User>(
-                    value: _selectedUser,
-                    decoration: const InputDecoration(
-                      labelText: 'Jugador',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: availablePlayers.map((user) {
-                      return DropdownMenuItem<app_user.User>(
-                        value: user,
-                        child: Text(user.name),
-                      );
-                    }).toList(),
-                    onChanged: _onUserSelected, // Esto cargará el perfil
-                  ),
-                ),
-              ),
-            ] else ...[
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    children: [
-                      TextField(
-                        controller: emailCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Email *',
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: passwordCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Contraseña *',
-                          border: OutlineInputBorder(),
-                        ),
-                        obscureText: true,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-          ],
-          // --- FIN DE LA SECCIÓN SOLO PARA COACH ---
-
-          // Card de Datos del Jugador
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: nameCtrl,
-                    // Si es coach Y está creando, es editable.
-                    // Si es jugador, está bloqueado.
-                    enabled: isCoach && _isCreatingNewUser,
-                    decoration: InputDecoration(
-                      labelText: 'Nombre *',
-                      border: const OutlineInputBorder(),
-                      filled: !isCoach || _isExistingUser,
-                      fillColor: (!_isCreatingNewUser)
-                          ? Colors.grey[200]
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: selectedPosition,
-                    decoration: InputDecoration(
-                      labelText: 'Posición',
-                      border: const OutlineInputBorder(),
-                      filled: _isExistingUser || !isCoach,
-                      fillColor: (_isExistingUser || !isCoach)
-                          ? Colors.grey[200]
-                          : null,
-                    ),
-                    items: ['Central', 'Libero', 'Punta', 'Opuesto', 'Armadora']
-                        .map(
-                          (String value) => DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (_isExistingUser || !isCoach)
-                        ? null
-                        : (newValue) {
-                            // Bloqueado
-                            setState(() => selectedPosition = newValue!);
-                          },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: selectedLevel,
-                    decoration: InputDecoration(
-                      labelText: 'Nivel',
-                      border: const OutlineInputBorder(),
-                      filled: _isExistingUser || !isCoach,
-                      fillColor: (_isExistingUser || !isCoach)
-                          ? Colors.grey[200]
-                          : null,
-                    ),
-                    items: ['Competitivo', 'Recreativo']
-                        .map(
-                          (String value) => DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (_isExistingUser || !isCoach)
-                        ? null
-                        : (newValue) {
-                            // Bloqueado
-                            setState(() => selectedLevel = newValue!);
-                          },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Card de Disponibilidad
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Disponibilidad',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  ..._allDays.map(
-                    (day) => CheckboxListTile(
-                      title: Text(day),
-                      value: selectedDays.contains(day),
-                      onChanged: (_isExistingUser || !isCoach)
-                          ? null
-                          : (bool? value) {
-                              // Bloqueado
-                              setState(() {
-                                if (value == true) {
-                                  selectedDays.add(day);
-                                } else {
-                                  selectedDays.remove(day);
-                                }
-                              });
-                            },
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      controlAffinity: ListTileControlAffinity.leading,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<int>(
-                    value: _selectedDurationMinutes,
-                    decoration: InputDecoration(
-                      labelText: 'Duración por Sesión',
-                      border: const OutlineInputBorder(),
-                      filled: _isExistingUser || !isCoach,
-                      fillColor: (_isExistingUser || !isCoach)
-                          ? Colors.grey[200]
-                          : null,
-                    ),
-                    items: _durationOptions.entries
-                        .map(
-                          (entry) => DropdownMenuItem<int>(
-                            value: entry.value,
-                            child: Text(entry.key),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (_isExistingUser || !isCoach)
-                        ? null
-                        : (newValue) {
-                            // Bloqueado
-                            if (newValue != null) {
-                              setState(
-                                () => _selectedDurationMinutes = newValue,
-                              );
-                            }
-                          },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Card de Lesiones
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Lesiones',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8.0,
-                    runSpacing: 4.0,
-                    children:
-                        [
-                          'Rodilla',
-                          'Tobillo',
-                          'Hombro',
-                          'Espalda',
-                          'Muñeca',
-                          'Dedo',
-                          'Ninguna',
-                        ].map((injury) {
-                          final isSelected = selectedInjuries.contains(injury);
-                          return FilterChip(
-                            label: Text(injury),
-                            selected: isSelected,
-                            onSelected: (_isExistingUser || !isCoach)
-                                ? null
-                                : (bool selected) {
-                                    // Bloqueado
-                                    setState(() {
-                                      if (injury == 'Ninguna') {
-                                        if (selected) {
-                                          selectedInjuries.clear();
-                                          selectedInjuries.add('Ninguna');
-                                        } else {
-                                          selectedInjuries.remove('Ninguna');
-                                        }
-                                      } else {
-                                        selectedInjuries.remove('Ninguna');
-                                        if (selected) {
-                                          selectedInjuries.add(injury);
-                                        } else {
-                                          selectedInjuries.remove(injury);
-                                        }
-                                      }
-                                    });
-                                  },
-                          );
-                        }).toList(),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Card de Evaluación y Torneos
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Torneos',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle, color: Colors.blue),
-                        tooltip: 'Añadir Torneo',
-                        onPressed: (_isExistingUser || !isCoach)
-                            ? null
-                            : _showAddTournamentDialog, // Bloqueado
-                      ),
-                    ],
-                  ),
-                  _selectedTournaments.isEmpty
-                      ? Text(
-                          (_isExistingUser || !isCoach)
-                              ? 'Los torneos del jugador se muestran aquí.'
-                              : 'Añade torneos (solo para usuarios nuevos).',
-                          style: const TextStyle(color: Colors.grey),
-                        )
-                      : Wrap(
-                          spacing: 8.0,
-                          runSpacing: 4.0,
-                          children: _selectedTournaments.map((tournament) {
-                            return Chip(
-                              label: Text(
-                                '${tournament.name} (${DateFormat('dd/MM/yy').format(tournament.date)})',
-                              ),
-                              deleteIcon: const Icon(Icons.cancel, size: 18),
-                              onDeleted: (_isExistingUser || !isCoach)
-                                  ? null
-                                  : () {
-                                      // Bloqueado
-                                      setState(
-                                        () => _selectedTournaments.remove(
-                                          tournament,
-                                        ),
-                                      );
-                                    },
-                            );
-                          }).toList(),
-                        ),
-                  const Divider(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Puntuaciones de Test',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.add_circle_outline,
-                          color: Colors.green,
-                        ),
-                        tooltip: 'Añadir Test',
-                        onPressed: _showAddTestDialog, // ¡SIEMPRE HABILITADO!
-                      ),
-                    ],
-                  ),
-                  if (_testScores.isEmpty)
-                    const Text(
-                      'Añade puntuaciones de test presionando el botón "+".',
-                      style: TextStyle(color: Colors.grey),
-                    )
-                  else
-                    ..._testScores.entries.map((entry) {
-                      return ListTile(
-                        title: Text(entry.key),
-                        trailing: Text(entry.value.toString()),
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                      );
-                    }).toList(),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Botón de Envío
-          ElevatedButton(
-            onPressed: _isSubmitting ? null : _handleSubmit,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            child: _isSubmitting
-                ? const CircularProgressIndicator(color: Colors.white)
-                : Text(
-                    _isExistingUser
-                        ? 'Actualizar Tests y Generar'
-                        : 'Guardar y Generar Programa',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-          ),
-          const SizedBox(height: 10),
-          Text("--- O ---"),
-          const SizedBox(height: 10),
-
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.grey[700], // Color diferente
-            ),
-            // Solo se activa si es un USUARIO EXISTENTE
-            onPressed: (_isExistingUser && _loadedProfile != null)
-                ? () {
-                    // Navega a la nueva pantalla del editor
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            ProgramEditorScreen(profile: _loadedProfile!),
-                      ),
-                    );
-                  }
-                : null, // Desactivado si es un usuario nuevo
-            child: const Text('Crear Programa Manualmente'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// --- Método de Envío (con lógica de 'id' corregida) ---
-  Future<void> _handleSubmit() async {
-    // Validaciones
-    if (nameCtrl.text.trim().isEmpty) {
-      _showError('Por favor ingresa el nombre del jugador');
-      return;
-    }
-    if (_isCreatingNewUser &&
-        (emailCtrl.text.trim().isEmpty || passwordCtrl.text.trim().isEmpty)) {
-      _showError('Por favor completa email y contraseña');
-      return;
-    }
-    // Si no es coach Y no está creando, DEBE ser un jugador existente (para el modo Player)
-    // O si es coach Y no está creando, debe haber seleccionado un usuario.
-    if (!_isCreatingNewUser && _selectedUser == null) {
-      _showError('Por favor selecciona un usuario');
-      return;
-    }
-    if (_currentCoachId == null) {
-      // Si el jugador no tiene coach, _currentCoachId será null
-      // Asignamos un ID genérico o vacío si es un jugador sin coach
-      if (ref.read(currentUserAppUserProvider).value?.isPlayer ?? false) {
-        _currentCoachId = ""; // Un jugador puede no tener coach
-      } else {
-        _showError('Error: No se pudo identificar al entrenador');
-        return;
-      }
-    }
-
-    setState(() => _isSubmitting = true);
-
-    try {
-      PlayerProfile profileToSave;
-
-      final availability = Availability(
-        trainingDays: selectedDays,
-        sessionMinutes: _selectedDurationMinutes,
-      );
-
-      if (_isCreatingNewUser) {
-        // --- LÓGICA DE CREAR NUEVO USUARIO (Solo Coach) ---
-        final functions = ref.read(functionsProvider);
-        final callable = functions.httpsCallable('createPlayerAccount');
-        final result = await callable.call(<String, dynamic>{
-          'email': emailCtrl.text.trim(),
-          'password': passwordCtrl.text.trim(),
-          'name': nameCtrl.text.trim(),
-          'coachId': _currentCoachId!,
-        });
-
-        final userId = result.data['userId'];
-        if (userId == null) {
-          throw Exception('La Cloud Function no devolvió un userId.');
-        }
-
-        profileToSave = PlayerProfile(
-          id: uuid.v4(), // ID Nuevo
-          userId: userId, // El ID de Auth que devolvió la función
-          assignedCoachId: _currentCoachId!,
-          name: nameCtrl.text.trim(),
-          position: selectedPosition,
-          level: selectedLevel.toLowerCase(),
-          goals: ['salto', 'fuerza'],
-          injuries: selectedInjuries.contains('Ninguna')
-              ? []
-              : selectedInjuries,
-          availability: availability,
-          evaluation: EvaluationResult(
-            testScores: _testScores,
-            strengths: ['potencia'],
-            weaknesses: ['resistencia'],
-          ),
-          tournaments: _selectedTournaments,
-        );
-      } else {
-        // --- LÓGICA DE ACTUALIZAR (Coach) O CREAR/ACTUALIZAR (Jugador) ---
-
-        // _selectedUser no puede ser null aquí (validado arriba)
-
-        if (_loadedProfile != null) {
-          // A. ACTUALIZAR Perfil Existente (Coach o Jugador)
-          profileToSave = _loadedProfile!.copyWith(
-            // Solo actualizamos el mapa de 'testScores'
-            evaluation: _loadedProfile!.evaluation.copyWith(
-              testScores: _testScores,
-            ),
-          );
-        } else {
-          // B. CREAR Perfil por primera vez (Jugador)
-          profileToSave = PlayerProfile(
-            id: uuid.v4(), // ID Nuevo
-            userId: _selectedUser!.id, // ID del Jugador logueado
-            assignedCoachId: _currentCoachId!, // (puede ser "" si no tiene)
-            name: _selectedUser!.name, // (Nombre de su cuenta de usuario)
-            position: selectedPosition,
-            level: selectedLevel.toLowerCase(),
-            goals: ['salto', 'fuerza'],
-            injuries: selectedInjuries.contains('Ninguna')
-                ? []
-                : selectedInjuries,
-            availability: availability,
-            evaluation: EvaluationResult(
-              testScores: _testScores,
-              strengths: ['potencia'],
-              weaknesses: ['resistencia'],
-            ),
-            tournaments: _selectedTournaments,
-          );
-        }
-      }
-
-      // --- PASOS FINALES ---
-      await _firestoreService.savePlayerProfile(profileToSave);
-      ref.read(playerProfileProvider.notifier).state = profileToSave;
-
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Evaluación guardada exitosamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pushNamed(context, '/generate');
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-        _showError('Error al guardar: $e');
-      }
-    }
   }
 }
