@@ -226,6 +226,67 @@ function generateProgram(profile: PlayerProfile, allExercises: Exercise[]): Prog
 
 // --- 3. FUNCIÓN "Callable" (Punto de Entrada MODIFICADO) ---
 
+// --- FUNCIÓN PARA CREAR USUARIO SIN AFECTAR SESIÓN ACTUAL ---
+export const createPlayerUser = onCall(async (request) => {
+  const callerId = request.auth?.uid;
+  if (!callerId) {
+    throw new HttpsError("unauthenticated", "El usuario debe estar autenticado.");
+  }
+
+  const { email, password, name, coachId } = request.data;
+
+  if (!email || !password || !name || !coachId) {
+    throw new HttpsError("invalid-argument", "Faltan datos requeridos.");
+  }
+
+  try {
+    // Verificar que el caller es el coach
+    if (callerId !== coachId) {
+      throw new HttpsError("permission-denied", "Solo puedes crear usuarios para ti mismo.");
+    }
+
+    // Crear usuario en Firebase Auth usando Admin SDK
+    const userRecord = await admin.auth().createUser({
+      email: email,
+      password: password,
+      displayName: name,
+    });
+
+    // Crear documento en Firestore
+    const user = {
+      id: userRecord.uid,
+      email: email,
+      name: name,
+      role: "player",
+      createdAt: admin.firestore.Timestamp.now(),
+      coachId: coachId,
+      testScores: [],
+    };
+
+    await db.collection("users").doc(userRecord.uid).set(user);
+
+    // Crear permiso aceptado
+    const permission = {
+      id: `${coachId}_${userRecord.uid}`,
+      coachId: coachId,
+      playerId: userRecord.uid,
+      status: "accepted",
+      createdAt: admin.firestore.Timestamp.now(),
+      updatedAt: admin.firestore.Timestamp.now(),
+    };
+
+    await db.collection("coach_player_permissions").doc(permission.id).set(permission);
+
+    return { success: true, userId: userRecord.uid };
+  } catch (error: any) {
+    console.error("Error al crear usuario:", error);
+    if (error.code === "auth/email-already-exists") {
+      throw new HttpsError("already-exists", "El correo ya está en uso.");
+    }
+    throw new HttpsError("internal", "No se pudo crear el usuario.", error);
+  }
+});
+
 export const generateMyProgram = onCall(async (request) => {
   // 3a. Identificar al usuario que LLAMA (caller)
   const callerId = request.auth?.uid;

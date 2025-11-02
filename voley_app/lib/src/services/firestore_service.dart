@@ -321,6 +321,35 @@ class FirestoreService {
     return PlayerProfile.fromJson(snap.docs.first.data());
   }
 
+  /// Update an existing player profile
+  Future<void> updatePlayerProfile(PlayerProfile profile) async {
+    await _db.collection('players').doc(profile.id).update(profile.toJson());
+  }
+
+  /// Add a new test score to an existing player profile
+  Future<void> addTestScore(String profileId, String testName, double score) async {
+    final profile = await getPlayerProfile(profileId);
+    if (profile == null) return;
+
+    final updatedScores = Map<String, double>.from(profile.evaluation.testScores);
+    updatedScores[testName] = score;
+
+    await _db.collection('players').doc(profileId).update({
+      'evaluation.testScores': updatedScores,
+    });
+  }
+
+  /// Check if a user already has a player profile
+  Future<bool> hasPlayerProfile(String userId) async {
+    final snap = await _db
+        .collection('players')
+        .where('userId', isEqualTo: userId)
+        .limit(1)
+        .get();
+
+    return snap.docs.isNotEmpty;
+  }
+
   Future<List<Exercise>> getAllExercises() async {
     final snap = await _db.collection('exercises').get();
     return snap.docs.map((d) => Exercise.fromJson(d.data())).toList();

@@ -14,8 +14,16 @@ class AuthService {
     String name,
     app_user.UserRole role, {
     String? coachId,
+    bool keepCurrentSession = false,
   }) async {
+    User? currentUser;
+    
     try {
+      // Si queremos mantener la sesión actual (coach creando player)
+      if (keepCurrentSession) {
+        currentUser = _auth.currentUser;
+      }
+
       // 1. Crear usuario en Firebase Auth
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -49,6 +57,15 @@ class AuthService {
             .collection('coach_player_permissions')
             .doc(permission['id'] as String)
             .set(permission);
+      }
+
+      // 5. Si debemos mantener la sesión actual, cerrar sesión del nuevo usuario
+      // y volver a iniciar sesión con el usuario anterior
+      if (keepCurrentSession && currentUser != null) {
+        await _auth.signOut();
+        // Note: We can't directly sign back in without credentials
+        // The caller should handle re-authentication if needed
+        // For now, we'll just sign out the new user
       }
 
       return "success";
