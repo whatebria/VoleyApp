@@ -115,3 +115,47 @@ final selectedPlayerProfileProvider = FutureProvider<PlayerProfile?>((ref) async
 /// Almacena el programa (Program) que el coach selecciona en el 2do Dropdown.
 final explorerSelectedProgramProvider = StateProvider<Program?>((ref) => null);
 final isGeneratingProgramProvider = StateProvider<bool>((ref) => false);
+final isLoggingOutProvider = StateProvider<bool>((ref) => false);
+
+final ownProfileProvider = FutureProvider<PlayerProfile?>((ref) async {
+  
+  final appUser = await ref.watch(currentUserAppUserProvider.future);
+  if (appUser != null && !appUser.isCoach) {
+    return ref.read(firestoreProvider).getPlayerProfileByUserId(appUser.id);
+  } else {
+    // No es un jugador (o no está logueado): Retorna un perfil nulo
+    return null;
+  }
+});
+/// Clase auxiliar para agrupar un jugador con su perfil
+class PlayerWithProfile {
+  final app_user.User player;
+  final PlayerProfile? profile;
+  PlayerWithProfile(this.player, this.profile);
+}
+
+/// Provider para el estado de carga del formulario de creación
+final isCreatingPlayerProvider = StateProvider<bool>((ref) => false);
+
+/// --- MEJORA DE RENDIMIENTO (N+1) ---
+/// Este provider obtiene los jugadores del coach Y, en paralelo,
+/// busca el perfil de cada uno.
+final coachPlayersWithProfilesProvider = FutureProvider<List<PlayerWithProfile>>((ref) async {
+  final firestore = ref.read(firestoreProvider);
+  
+  // 1. Observa el stream de jugadores (de 'coachPlayersProvider')
+  //    Usamos .future para hacerlo 'awaitable'
+  final players = await ref.watch(coachPlayersProvider.future);
+  if (players.isEmpty) {
+    return []; // No hay jugadores, devuelve lista vacía
+  }
+
+  // 2. Crea una lista de Futuros (llamadas en paralelo)
+  final futures = players.map((player) async {
+    final profile = await firestore.getPlayerProfileByUserId(player.id);
+    return PlayerWithProfile(player, profile);
+  }).toList();
+
+  // 3. Espera a que TODOS los futuros se completen
+  return await Future.wait(futures);
+});

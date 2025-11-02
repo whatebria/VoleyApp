@@ -6,9 +6,12 @@ import 'package:voley_app/firebase_options.dart';
 import 'package:voley_app/src/auth/auth_wrapper.dart';
 import 'package:voley_app/src/auth/login_screen.dart';
 import 'package:voley_app/src/auth/register_screen.dart';
+import 'package:voley_app/src/screens/exercise_library_screen.dart';
 import 'package:voley_app/src/screens/generate_program_screen.dart';
-import 'package:voley_app/src/screens/onboarding/evaluation_screen.dart';
+import 'package:voley_app/src/screens/evaluation_screen.dart';
+import 'package:voley_app/src/screens/permissions/permission_management_screen.dart';
 import 'package:voley_app/src/screens/program_view_screen.dart';
+import 'package:voley_app/src/screens/user_management_screen.dart';
 import 'package:voley_app/theme/app_theme.dart';
 
 void main() async {
@@ -36,6 +39,9 @@ class MyApp extends StatelessWidget {
         '/evaluation': (c) => EvaluationScreen(),
         '/generate': (c) => GenerateProgramScreen(),
         '/program': (c) => ProgramViewScreen(),
+        '/permiso': (c) => PermissionManagementScreen(),
+        '/user_management': (c) => const UserManagementScreen(),
+        '/excercise_library': (c) => const ExerciseLibraryScreen(),
       },
     );
   }

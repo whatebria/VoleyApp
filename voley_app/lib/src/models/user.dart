@@ -109,3 +109,4 @@ class User {
 
   bool get isPlayer => role == UserRole.player;
 }
+
