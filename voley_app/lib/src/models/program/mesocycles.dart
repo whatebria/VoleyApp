@@ -1,15 +1,13 @@
-// En mesocycles.dart
-import 'package:voley_app/src/models/program/microcicle.dart';
+// lib/src/models/program/mesocycles.dart
+import 'package:voley_app/src/models/program/microcicle.dart'; // Ajusta el path
 
 class Mesocycle {
-  // (Tus campos)
   final String name;
   final int weeks;
   final String focus;
   final String progressionType;
   final List<Microcycle> microcycles;
 
-  // (Tu constructor)
   Mesocycle({
     required this.name,
     required this.weeks,
@@ -18,20 +16,19 @@ class Mesocycle {
     required this.microcycles,
   });
 
-  // --- AÑADE ESTE CONSTRUCTOR ---
+  // --- CONSTRUCTOR fromJson CORREGIDO Y SEGURO ---
   factory Mesocycle.fromJson(Map<String, dynamic> json) {
     return Mesocycle(
-      name: json['name'] ?? '',
-      weeks: json['weeks'] ?? 0,
-      focus: json['focus'] ?? '',
-      progressionType: json['progressionType'] ?? '',
+      name: json['name'] as String? ?? '', // <-- Seguro
+      weeks: json['weeks'] as int? ?? 0,
+      focus: json['focus'] as String? ?? '', // <-- Seguro
+      progressionType: json['progressionType'] as String? ?? '', // <-- Seguro
       microcycles: (json['microcycles'] as List<dynamic>? ?? [])
           .map((microJson) => Microcycle.fromJson(microJson as Map<String, dynamic>))
           .toList(),
     );
   }
 
-  // (Tu método toJson)
   Map<String, dynamic> toJson() => {
     'name': name,
     'weeks': weeks,

@@ -1,5 +1,4 @@
 // lib/src/models/program/workout_exercise.dart
-
 class WorkoutExercise {
   final String exerciseId;
   final String name;
@@ -15,7 +14,6 @@ class WorkoutExercise {
     required this.intensity,
   });
 
-  // Constructor fromJson (seguro contra nulos)
   factory WorkoutExercise.fromJson(Map<String, dynamic> json) {
     return WorkoutExercise(
       exerciseId: json['exerciseId'] as String? ?? '',
@@ -26,7 +24,6 @@ class WorkoutExercise {
     );
   }
 
-  // Método toJson
   Map<String, dynamic> toJson() => {
     'exerciseId': exerciseId,
     'name': name,
