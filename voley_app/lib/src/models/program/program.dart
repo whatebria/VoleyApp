@@ -21,14 +21,13 @@ class Program {
   factory Program.fromJson(Map<String, dynamic> json) {
     return Program(
       id: json['id'] as String? ?? '',
-      source: json['source'] as String? ?? 'Automático', // <-- Seguro
-      
-      // Maneja Timestamps nulos (aunque no debería pasar)
+      source: json['source'] as String? ?? 'Automático',
       startDate: (json['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
       endDate: (json['endDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      
       mesocycles: (json['mesocycles'] as List<dynamic>? ?? [])
-          .map((mesoJson) => Mesocycle.fromJson(mesoJson as Map<String, dynamic>))
+          .map(
+            (mesoJson) => Mesocycle.fromJson(mesoJson as Map<String, dynamic>),
+          )
           .toList(),
     );
   }
@@ -36,25 +35,25 @@ class Program {
   Map<String, dynamic> toJson() => {
     'id': id,
     'source': source,
-    'startDate': startDate,
-    'endDate': endDate,
+    'startDate': Timestamp.fromDate(startDate),
+    'endDate': Timestamp.fromDate(endDate),
     'mesocycles': mesocycles.map((m) => m.toJson()).toList(),
   };
 
   // Constructor fromFirestore (para leer el ID del documento)
   factory Program.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    return Program.fromJson(data).copyWith(id: doc.id); 
+    return Program.fromJson(data).copyWith(id: doc.id);
   }
 
   // Método auxiliar 'copyWith'
   Program copyWith({String? id}) {
     return Program(
       id: id ?? this.id,
-      source: this.source,
-      startDate: this.startDate,
-      endDate: this.endDate,
-      mesocycles: this.mesocycles,
+      source: source,
+      startDate: startDate,
+      endDate: endDate,
+      mesocycles: mesocycles,
     );
   }
 }
