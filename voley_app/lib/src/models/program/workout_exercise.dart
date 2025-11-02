@@ -15,14 +15,14 @@ class WorkoutExercise {
     required this.intensity,
   });
 
-  // Constructor fromJson
+  // Constructor fromJson (seguro contra nulos)
   factory WorkoutExercise.fromJson(Map<String, dynamic> json) {
     return WorkoutExercise(
-      exerciseId: json['exerciseId'] ?? '',
-      name: json['name'] ?? '',
-      sets: json['sets'] ?? 0,
-      reps: json['reps'] ?? '',
-      intensity: json['intensity'] ?? '',
+      exerciseId: json['exerciseId'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      sets: json['sets'] as int? ?? 0,
+      reps: json['reps'] as String? ?? '',
+      intensity: json['intensity'] as String? ?? '',
     );
   }
 

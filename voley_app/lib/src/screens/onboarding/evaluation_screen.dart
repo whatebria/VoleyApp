@@ -25,16 +25,39 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
   final positionCtrl = TextEditingController();
   final levelCtrl = TextEditingController();
   final testScoreCtrl = TextEditingController();
-  final sessionMinutesCtrl = TextEditingController(); // <-- 1. AÑADIDO
+  // final sessionMinutesCtrl = TextEditingController(); // <-- 1. ELIMINADO
   final uuid = Uuid();
   final _firestoreService = FirestoreService();
   final _authService = AuthService();
 
   String selectedPosition = 'Central';
   String selectedLevel = 'Competitivo';
-  List<String> selectedDays = [];
-  List<String> selectedInjuries = [];
   List<Tournament> _selectedTournaments = [];
+  List<String> selectedInjuries = [];
+
+  // --- 1. CAMBIOS EN DISPONIBILIDAD ---
+  final List<String> _allDays = [
+    'Lunes',
+    'Martes',
+    'Miércoles',
+    'Jueves',
+    'Viernes',
+    'Sábado',
+    'Domingo',
+  ];
+  List<String> selectedDays = [];
+
+  // Opciones para los rangos de duración (Texto amigable -> Valor en minutos)
+  final Map<String, int> _durationOptions = {
+    '30-45 minutos': 45,
+    '45-60 minutos': 60,
+    '60-75 minutos': 75,
+    '75-90 minutos': 90,
+    '90+ minutos': 120,
+  };
+  // Valor seleccionado (60 minutos por defecto)
+  int _selectedDurationMinutes = 60;
+  // --- FIN CAMBIOS EN DISPONIBILIDAD ---
 
   // User selection state
   bool _isCreatingNewUser = true;
@@ -46,7 +69,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
   @override
   void initState() {
     super.initState();
-    sessionMinutesCtrl.text = '60'; // <-- 2. AÑADIDO (valor por defecto)
+    // sessionMinutesCtrl.text = '60'; // <-- 2. ELIMINADO
     _loadCoachPlayers();
   }
 
@@ -58,7 +81,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
     positionCtrl.dispose();
     levelCtrl.dispose();
     testScoreCtrl.dispose();
-    sessionMinutesCtrl.dispose(); // <-- 3. AÑADIDO
+    // sessionMinutesCtrl.dispose(); // <-- 3. ELIMINADO
     super.dispose();
   }
 
@@ -74,13 +97,11 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
 
       _currentCoachId = currentFirebaseUser.uid;
 
-      // Get current user to verify they're a coach
       final currentUser = await _firestoreService.getUser(
         currentFirebaseUser.uid,
       );
 
       if (currentUser != null && currentUser.isCoach) {
-        // Load players linked to this coach
         _availablePlayers = await _firestoreService.getPlayersByCoach(
           currentFirebaseUser.uid,
         );
@@ -284,10 +305,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(user.name),
-
-                                ],
+                                children: [Text(user.name)],
                               ),
                             );
                           }).toList(),
@@ -335,6 +353,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
             ],
             const SizedBox(height: 16),
 
+            // ... (Card de Datos del Jugador - sin cambios) ...
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
@@ -360,6 +379,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
             ),
             const SizedBox(height: 12),
 
+            // ... (Card de Posición y Nivel - sin cambios) ...
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
@@ -373,19 +393,17 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                       ),
                       items:
                           [
-                                'Central',
-                                'Libero',
-                                'Punta',
-                                'Opuesto',
-                                'Armadora',
-                              ] // <-- AÑADIDO 'Armadora'
-                              .map((String value) {
-                                return DropdownMenuItem<String>(
-                                  value: value,
-                                  child: Text(value),
-                                );
-                              })
-                              .toList(),
+                            'Central',
+                            'Libero',
+                            'Punta',
+                            'Opuesto',
+                            'Armadora',
+                          ].map((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value),
+                            );
+                          }).toList(),
                       onChanged: (newValue) {
                         setState(() {
                           selectedPosition = newValue!;
@@ -394,7 +412,8 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: selectedLevel,
+                      // No uses 'initialValue' y 'value' juntos. 'value' es suficiente.
+                      value: selectedLevel,
                       decoration: const InputDecoration(
                         labelText: 'Nivel',
                         border: OutlineInputBorder(),
@@ -428,64 +447,60 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                       'Disponibilidad',
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
-                    CheckboxListTile(
-                      title: const Text('Lunes'),
-                      value: selectedDays.contains('Lunes'),
-                      onChanged: (bool? value) {
-                        setState(() {
-                          if (value == true) {
-                            selectedDays.add('Lunes');
-                          } else {
-                            selectedDays.remove('Lunes');
-                          }
-                        });
-                      },
-                    ),
-                    CheckboxListTile(
-                      title: const Text('Miércoles'),
-                      value: selectedDays.contains('Miércoles'),
-                      onChanged: (bool? value) {
-                        setState(() {
-                          if (value == true) {
-                            selectedDays.add('Miércoles');
-                          } else {
-                            selectedDays.remove('Miércoles');
-                          }
-                        });
-                      },
-                    ),
-                    CheckboxListTile(
-                      title: const Text('Viernes'),
-                      value: selectedDays.contains('Viernes'),
-                      onChanged: (bool? value) {
-                        setState(() {
-                          if (value == true) {
-                            selectedDays.add('Viernes');
-                          } else {
-                            selectedDays.remove('Viernes');
-                          }
-                        });
-                      },
-                    ),
-                    // --- CAMPO AÑADIDO ---
                     const SizedBox(height: 8),
-                    TextField(
-                      controller: sessionMinutesCtrl,
+                    // Checkbox para todos los días
+                    ..._allDays.map((day) {
+                      return CheckboxListTile(
+                        title: Text(day),
+                        value: selectedDays.contains(day),
+                        onChanged: (bool? value) {
+                          setState(() {
+                            if (value == true) {
+                              selectedDays.add(day);
+                            } else {
+                              selectedDays.remove(day);
+                            }
+                          });
+                        },
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                      );
+                    }).toList(),
+
+                    const SizedBox(height: 16),
+
+                    // Dropdown para los rangos de sesión
+                    DropdownButtonFormField<int>(
+                      value: _selectedDurationMinutes,
                       decoration: const InputDecoration(
-                        labelText: 'Duración de Sesión (minutos)',
+                        labelText: 'Duración por Sesión',
                         border: OutlineInputBorder(),
                       ),
-                      keyboardType: TextInputType.number,
+                      items: _durationOptions.entries.map((entry) {
+                        // entry.key = "45-60 minutos", entry.value = 60
+                        return DropdownMenuItem<int>(
+                          value: entry.value,
+                          child: Text(entry.key),
+                        );
+                      }).toList(),
+                      onChanged: (newValue) {
+                        if (newValue != null) {
+                          setState(() {
+                            _selectedDurationMinutes = newValue;
+                          });
+                        }
+                      },
                     ),
-                    // --- FIN DEL CAMPO AÑADIDO ---
                   ],
                 ),
               ),
             ),
 
+            // --- FIN DE LA UI DE DISPONIBILIDAD MODIFICADA ---
             const SizedBox(height: 12),
 
-            // Card de Lesiones
+            // ... (Card de Lesiones - sin cambios) ...
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
@@ -500,42 +515,43 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                     Wrap(
                       spacing: 8.0,
                       runSpacing: 4.0,
-                      children: [
-                        'Rodilla',
-                        'Tobillo',
-                        'Hombro',
-                        'Espalda',
-                        'Muñeca',
-                        'Dedo',
-                        'Ninguna',
-                      ].map((injury) {
-                        final isSelected = selectedInjuries.contains(injury);
-                        return FilterChip(
-                          label: Text(injury),
-                          selected: isSelected,
-                          onSelected: (bool selected) {
-                            setState(() {
-                              if (injury == 'Ninguna') {
-                                // Si selecciona "Ninguna", limpiar todas las demás
-                                if (selected) {
-                                  selectedInjuries.clear();
-                                  selectedInjuries.add('Ninguna');
-                                } else {
-                                  selectedInjuries.remove('Ninguna');
-                                }
-                              } else {
-                                // Si selecciona otra lesión, quitar "Ninguna"
-                                selectedInjuries.remove('Ninguna');
-                                if (selected) {
-                                  selectedInjuries.add(injury);
-                                } else {
-                                  selectedInjuries.remove(injury);
-                                }
-                              }
-                            });
-                          },
-                        );
-                      }).toList(),
+                      children:
+                          [
+                            'Rodilla',
+                            'Tobillo',
+                            'Hombro',
+                            'Espalda',
+                            'Muñeca',
+                            'Dedo',
+                            'Ninguna',
+                          ].map((injury) {
+                            final isSelected = selectedInjuries.contains(
+                              injury,
+                            );
+                            return FilterChip(
+                              label: Text(injury),
+                              selected: isSelected,
+                              onSelected: (bool selected) {
+                                setState(() {
+                                  if (injury == 'Ninguna') {
+                                    if (selected) {
+                                      selectedInjuries.clear();
+                                      selectedInjuries.add('Ninguna');
+                                    } else {
+                                      selectedInjuries.remove('Ninguna');
+                                    }
+                                  } else {
+                                    selectedInjuries.remove('Ninguna');
+                                    if (selected) {
+                                      selectedInjuries.add(injury);
+                                    } else {
+                                      selectedInjuries.remove(injury);
+                                    }
+                                  }
+                                });
+                              },
+                            );
+                          }).toList(),
                     ),
                   ],
                 ),
@@ -543,6 +559,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
             ),
             const SizedBox(height: 12),
 
+            // ... (Card de Evaluación y Torneos - sin cambios) ...
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
@@ -623,6 +640,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
   }
 
   Future<void> _handleSubmit() async {
+    // ... (Validaciones - sin cambios) ...
     if (nameCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -675,6 +693,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
       String userId;
 
       if (_isCreatingNewUser) {
+        // ... (Lógica de creación de usuario - sin cambios) ...
         final result = await _authService.register(
           emailCtrl.text.trim(),
           passwordCtrl.text.trim(),
@@ -709,33 +728,29 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
         userId = _selectedUser!.id;
       }
 
-      // --- 5. INICIO DE LA LÓGICA DE AVAILABILITY MODIFICADA ---
-
-      // Parsea los minutos del controlador. Usa 60 como fallback.
-      final int sessionMinutes = int.tryParse(sessionMinutesCtrl.text) ?? 60;
-
-      // Crea el objeto Availability
+      // --- 5. LÓGICA DE AVAILABILITY MODIFICADA ---
       final availability = Availability(
         trainingDays: selectedDays,
-        sessionMinutes: sessionMinutes,
+        sessionMinutes:
+            _selectedDurationMinutes, // <-- USA EL VALOR DEL DROPDOWN
       );
-
-      // --- FIN DE LA LÓGICA DE AVAILABILITY MODIFICADA ---
+      // --- FIN DE LA LÓGICA ---
 
       // Create player profile
       final profile = PlayerProfile(
         id: uuid.v4(),
         userId: userId,
         name: nameCtrl.text.trim(),
+        assignedCoachId: _currentCoachId!,
         position: selectedPosition,
-        level: selectedLevel,
-        goals: ['salto', 'fuerza'],
-        injuries: selectedInjuries,
+        level: selectedLevel.toLowerCase(), // Guardar en minúsculas
+        goals: ['salto', 'fuerza'], // (hardcoded, añade UI para esto)
+        injuries: selectedInjuries.contains('Ninguna') ? [] : selectedInjuries,
         availability: availability, // <-- USA EL OBJETO CREADO
         evaluation: EvaluationResult(
           testScores: {'salto': double.tryParse(testScoreCtrl.text) ?? 0.0},
-          strengths: ['potencia'],
-          weaknesses: ['resistencia'],
+          strengths: ['potencia'], // (hardcoded, añade UI para esto)
+          weaknesses: ['resistencia'], // (hardcoded, añade UI para esto)
         ),
         tournaments: _selectedTournaments,
       );

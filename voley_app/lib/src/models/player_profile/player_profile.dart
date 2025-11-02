@@ -6,6 +6,7 @@ class PlayerProfile {
   final String id;
   final String? userId; // Link to User document
   final String name;
+  final String assignedCoachId;
   final String position;
   final String level; // "recreativo", "competitivo", "semiprofesional"
   final List<String> goals;
@@ -18,19 +19,21 @@ class PlayerProfile {
     required this.id,
     this.userId,
     required this.name,
+    required this.assignedCoachId,
     required this.position,
     required this.level,
     required this.goals,
     required this.injuries,
     required this.availability,
     required this.evaluation,
-    required this.tournaments,
+    required this.tournaments, 
   });
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'userId': userId,
         'name': name,
+        'assignedCoachId': assignedCoachId,
         'position': position,
         'level': level,
         'goals': goals,
@@ -44,6 +47,7 @@ class PlayerProfile {
         id: json['id'],
         userId: json['userId'],
         name: json['name'],
+        assignedCoachId: json['assignedCoachId'],
         position: json['position'],
         level: json['level'],
         goals: List<String>.from(json['goals'] ?? []),
