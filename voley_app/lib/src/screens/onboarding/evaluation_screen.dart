@@ -286,13 +286,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(user.name),
-                                  Text(
-                                    user.email,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
+
                                 ],
                               ),
                             );
@@ -341,7 +335,6 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
             ],
             const SizedBox(height: 16),
 
-            // ... (Card de Datos del Jugador - sin cambios) ...
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
@@ -367,7 +360,6 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
             ),
             const SizedBox(height: 12),
 
-            // ... (Card de Posición y Nivel - sin cambios) ...
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
@@ -491,7 +483,6 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
               ),
             ),
 
-            // --- FIN DE LA UI DE DISPONIBILIDAD MODIFICADA ---
             const SizedBox(height: 12),
 
             // Card de Lesiones
@@ -552,7 +543,6 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
             ),
             const SizedBox(height: 12),
 
-            // ... (Card de Torneos y Evaluación - sin cambios) ...
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
@@ -633,7 +623,6 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
   }
 
   Future<void> _handleSubmit() async {
-    // ... (Validaciones - sin cambios) ...
     if (nameCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -686,7 +675,6 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
       String userId;
 
       if (_isCreatingNewUser) {
-        // ... (Lógica de creación de usuario - sin cambios) ...
         final result = await _authService.register(
           emailCtrl.text.trim(),
           passwordCtrl.text.trim(),

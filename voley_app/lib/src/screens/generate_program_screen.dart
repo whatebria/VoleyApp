@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
 
 class GenerateProgramScreen extends ConsumerWidget {
+  const GenerateProgramScreen({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 1. Ya no necesitamos 'exercisesAsync'
+    // 1. Solo necesitamos el perfil y la acción
     final profile = ref.watch(playerProfileProvider);
     final generateAction = ref.read(programGeneratorAction);
 
@@ -14,11 +16,7 @@ class GenerateProgramScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Generador Automático')),
       body: Center(
         child: profile == null
-            // 2. Si no hay perfil, mostramos el error
-            ? Text('Por favor completa la evaluación primero')
-            
-            // 3. Si hay perfil, mostramos el botón. 
-            //    Ya no necesitamos el .when() de 'exercisesAsync'
+            ? const Text('Por favor completa la evaluación primero')
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -26,7 +24,7 @@ class GenerateProgramScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   ElevatedButton(
                     onPressed: () async {
-                      // Muestra un indicador de carga
+                      // Muestra un indicador de carga MIENTRAS se dispara la función
                       showDialog(
                         context: context,
                         barrierDismissible: false,
@@ -35,24 +33,26 @@ class GenerateProgramScreen extends ConsumerWidget {
                       );
 
                       try {
-                        // 4. Llama a la acción SÓLO con el perfil
-                        //    La Cloud Function se encarga del resto.
+                        // 2. Llama a la Cloud Function SÓLO con el perfil
+                        //    No se pasan ejercicios.
                         await generateAction(profile);
 
                         // Cierra el indicador de carga
-                        Navigator.pop(context); 
+                        if (context.mounted) Navigator.pop(context); 
                         
-                        // 5. Navega a la pantalla del programa.
-                        //    El StreamProvider se encargará de mostrar la carga.
-                        Navigator.pushNamed(context, '/program');
+                        // 3. Navega a la pantalla del programa.
+                        //    El StreamProvider se encargará de mostrar la carga allí.
+                        if (context.mounted) Navigator.pushNamed(context, '/program');
 
                       } catch (e) {
                          // Cierra el indicador de carga
-                        Navigator.pop(context); 
+                        if (context.mounted) Navigator.pop(context); 
                         // Muestra un error si la Cloud Function falló
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error al generar: $e')),
-                        );
+                        if (context.mounted) {
+                           ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error al generar: $e')),
+                          );
+                        }
                       }
                     },
                     child: const Text('Generar'),

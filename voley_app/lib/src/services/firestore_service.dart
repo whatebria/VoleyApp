@@ -4,15 +4,10 @@ import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/bd/exercise.dart';
 import 'package:voley_app/src/models/program/program.dart';
 import 'package:voley_app/src/models/user.dart' as app_user;
-
 import 'package:voley_app/src/models/coach_player_permission.dart';
-
-import 'package:uuid/uuid.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-
-  final _uuid = const Uuid();
 
   // ========== User Methods ==========
 
@@ -93,7 +88,9 @@ class FirestoreService {
 
       createdAt: DateTime.now(),
 
-      updatedAt: initialStatus != PermissionStatus.pending ? DateTime.now() : null,
+      updatedAt: initialStatus != PermissionStatus.pending
+          ? DateTime.now()
+          : null,
     );
 
     await _db
@@ -239,9 +236,7 @@ class FirestoreService {
 
   /// Update user's coachId field
   Future<void> updateUserCoachId(String userId, String? coachId) async {
-    await _db.collection('users').doc(userId).update({
-      'coachId': coachId,
-    });
+    await _db.collection('users').doc(userId).update({'coachId': coachId});
   }
 
   // ========== Existing Player Profile Methods ==========
@@ -252,19 +247,18 @@ class FirestoreService {
 
   Stream<Program?> getLatestProgramStream(String profileId) {
     return _db
-        .collection('users')
+        .collection('players') // <-- CORREGIDO
         .doc(profileId)
         .collection('programs')
-        .orderBy('startDate', descending: true) // Obtener el más nuevo primero
-        .limit(1) // Solo queremos el último
-        .snapshots() // Escucha cambios en tiempo real
+        .orderBy('startDate', descending: true)
+        .limit(1)
+        .snapshots()
         .map((snapshot) {
-      if (snapshot.docs.isEmpty) {
-        return null; // No hay programas
-      }
-      // Convierte el documento de Firestore al modelo Program
-      return Program.fromFirestore(snapshot.docs.first); 
-    });
+          if (snapshot.docs.isEmpty) {
+            return null;
+          }
+          return Program.fromFirestore(snapshot.docs.first);
+        });
   }
 
   Future<PlayerProfile?> getPlayerProfile(String id) async {
@@ -290,8 +284,30 @@ class FirestoreService {
         .collection('programs')
         .orderBy('startDate', descending: true)
         .get();
-    
+
     return snap.docs.map((d) => Program.fromJson(d.data())).toList();
+  }
+
+  Stream<List<Program>> getAllProgramsStream(String profileId) {
+    // Usamos 'players' porque tus otros métodos (saveProgram, getPlayerProfile)
+    // también usan la colección 'players'.
+    return _db
+        .collection('players')
+        .doc(profileId)
+        .collection('programs')
+        .orderBy('startDate', descending: true)
+        .snapshots() // .snapshots() devuelve un Stream
+        .map((snapshot) {
+          // Convierte el QuerySnapshot en un List<Program>
+          if (snapshot.docs.isEmpty) {
+            return []; // Devuelve una lista vacía si no hay programas
+          }
+          return snapshot.docs
+              .map(
+                (doc) => Program.fromFirestore(doc),
+              ) // Usa el constructor que creamos
+              .toList();
+        });
   }
 
   Future<PlayerProfile?> getPlayerProfileByUserId(String userId) async {
@@ -300,7 +316,7 @@ class FirestoreService {
         .where('userId', isEqualTo: userId)
         .limit(1)
         .get();
-    
+
     if (snap.docs.isEmpty) return null;
     return PlayerProfile.fromJson(snap.docs.first.data());
   }
