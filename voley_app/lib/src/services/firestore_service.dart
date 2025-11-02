@@ -1,5 +1,7 @@
 // lib/services/firestore_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/bd/exercise.dart';
 import 'package:voley_app/src/models/program/program.dart';
@@ -245,20 +247,20 @@ class FirestoreService {
     return _db.collection('players').doc(profile.id).set(profile.toJson());
   }
 
-  Stream<Program?> getLatestProgramStream(String profileId) {
+Stream<Program?> getLatestProgramStream(String profileId) {
     return _db
-        .collection('players') // <-- CORREGIDO
+        .collection('players') 
         .doc(profileId)
         .collection('programs')
-        .orderBy('startDate', descending: true)
-        .limit(1)
+        .orderBy('startDate', descending: true) 
+        .limit(1) 
         .snapshots()
         .map((snapshot) {
-          if (snapshot.docs.isEmpty) {
-            return null;
-          }
-          return Program.fromFirestore(snapshot.docs.first);
-        });
+      if (snapshot.docs.isEmpty) {
+        return null; 
+      }
+      return Program.fromFirestore(snapshot.docs.first); 
+    });
   }
 
   Future<PlayerProfile?> getPlayerProfile(String id) async {
@@ -362,5 +364,29 @@ class FirestoreService {
       // 5. Filtra los que no sean nulos y devuelve la lista
       return players.whereType<app_user.User>().toList();
     });
+    
   }
+  /// Observa el perfil del jugador y, si existe,
+/// obtiene un [Stream] de su programa más reciente.
+final playerProgramProvider = StreamProvider<Program?>((ref) {
+  
+  // 1. Depende del FutureProvider del perfil
+  final profileAsync = ref.watch(ownProfileProvider);
+  
+  // 2. Mapea el estado del perfil al stream del programa
+  return profileAsync.when(
+    data: (profile) {
+      if (profile == null) {
+        // Si no hay perfil, no hay programa.
+        return Stream.value(null);
+      }
+      // Si hay perfil, escucha el stream del programa
+      return ref.read(firestoreProvider).getLatestProgramStream(profile.id);
+    },
+    // Mientras el perfil carga o da error, no hay programa.
+    loading: () => Stream.value(null),
+    error: (e, s) => Stream.error(e, s),
+  );
+});
+  
 }

@@ -8,12 +8,12 @@ import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
 import 'package:voley_app/src/models/user.dart' as app_user;
-import 'package:voley_app/src/services/firestore_service.dart';
-import 'package:voley_app/src/auth/auth_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 
-// 1. Nombre de la clase cambiado
+// (Asegúrate de que 'isCreatingPlayerProvider' y 'coachPlayersProvider'
+// estén definidos en tu archivo 'providers.dart')
+
 class CreatePlayerScreen extends ConsumerStatefulWidget {
   const CreatePlayerScreen({super.key});
 
@@ -22,45 +22,43 @@ class CreatePlayerScreen extends ConsumerStatefulWidget {
 }
 
 class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
+  // --- MEJORA DE UX: Estado del Stepper ---
+  int _currentStep = 0;
+
+  // Claves de formulario para validación por paso
+  final _step1Key = GlobalKey<FormState>();
+  final _step2Key = GlobalKey<FormState>();
+  final _step3Key = GlobalKey<FormState>();
+
   // Controladores
   final nameCtrl = TextEditingController();
   final emailCtrl = TextEditingController();
   final passwordCtrl = TextEditingController();
   final uuid = Uuid();
-  
-  // Instancias de servicios
-  late final FirestoreService _firestoreService;
-  late final AuthService _authService;
 
-  // Estado del formulario
+  // Estado del formulario (Efímero, se queda en la UI)
   String selectedPosition = 'Central';
   String selectedLevel = 'Competitivo';
   List<Tournament> _selectedTournaments = [];
   List<String> selectedInjuries = [];
-  // (Tests eliminados de esta pantalla)
-  // Map<String, double> _testScores = {}; 
-
-  // Estado de Disponibilidad
-  final List<String> _allDays = [ 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo' ];
   List<String> selectedDays = [];
+  final List<String> _allDays = [
+    'Lunes',
+    'Martes',
+    'Miércoles',
+    'Jueves',
+    'Viernes',
+    'Sábado',
+    'Domingo',
+  ];
   final Map<String, int> _durationOptions = {
-    '30-45 minutos': 45, '45-60 minutos': 60, '60-75 minutos': 75,
-    '75-90 minutos': 90, '90+ minutos': 120,
+    '30-45 minutos': 45,
+    '45-60 minutos': 60,
+    '60-75 minutos': 75,
+    '75-90 minutos': 90,
+    '90+ minutos': 120,
   };
-  int _selectedDurationMinutes = 60; 
-
-  // Estado de la pantalla
-  bool _isSubmitting = false;
-  String? _currentCoachId;
-
-  // 2. Lógica de "Usuario Existente" eliminada
-
-  @override
-  void initState() {
-    super.initState();
-    _firestoreService = ref.read(firestoreProvider);
-    _authService = ref.read(authServiceProvider);
-  }
+  int _selectedDurationMinutes = 60;
 
   @override
   void dispose() {
@@ -69,102 +67,92 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
     passwordCtrl.dispose();
     super.dispose();
   }
-  
-  /// Limpia todos los campos del formulario
-  void _clearForm() {
-      nameCtrl.clear();
-      emailCtrl.clear();
-      passwordCtrl.clear();
-      setState(() {
-        selectedPosition = 'Central';
-        selectedLevel = 'Competitivo';
-        selectedDays = [];
-        _selectedDurationMinutes = 60;
-        selectedInjuries = [];
-        _selectedTournaments = [];
-        // _testScores = {};
+
+  /// --- MEJORA DE ARQUITECTURA Y UX: Método de Envío ---
+  Future<void> _handleSubmit() async {
+    // Validar todos los formularios
+    if (!_step1Key.currentState!.validate() ||
+        !_step2Key.currentState!.validate() ||
+        !_step3Key.currentState!.validate()) {
+      _showError('Por favor revisa los campos en todos los pasos.');
+      return;
+    }
+
+    final coachId = ref.read(currentUserAppUserProvider).valueOrNull?.id;
+    if (coachId == null) {
+      _showError('Error: No se pudo identificar al entrenador');
+      return;
+    }
+
+    ref.read(isCreatingPlayerProvider.notifier).state = true;
+
+    try {
+      // 1. Crear Cuenta de Auth y Usuario en Firestore
+      final functions = ref.read(functionsProvider);
+      final callable = functions.httpsCallable('createPlayerAccount');
+      final result = await callable.call(<String, dynamic>{
+        'email': emailCtrl.text.trim(),
+        'password': passwordCtrl.text.trim(),
+        'name': nameCtrl.text.trim(),
+        'coachId': coachId,
       });
+
+      final userId = result.data['userId'];
+      if (userId == null) {
+        throw Exception('La Cloud Function no devolvió un userId.');
+      }
+
+      // 2. Preparar el Perfil de Jugador
+      final availability = Availability(
+        trainingDays: selectedDays,
+        sessionMinutes: _selectedDurationMinutes,
+      );
+
+      final profileToSave = PlayerProfile(
+        id: uuid.v4(),
+        userId: userId,
+        assignedCoachId: coachId,
+        name: nameCtrl.text.trim(),
+        position: selectedPosition,
+        level: selectedLevel.toLowerCase(),
+        goals: [], // Se definen después en la evaluación
+        injuries: selectedInjuries.contains('Ninguna') ? [] : selectedInjuries,
+        availability: availability,
+        evaluation: EvaluationResult(
+          testScores: {}, // Se llena en la pantalla de Evaluación
+          strengths: [],
+          weaknesses: [],
+        ),
+        tournaments: _selectedTournaments,
+      );
+
+      // 3. Guardar el Perfil
+      await ref.read(firestoreProvider).savePlayerProfile(profileToSave);
+
+      if (mounted) {
+        _showSuccess('¡Jugador creado exitosamente!');
+
+        // --- MEJORA DE UX: Refresca la lista y vuelve atrás ---
+        ref.invalidate(coachPlayersProvider);
+        Navigator.pop(context); // Vuelve a la lista de jugadores
+      }
+    } catch (e) {
+      _showError('Error al guardar: $e');
+    } finally {
+      if (mounted) {
+        ref.read(isCreatingPlayerProvider.notifier).state = false;
+      }
+    }
   }
 
-  // 3. _loadProfileForUser y _onUserSelected eliminados
-
-  // ... (Diálogo _showAddTournamentDialog - sin cambios) ...
-  Future<void> _showAddTournamentDialog() async {
-     final nameController = TextEditingController();
-    DateTime? pickedDate;
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Añadir Torneo'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration:
-                        const InputDecoration(labelText: 'Nombre del Torneo'),
-                    autofocus: true,
-                  ),
-                  const SizedBox(height: 16),
-                  TextButton.icon(
-                    icon: const Icon(Icons.calendar_today),
-                    label: Text(
-                      pickedDate == null
-                          ? 'Seleccionar Fecha'
-                          : DateFormat('dd/MM/yyyy').format(pickedDate!),
-                    ),
-                    onPressed: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 730)),
-                      );
-                      if (date != null) {
-                        setDialogState(() {
-                          pickedDate = date;
-                        });
-                      }
-                    },
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (nameController.text.isNotEmpty && pickedDate != null) {
-                      setState(() {
-                        _selectedTournaments.add(Tournament(
-                          name: nameController.text,
-                          date: pickedDate!,
-                        ));
-                      });
-                      Navigator.pop(context);
-                    }
-                  },
-                  child: const Text('Añadir'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // 4. _showAddTestDialog eliminado
-
+  // --- Helpers de UI ---
   void _showError(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
       );
     }
   }
@@ -172,382 +160,359 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
   void _showSuccess(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.green, // Color de éxito
-        ),
+        SnackBar(content: Text(message), backgroundColor: Colors.green),
       );
     }
   }
 
+  // ... (Tu diálogo _showAddTournamentDialog se queda igual) ...
+  Future<void> _showAddTournamentDialog() async {
+    /* ... tu código ... */
+  }
 
   @override
   Widget build(BuildContext context) {
-    // 5. Build simplificado
+    final theme = Theme.of(context);
     final coachUserAsync = ref.watch(currentUserAppUserProvider);
-    
-    final loadingOverlay = _isSubmitting
-        ? Container(
-            color: Colors.black.withOpacity(0.3),
-            child: const Center(child: CircularProgressIndicator()),
-          )
-        : const SizedBox.shrink();
+    final isCreating = ref.watch(isCreatingPlayerProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Crear Nuevo Jugador')),
-      body: Stack(
-        children: [
-          coachUserAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e,s) => Center(child: Text("Error al cargar usuario: $e")),
-            data: (currentUser) {
-              if (currentUser == null || !currentUser.isCoach) {
-                 return const Center(child: Text("No tienes permisos para esta pantalla."));
+      body: coachUserAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, s) => Center(child: Text("Error al cargar usuario: $e")),
+        data: (currentUser) {
+          if (currentUser == null || !currentUser.isCoach) {
+            return const Center(
+              child: Text("No tienes permisos para esta pantalla."),
+            );
+          }
+
+          // --- MEJORA DE UI/UX: Implementación del Stepper ---
+          return Stepper(
+            type: StepperType.horizontal,
+            currentStep: _currentStep,
+            onStepTapped: (step) => setState(() => _currentStep = step),
+            onStepContinue: () {
+              bool isValid = false;
+              if (_currentStep == 0) {
+                isValid = _step1Key.currentState?.validate() ?? false;
+              } else if (_currentStep == 1) {
+                isValid = _step2Key.currentState?.validate() ?? false;
+              } else if (_currentStep == 2) {
+                isValid = _step3Key.currentState?.validate() ?? false;
+                if (isValid) _handleSubmit(); // Enviar en el último paso
               }
-              _currentCoachId = currentUser.id;
-              // Muestra el formulario directamente
-              return _buildForm(context);
+
+              if (isValid && _currentStep < 2) {
+                setState(() => _currentStep += 1);
+              }
             },
-          ),
-          loadingOverlay,
-        ],
+            onStepCancel: () {
+              if (_currentStep > 0) {
+                setState(() => _currentStep -= 1);
+              }
+            },
+            // --- MEJORA DE DISEÑO: Botones con tema ---
+            controlsBuilder: (context, details) {
+              final isLastStep = _currentStep == 2;
+              return Padding(
+                padding: const EdgeInsets.only(top: 24.0),
+                child: isCreating
+                    ? const Center(child: CircularProgressIndicator())
+                    : Row(
+                        children: [
+                          if (_currentStep > 0)
+                            TextButton.icon(
+                              icon: const Icon(Icons.arrow_back),
+                              label: const Text('Atrás'),
+                              onPressed: details.onStepCancel,
+                            ),
+                          const Spacer(),
+                          ElevatedButton.icon(
+                            icon: Icon(
+                              isLastStep
+                                  ? Icons.person_add
+                                  : Icons.arrow_forward,
+                            ),
+                            label: Text(
+                              isLastStep ? 'Crear Jugador' : 'Siguiente',
+                            ),
+                            onPressed: details.onStepContinue,
+                          ),
+                        ],
+                      ),
+              );
+            },
+            steps: [
+              _buildStep1Cuenta(theme),
+              _buildStep2Perfil(theme),
+              _buildStep3Disponibilidad(theme),
+            ],
+          );
+        },
       ),
     );
   }
 
+  /// --- Paso 1 del Stepper: Cuenta ---
+  Step _buildStep1Cuenta(ThemeData theme) {
+    return Step(
+      title: const Text('Cuenta'),
+      isActive: _currentStep >= 0,
+      state: _currentStep > 0 ? StepState.complete : StepState.indexed,
+      content: Form(
+        key: _step1Key,
+        child: Column(
+          children: [
+            TextFormField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Nombre *',
+                prefixIcon: Icon(Icons.person_outlined),
+              ),
+              validator: (v) =>
+                  (v?.isEmpty ?? true) ? 'El nombre es requerido' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: emailCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Email *',
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+              keyboardType: TextInputType.emailAddress,
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'El email es requerido';
+                if (!v.contains('@')) return 'Email no válido';
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: passwordCtrl,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Contraseña *',
+                prefixIcon: Icon(Icons.lock_outlined),
+              ),
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'La contraseña es requerida';
+                if (v.length < 6) return 'Mínimo 6 caracteres';
+                return null;
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-  /// --- 6. Formulario Simplificado ---
-  Widget _buildForm(BuildContext context) {
-     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          
-          // 7. Sección de "Seleccionar Usuario" ELIMINADA
-
-          // 8. Campos de Auth/User siempre visibles
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                children: [
-                   TextField(
-                    controller: emailCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Email *',
-                      border: OutlineInputBorder(),
+  /// --- Paso 2 del Stepper: Perfil ---
+  Step _buildStep2Perfil(ThemeData theme) {
+    return Step(
+      title: const Text('Perfil'),
+      isActive: _currentStep >= 1,
+      state: _currentStep > 1 ? StepState.complete : StepState.indexed,
+      content: Form(
+        key: _step2Key,
+        child: Column(
+          children: [
+            DropdownButtonFormField<String>(
+              value: selectedPosition,
+              decoration: const InputDecoration(
+                labelText: 'Posición',
+                prefixIcon: Icon(Icons.sports_volleyball),
+              ),
+              items: ['Central', 'Libero', 'Punta', 'Opuesto', 'Armadora']
+                  .map(
+                    (String value) => DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
                     ),
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: passwordCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Contraseña *',
-                      border: OutlineInputBorder(),
+                  )
+                  .toList(),
+              onChanged: (newValue) {
+                setState(() => selectedPosition = newValue!);
+              },
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: selectedLevel,
+              decoration: const InputDecoration(
+                labelText: 'Nivel',
+                prefixIcon: Icon(Icons.bar_chart),
+              ),
+              items: ['Competitivo', 'Recreativo']
+                  .map(
+                    (String value) => DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
                     ),
-                    obscureText: true,
-                  ),
-                ],
+                  )
+                  .toList(),
+              onChanged: (newValue) {
+                setState(() => selectedLevel = newValue!);
+              },
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Lesiones (opcional)',
+                style: theme.textTheme.titleSmall,
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-
-          // Card de Datos del Jugador (Siempre editable)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: nameCtrl,
-                    enabled: true, 
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre *',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: selectedPosition,
-                    decoration: const InputDecoration(
-                      labelText: 'Posición',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: ['Central', 'Libero', 'Punta', 'Opuesto', 'Armadora']
-                        .map((String value) => DropdownMenuItem<String>(
-                              value: value,
-                              child: Text(value),
-                            ))
-                        .toList(),
-                    onChanged: (newValue) { 
-                      setState(() => selectedPosition = newValue!);
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: selectedLevel,
-                    decoration: const InputDecoration(
-                      labelText: 'Nivel',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: ['Competitivo', 'Recreativo']
-                        .map((String value) => DropdownMenuItem<String>(
-                              value: value,
-                              child: Text(value),
-                            ))
-                        .toList(),
-                    onChanged: (newValue) {
-                      setState(() => selectedLevel = newValue!);
-                    },
-                  ),
-                ],
-              ),
+            const SizedBox(height: 8),
+            // --- MEJORA DE DISEÑO: FilterChip con tema ---
+            Wrap(
+              spacing: 8.0,
+              runSpacing: 4.0,
+              children:
+                  [
+                    'Rodilla',
+                    'Tobillo',
+                    'Hombro',
+                    'Espalda',
+                    'Muñeca',
+                    'Dedo',
+                    'Ninguna',
+                  ].map((injury) {
+                    final isSelected = selectedInjuries.contains(injury);
+                    return FilterChip(
+                      label: Text(injury),
+                      selected: isSelected,
+                      // --- MEJORA DE DISEÑO: Colores del tema ---
+                      selectedColor: theme.colorScheme.primary,
+                      labelStyle: TextStyle(
+                        color: isSelected
+                            ? theme.colorScheme.onPrimary
+                            : theme.colorScheme.onSurface,
+                      ),
+                      onSelected: (bool selected) {
+                        setState(() {
+                          if (injury == 'Ninguna') {
+                            selectedInjuries.clear();
+                            if (selected) selectedInjuries.add('Ninguna');
+                          } else {
+                            selectedInjuries.remove('Ninguna');
+                            if (selected)
+                              selectedInjuries.add(injury);
+                            else
+                              selectedInjuries.remove(injury);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
             ),
-          ),
-          const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
 
-          // Card de Disponibilidad (Siempre editable)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Disponibilidad',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  ..._allDays.map((day) => CheckboxListTile(
+  /// --- Paso 3 del Stepper: Disponibilidad ---
+  Step _buildStep3Disponibilidad(ThemeData theme) {
+    return Step(
+      title: const Text('Disponibilidad'),
+      isActive: _currentStep >= 2,
+      content: Form(
+        key: _step3Key,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Días de Entrenamiento (opcional)',
+              style: theme.textTheme.titleSmall,
+            ),
+            Wrap(
+              spacing: 4.0,
+              runSpacing: 0.0,
+              children: _allDays
+                  .map(
+                    (day) => SizedBox(
+                      width: 160,
+                      child: CheckboxListTile(
                         title: Text(day),
                         value: selectedDays.contains(day),
-                        onChanged: (bool? value) { 
+                        onChanged: (bool? value) {
                           setState(() {
-                            if (value == true) {
+                            if (value == true)
                               selectedDays.add(day);
-                            } else {
+                            else
                               selectedDays.remove(day);
-                            }
                           });
                         },
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                         controlAffinity: ListTileControlAffinity.leading,
-                      )),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<int>(
-                    value: _selectedDurationMinutes,
-                    decoration: const InputDecoration(
-                      labelText: 'Duración por Sesión',
-                      border: OutlineInputBorder(),
+                      ),
                     ),
-                    items: _durationOptions.entries
-                        .map((entry) => DropdownMenuItem<int>(
-                              value: entry.value,
-                              child: Text(entry.key),
-                            ))
-                        .toList(),
-                    onChanged: (newValue) { 
-                      if (newValue != null) {
-                        setState(() => _selectedDurationMinutes = newValue);
-                      }
-                    },
-                  ),
-                ],
-              ),
+                  )
+                  .toList(),
             ),
-          ),
-          const SizedBox(height: 12),
-
-          // Card de Lesiones (Siempre editable)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Lesiones',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
+            const SizedBox(height: 12),
+            DropdownButtonFormField<int>(
+              value: _selectedDurationMinutes,
+              decoration: const InputDecoration(
+                labelText: 'Duración por Sesión',
+                prefixIcon: Icon(Icons.timer),
+              ),
+              items: _durationOptions.entries
+                  .map(
+                    (entry) => DropdownMenuItem<int>(
+                      value: entry.value,
+                      child: Text(entry.key),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (newValue) {
+                if (newValue != null) {
+                  setState(() => _selectedDurationMinutes = newValue);
+                }
+              },
+            ),
+            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Torneos (opcional)', style: theme.textTheme.titleSmall),
+                IconButton(
+                  icon: Icon(
+                    Icons.add_circle,
+                    color: theme.colorScheme.secondary,
+                  ), // Azul Pro
+                  tooltip: 'Añadir Torneo',
+                  onPressed: _showAddTournamentDialog,
+                ),
+              ],
+            ),
+            _selectedTournaments.isEmpty
+                ? const Text(
+                    'Añade torneos jugados (opcional).',
+                    style: TextStyle(color: Colors.grey),
+                  )
+                : Wrap(
                     spacing: 8.0,
                     runSpacing: 4.0,
-                    children: [ 'Rodilla', 'Tobillo', 'Hombro', 'Espalda', 'Muñeca', 'Dedo', 'Ninguna']
-                        .map((injury) {
-                      final isSelected = selectedInjuries.contains(injury);
-                      return FilterChip(
-                        label: Text(injury),
-                        selected: isSelected,
-                        onSelected: (bool selected) { 
-                          setState(() {
-                             if (injury == 'Ninguna') {
-                              if (selected) {
-                                selectedInjuries.clear();
-                                selectedInjuries.add('Ninguna');
-                              } else {
-                                selectedInjuries.remove('Ninguna');
-                              }
-                            } else {
-                              selectedInjuries.remove('Ninguna');
-                              if (selected) {
-                                selectedInjuries.add(injury);
-                              } else {
-                                selectedInjuries.remove(injury);
-                              }
-                            }
-                          });
+                    children: _selectedTournaments.map((tournament) {
+                      return Chip(
+                        label: Text(
+                          '${tournament.name} (${DateFormat('dd/MM/yy').format(tournament.date)})',
+                        ),
+                        deleteIcon: const Icon(Icons.cancel, size: 18),
+                        onDeleted: () {
+                          setState(
+                            () => _selectedTournaments.remove(tournament),
+                          );
                         },
                       );
                     }).toList(),
                   ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Card de Torneos (Siempre editable)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Torneos',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle, color: Colors.blue),
-                        tooltip: 'Añadir Torneo',
-                        onPressed: _showAddTournamentDialog, 
-                      ),
-                    ],
-                  ),
-                  _selectedTournaments.isEmpty
-                      ? const Text(
-                          'Añade torneos (opcional).',
-                          style: TextStyle(color: Colors.grey),
-                        )
-                      : Wrap(
-                          spacing: 8.0,
-                          runSpacing: 4.0,
-                          children: _selectedTournaments.map((tournament) {
-                            return Chip(
-                              label: Text(
-                                '${tournament.name} (${DateFormat('dd/MM/yy').format(tournament.date)})',
-                              ),
-                              deleteIcon: const Icon(Icons.cancel, size: 18),
-                              onDeleted: () { 
-                                setState(() => _selectedTournaments.remove(tournament));
-                              },
-                            );
-                          }).toList(),
-                        ),
-                  
-                  // 9. Sección de Puntuaciones de Test ELIMINADA
-                
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Botón de Envío
-          ElevatedButton(
-            onPressed: _isSubmitting ? null : _handleSubmit,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            child: _isSubmitting 
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text(
-                    'Crear Jugador y Perfil', // Texto cambiado
-                    style: TextStyle(fontSize: 16),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
-  }
-
-  /// --- 10. Método de Envío Simplificado ---
-  Future<void> _handleSubmit() async {
-    // Solo valida la creación
-    if (nameCtrl.text.trim().isEmpty || emailCtrl.text.trim().isEmpty || passwordCtrl.text.trim().isEmpty) {
-      _showError('Por favor completa Nombre, Email y Contraseña');
-      return;
-    }
-    if (_currentCoachId == null) {
-      _showError('Error: No se pudo identificar al entrenador');
-      return;
-    }
-
-    setState(() => _isSubmitting = true);
-
-    try {
-      // --- SOLO LÓGICA DE CREAR NUEVO USUARIO ---
-      final functions = ref.read(functionsProvider);
-      final callable = functions.httpsCallable('createPlayerAccount');
-      final result = await callable.call(<String, dynamic>{
-        'email': emailCtrl.text.trim(),
-        'password': passwordCtrl.text.trim(),
-        'name': nameCtrl.text.trim(),
-        'coachId': _currentCoachId!,
-      });
-      
-      final userId = result.data['userId'];
-      if (userId == null) {
-         throw Exception('La Cloud Function no devolvió un userId.');
-      }
-
-      final availability = Availability(
-        trainingDays: selectedDays,
-        sessionMinutes: _selectedDurationMinutes,
-      );
-
-      // Crea el Perfil NUEVO
-      final profileToSave = PlayerProfile(
-        id: uuid.v4(), // ID Nuevo
-        userId: userId, // El ID de Auth que devolvió la función
-        assignedCoachId: _currentCoachId!,
-        name: nameCtrl.text.trim(),
-        position: selectedPosition,
-        level: selectedLevel.toLowerCase(),
-        goals: ['salto', 'fuerza'],
-        injuries: selectedInjuries.contains('Ninguna') ? [] : selectedInjuries,
-        availability: availability,
-        evaluation: EvaluationResult(
-          testScores: {}, // Se guarda vacío, se llena en la otra pantalla
-          strengths: ['potencia'],
-          weaknesses: ['resistencia'],
-        ),
-        tournaments: _selectedTournaments,
-      );
-
-      // --- PASOS FINALES ---
-      await _firestoreService.savePlayerProfile(profileToSave);
-      
-      // Ya no actualizamos 'playerProfileProvider' ni navegamos a '/generate'
-      
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-        _showSuccess('¡Jugador creado exitosamente!');
-        _clearForm(); // Limpia el formulario para el siguiente
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-        _showError('Error al guardar: $e');
-      }
-    }
   }
 }

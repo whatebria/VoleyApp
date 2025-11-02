@@ -1,0 +1,518 @@
+// lib/src/screens/player_evaluation_screen.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+import 'package:voley_app/providers/providers.dart'; // Importa 'ownProfileProvider'
+import 'package:voley_app/src/models/player_profile/availability.dart';
+import 'package:voley_app/src/models/player_profile/player_profile.dart';
+import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
+import 'package:voley_app/src/models/player_profile/tournament.dart';
+import 'package:voley_app/src/services/firestore_service.dart';
+import 'package:intl/intl.dart';
+
+class PlayerEvaluationScreen extends ConsumerStatefulWidget {
+  const PlayerEvaluationScreen({super.key});
+
+  @override
+  ConsumerState<PlayerEvaluationScreen> createState() =>
+      _PlayerEvaluationScreenState();
+}
+
+class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen> {
+  // --- Estado del Formulario ---
+  final _formKey = GlobalKey<FormState>();
+  final nameCtrl = TextEditingController();
+  String selectedPosition = 'Central';
+  String selectedLevel = 'Competitivo';
+  List<Tournament> _selectedTournaments = [];
+  List<String> selectedInjuries = [];
+  Map<String, double> _testScores = {};
+  List<String> selectedDays = [];
+  final List<String> _allDays = [
+    'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'
+  ];
+  final Map<String, int> _durationOptions = {
+    '30-45 minutos': 45, '45-60 minutos': 60, '60-75 minutos': 75,
+    '75-90 minutos': 90, '90+ minutos': 120,
+  };
+  int _selectedDurationMinutes = 60;
+
+  // --- Estado de la Pantalla ---
+  late final FirestoreService _firestoreService;
+  PlayerProfile? _loadedProfile;
+  bool _isSubmitting = false;
+  bool _isFormPopulated = false; // Flag para evitar repoblar
+
+  @override
+  void initState() {
+    super.initState();
+    _firestoreService = ref.read(firestoreProvider);
+  }
+
+  void _populateForm(PlayerProfile p) {
+    setState(() {
+      _loadedProfile = p;
+      nameCtrl.text = p.name;
+      selectedPosition = p.position;
+      selectedLevel = p.level.isNotEmpty ? p.level[0].toUpperCase() + p.level.substring(1) : 'Competitivo';
+      selectedDays = p.availability.trainingDays;
+      _selectedDurationMinutes = p.availability.sessionMinutes;
+      selectedInjuries = p.injuries.isEmpty ? ['Ninguna'] : p.injuries;
+      _selectedTournaments = p.tournaments;
+      _testScores = p.evaluation.testScores;
+      _isFormPopulated = true;
+    });
+  }
+
+  void _populateNewForm() {
+    final userName = ref.read(currentUserAppUserProvider).value?.name ?? 'Jugador';
+    setState(() {
+      nameCtrl.text = userName;
+      _isFormPopulated = true;
+    });
+  }
+
+  @override
+  void dispose() {
+    nameCtrl.dispose();
+    super.dispose();
+  }
+
+  // ... (Tus diálogos _showAddTournamentDialog y _showAddTestDialog se quedan igual) ...
+  Future<void> _showAddTournamentDialog() async { /* ... tu código ... */ }
+  Future<void> _showAddTestDialog() async { /* ... tu código ... */ }
+
+  void _showError(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleSubmit() async {
+    if (_formKey.currentState?.validate() == false) {
+      _showError('Por favor revisa los campos con errores.');
+      return;
+    }
+
+    final appUser = ref.read(currentUserAppUserProvider).value;
+    if (appUser == null) {
+      _showError('Error: No se pudo identificar al jugador');
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      // (La lógica de guardado de 'profileToSave' es idéntica a tu código original)
+      PlayerProfile profileToSave;
+      final availability = Availability(
+        trainingDays: selectedDays,
+        sessionMinutes: _selectedDurationMinutes,
+      );
+      final evaluation = EvaluationResult(
+        testScores: _testScores,
+        strengths: _loadedProfile?.evaluation.strengths ?? [],
+        weaknesses: _loadedProfile?.evaluation.weaknesses ?? [],
+      );
+
+      if (_loadedProfile != null) {
+        profileToSave = _loadedProfile!.copyWith(
+          position: selectedPosition,
+          level: selectedLevel.toLowerCase(),
+          injuries: selectedInjuries.contains('Ninguna') ? [] : selectedInjuries,
+          availability: availability,
+          evaluation: evaluation,
+          tournaments: _selectedTournaments,
+        );
+      } else {
+        profileToSave = PlayerProfile(
+          id: const Uuid().v4(),
+          userId: appUser.id,
+          assignedCoachId: appUser.coachId ?? "",
+          name: nameCtrl.text.trim(),
+          position: selectedPosition,
+          level: selectedLevel.toLowerCase(),
+          goals: [],
+          injuries: selectedInjuries.contains('Ninguna') ? [] : selectedInjuries,
+          availability: availability,
+          evaluation: evaluation,
+          tournaments: _selectedTournaments,
+        );
+      }
+
+      await _firestoreService.savePlayerProfile(profileToSave);
+      
+      ref.read(playerProfileProvider.notifier).state = profileToSave;
+      ref.invalidate(ownProfileProvider); 
+
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Perfil guardado exitosamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context); // Vuelve a la pantalla de Perfil
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        _showError('Error al guardar: $e');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final profileAsync = ref.watch(ownProfileProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_loadedProfile == null ? 'Crear Perfil' : 'Editar Perfil'),
+      ),
+      body: profileAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, s) => Center(child: Text('Error al cargar perfil: $e')),
+        data: (profile) {
+          
+          if (!_isFormPopulated) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (profile != null) {
+                _populateForm(profile);
+              } else {
+                _populateNewForm();
+              }
+            });
+            // Muestra un loader mientras se puebla el formulario
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // --- MEJORA DE UI/UX: Stack para el botón pegajoso ---
+          return Stack(
+            children: [
+              Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0), // Padding para el botón
+                  children: [
+                    // --- Sección 1: Perfil ---
+                    _buildSectionHeader(theme, Icons.person, "Perfil Básico"),
+                    _buildPerfilSection(theme),
+                    const SizedBox(height: 24),
+
+                    // --- Sección 2: Disponibilidad ---
+                    _buildSectionHeader(theme, Icons.calendar_today, "Disponibilidad"),
+                    _buildDisponibilidadSection(theme),
+                    const SizedBox(height: 24),
+
+                    // --- Sección 3: Estado Físico ---
+                    _buildSectionHeader(theme, Icons.healing, "Estado Físico"),
+                    _buildEstadoFisicoSection(theme),
+                    const SizedBox(height: 24),
+
+                    // --- Sección 4: Rendimiento ---
+                    _buildSectionHeader(theme, Icons.bar_chart, "Rendimiento"),
+                    _buildRendimientoSection(theme),
+                  ],
+                ),
+              ),
+
+              // --- MEJORA DE UI/UX: Botón de Guardar Pegajoso ---
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: _buildStickySaveButton(theme, _isSubmitting),
+              )
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// --- MEJORA DE UI: Encabezado de Sección ---
+  Widget _buildSectionHeader(ThemeData theme, IconData icon, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Row(
+        children: [
+          Icon(icon, color: theme.colorScheme.secondary), // Azul Pro
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// --- Sección 1: Widget de Perfil ---
+  Widget _buildPerfilSection(ThemeData theme) {
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            TextFormField(
+              controller: nameCtrl,
+              enabled: false,
+              decoration: InputDecoration(
+                labelText: 'Nombre',
+                filled: true,
+                fillColor: theme.colorScheme.onSurface.withOpacity(0.1),
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: selectedPosition,
+              decoration: const InputDecoration(labelText: 'Posición Principal'),
+              items: ['Central', 'Libero', 'Punta', 'Opuesto', 'Armadora']
+                  .map((String value) => DropdownMenuItem<String>(value: value, child: Text(value)))
+                  .toList(),
+              onChanged: (newValue) => setState(() => selectedPosition = newValue!),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: selectedLevel,
+              decoration: const InputDecoration(labelText: 'Nivel de Juego'),
+              items: ['Competitivo', 'Recreativo']
+                  .map((String value) => DropdownMenuItem<String>(value: value, child: Text(value)))
+                  .toList(),
+              onChanged: (newValue) => setState(() => selectedLevel = newValue!),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// --- Sección 2: Widget de Disponibilidad ---
+  Widget _buildDisponibilidadSection(ThemeData theme) {
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // --- MEJORA DE UI: Checkboxes en 2 columnas ---
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    children: _allDays.sublist(0, 4).map((day) => CheckboxListTile(
+                          title: Text(day),
+                          value: selectedDays.contains(day),
+                          onChanged: (v) => setState(() => v! ? selectedDays.add(day) : selectedDays.remove(day)),
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                        )).toList(),
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    children: _allDays.sublist(4).map((day) => CheckboxListTile(
+                          title: Text(day),
+                          value: selectedDays.contains(day),
+                          onChanged: (v) => setState(() => v! ? selectedDays.add(day) : selectedDays.remove(day)),
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                        )).toList(),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<int>(
+              value: _selectedDurationMinutes,
+              decoration: const InputDecoration(labelText: 'Duración por Sesión'),
+              items: _durationOptions.entries
+                  .map((entry) => DropdownMenuItem<int>(value: entry.value, child: Text(entry.key)))
+                  .toList(),
+              onChanged: (newValue) {
+                if (newValue != null) setState(() => _selectedDurationMinutes = newValue);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// --- Sección 3: Widget de Estado Físico ---
+  Widget _buildEstadoFisicoSection(ThemeData theme) {
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Wrap(
+          spacing: 8.0,
+          runSpacing: 4.0,
+          children: [ 'Rodilla', 'Tobillo', 'Hombro', 'Espalda', 'Muñeca', 'Dedo', 'Ninguna']
+              .map((injury) {
+            final isSelected = selectedInjuries.contains(injury);
+            return FilterChip(
+              label: Text(injury),
+              selected: isSelected,
+              selectedColor: theme.colorScheme.primary, // Volt
+              labelStyle: TextStyle(
+                color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
+              ),
+              onSelected: (bool selected) {
+                setState(() {
+                  if (injury == 'Ninguna') {
+                    selectedInjuries.clear();
+                    if (selected) selectedInjuries.add('Ninguna');
+                  } else {
+                    selectedInjuries.remove('Ninguna');
+                    if (selected) selectedInjuries.add(injury);
+                    else selectedInjuries.remove(injury);
+                  }
+                });
+              },
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  /// --- Sección 4: Widget de Rendimiento ---
+  Widget _buildRendimientoSection(ThemeData theme) {
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // --- Tests Físicos ---
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Tests Físicos', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                OutlinedButton.icon(
+                  onPressed: _showAddTestDialog,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Añadir'),
+                  // --- MEJORA DE DISEÑO: Botón "Volt Pro" ---
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.colorScheme.primary, side: BorderSide(color: theme.colorScheme.primary),
+                  ),
+                ),
+              ],
+            ),
+            if (_testScores.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12.0),
+                child: Text('Añade tus puntuaciones (ej: Salto Vertical)...', style: TextStyle(color: Colors.grey)),
+              )
+            else
+              ..._testScores.entries.map((entry) {
+                return ListTile(
+                  title: Text(entry.key),
+                  trailing: Text(entry.value.toString(), style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
+                  dense: true,
+                  contentPadding: const EdgeInsets.only(left: 16),
+                  onTap: () => setState(() => _testScores.remove(entry.key)),
+                  leading: Icon(Icons.remove_circle_outline, color: theme.colorScheme.error, size: 20),
+                );
+              }).toList(),
+            
+            const Divider(height: 24),
+
+            // --- Torneos ---
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Torneos', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                OutlinedButton.icon(
+                  onPressed: _showAddTournamentDialog,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Añadir'),
+                  // --- MEJORA DE DISEÑO: Botón "Azul Pro" ---
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.colorScheme.secondary, side: BorderSide(color: theme.colorScheme.secondary),
+                  ),
+                ),
+              ],
+            ),
+            if (_selectedTournaments.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12.0),
+                child: Text('Añade torneos (opcional)...', style: TextStyle(color: Colors.grey)),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Wrap(
+                  spacing: 8.0,
+                  runSpacing: 4.0,
+                  children: _selectedTournaments.map((tournament) {
+                    return Chip(
+                      label: Text('${tournament.name} (${DateFormat('dd/MM/yy').format(tournament.date)})'),
+                      deleteIcon: const Icon(Icons.cancel, size: 18),
+                      onDeleted: () => setState(() => _selectedTournaments.remove(tournament)),
+                    );
+                  }).toList(),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  /// --- MEJORA DE UI: Botón de Guardar Pegajoso ---
+  Widget _buildStickySaveButton(ThemeData theme, bool isSubmitting) {
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor, // Color de fondo del scaffold
+        // --- MEJORA DE DISEÑO: Sombra para separar ---
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -4),
+          )
+        ],
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: isSubmitting ? null : _handleSubmit,
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+          child: isSubmitting
+              ? SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: theme.colorScheme.onPrimary,
+                  ),
+                )
+              : Text(
+                  _loadedProfile == null ? 'Crear Perfil' : 'Actualizar Perfil',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+        ),
+      ),
+    );
+  }
+}

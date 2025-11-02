@@ -117,6 +117,19 @@ final explorerSelectedProgramProvider = StateProvider<Program?>((ref) => null);
 final isGeneratingProgramProvider = StateProvider<bool>((ref) => false);
 final isLoggingOutProvider = StateProvider<bool>((ref) => false);
 
+final playerProgramProvider = StreamProvider<Program?>((ref) {
+  final profileAsync = ref.watch(ownProfileProvider);
+  return profileAsync.when(
+    data: (profile) {
+      if (profile == null) return Stream.value(null);
+      // Asumiendo que tu firestoreService tiene este método
+      return ref.read(firestoreProvider).getLatestProgramStream(profile.id);
+    },
+    loading: () => Stream.value(null),
+    error: (e, s) => Stream.error(e, s),
+  );
+});
+
 final ownProfileProvider = FutureProvider<PlayerProfile?>((ref) async {
   
   final appUser = await ref.watch(currentUserAppUserProvider.future);

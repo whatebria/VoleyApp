@@ -38,9 +38,6 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Biblioteca de Ejercicios'),
-      ),
       body: Column(
         children: [
           // 2. Barra de Búsqueda

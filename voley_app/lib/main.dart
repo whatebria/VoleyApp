@@ -11,6 +11,7 @@ import 'package:voley_app/src/screens/exercise_library_screen.dart';
 import 'package:voley_app/src/screens/generate_program_screen.dart';
 import 'package:voley_app/src/screens/new_evaluation_screen.dart';
 import 'package:voley_app/src/screens/permissions/permission_management_screen.dart';
+import 'package:voley_app/src/screens/player_evaluation_screen.dart';
 import 'package:voley_app/src/screens/program_view_screen.dart';
 import 'package:voley_app/src/screens/user_management_screen.dart';
 import 'package:voley_app/theme/app_theme.dart';
@@ -38,6 +39,7 @@ class MyApp extends StatelessWidget {
         '/login': (c) => const LoginScreen(),
         '/register': (c) => const RegisterScreen(),
         '/evaluation': (c) => NewEvaluationScreen(),
+        '/player_evaluation': (c) => PlayerEvaluationScreen(),
         '/generate': (c) => GenerateProgramScreen(),
         '/program': (c) => ProgramViewScreen(),
         '/permiso': (c) => PermissionManagementScreen(),
