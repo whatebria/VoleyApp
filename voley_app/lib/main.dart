@@ -6,9 +6,10 @@ import 'package:voley_app/firebase_options.dart';
 import 'package:voley_app/src/auth/auth_wrapper.dart';
 import 'package:voley_app/src/auth/login_screen.dart';
 import 'package:voley_app/src/auth/register_screen.dart';
+import 'package:voley_app/src/screens/create_player_screen.dart';
 import 'package:voley_app/src/screens/exercise_library_screen.dart';
 import 'package:voley_app/src/screens/generate_program_screen.dart';
-import 'package:voley_app/src/screens/evaluation_screen.dart';
+import 'package:voley_app/src/screens/new_evaluation_screen.dart';
 import 'package:voley_app/src/screens/permissions/permission_management_screen.dart';
 import 'package:voley_app/src/screens/program_view_screen.dart';
 import 'package:voley_app/src/screens/user_management_screen.dart';
@@ -23,7 +24,7 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -36,12 +37,13 @@ class MyApp extends StatelessWidget {
       routes: {
         '/login': (c) => const LoginScreen(),
         '/register': (c) => const RegisterScreen(),
-        '/evaluation': (c) => EvaluationScreen(),
+        '/evaluation': (c) => NewEvaluationScreen(),
         '/generate': (c) => GenerateProgramScreen(),
         '/program': (c) => ProgramViewScreen(),
         '/permiso': (c) => PermissionManagementScreen(),
-        '/user_management': (c) => const UserManagementScreen(),
-        '/excercise_library': (c) => const ExerciseLibraryScreen(),
+        '/user_create': (c) => CreatePlayerScreen(),
+        '/user_management': (c) => UserManagementScreen(),
+        '/library': (c) => const ExerciseLibraryScreen(),
       },
     );
   }

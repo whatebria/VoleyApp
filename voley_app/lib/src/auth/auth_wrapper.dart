@@ -1,8 +1,6 @@
 // lib/src/auth/auth_wrapper.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// 'auth_provider.dart' ya no es necesario aquí si 'currentUserAppUserProvider'
-// ya depende de 'authStateProvider' (lo cual es probable).
 import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/auth/login_screen.dart';
 import 'package:voley_app/src/screens/home_screen.dart';
