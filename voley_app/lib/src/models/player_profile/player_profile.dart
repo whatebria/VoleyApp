@@ -62,4 +62,32 @@ class PlayerProfile {
         assignedCoachId: json['assignedCoachId'],
         equipment: List<String>.from(json['equipment'] ?? []),
       );
+// --- AÑADE ESTE MÉTODO COMPLETO ---
+  PlayerProfile copyWith({
+    String? id,
+    String? userId,
+    String? assignedCoachId,
+    String? name,
+    String? position,
+    String? level,
+    List<String>? goals,
+    List<String>? injuries,
+    Availability? availability,
+    EvaluationResult? evaluation,
+    List<Tournament>? tournaments,
+  }) {
+    return PlayerProfile(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      assignedCoachId: assignedCoachId ?? this.assignedCoachId,
+      name: name ?? this.name,
+      position: position ?? this.position,
+      level: level ?? this.level,
+      goals: goals ?? this.goals,
+      injuries: injuries ?? this.injuries,
+      availability: availability ?? this.availability,
+      evaluation: evaluation ?? this.evaluation,
+      tournaments: tournaments ?? this.tournaments,
+    );
+  }
 }

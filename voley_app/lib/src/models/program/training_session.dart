@@ -29,4 +29,17 @@ class TrainingSession {
         .map((e) => WorkoutExercise.fromJson(e as Map<String, dynamic>))
         .toList(),
   );
+  TrainingSession copyWith({
+    String? day,
+    String? objective,
+    double? load,
+    List<WorkoutExercise>? exercises,
+  }) {
+    return TrainingSession(
+      day: day ?? this.day,
+      objective: objective ?? this.objective,
+      load: load ?? this.load,
+      exercises: exercises ?? this.exercises,
+    );
+  }
 }
