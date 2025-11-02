@@ -6,7 +6,6 @@ class PlayerProfile {
   final String id;
   final String? userId; // Link to User document
   final String name;
-  final String assignedCoachId;
   final String position;
   final String level; // "recreativo", "competitivo", "semiprofesional"
   final List<String> goals;
@@ -14,26 +13,28 @@ class PlayerProfile {
   final Availability availability;
   final EvaluationResult evaluation;
   final List<Tournament> tournaments;
+  final String? assignedCoachId; // UID del entrenador asignado
+  final List<String> equipment; // Equipamiento disponible
 
   PlayerProfile({
     required this.id,
     this.userId,
     required this.name,
-    required this.assignedCoachId,
     required this.position,
     required this.level,
     required this.goals,
     required this.injuries,
     required this.availability,
     required this.evaluation,
-    required this.tournaments, 
+    required this.tournaments,
+    this.assignedCoachId,
+    this.equipment = const [],
   });
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'userId': userId,
         'name': name,
-        'assignedCoachId': assignedCoachId,
         'position': position,
         'level': level,
         'goals': goals,
@@ -41,13 +42,14 @@ class PlayerProfile {
         'availability': availability.toJson(),
         'evaluation': evaluation.toJson(),
         'tournaments': tournaments.map((t) => t.toJson()).toList(),
+        'assignedCoachId': assignedCoachId,
+        'equipment': equipment,
       };
 
   static PlayerProfile fromJson(Map<String, dynamic> json) => PlayerProfile(
         id: json['id'],
         userId: json['userId'],
         name: json['name'],
-        assignedCoachId: json['assignedCoachId'],
         position: json['position'],
         level: json['level'],
         goals: List<String>.from(json['goals'] ?? []),
@@ -57,5 +59,7 @@ class PlayerProfile {
         tournaments: (json['tournaments'] as List<dynamic>? ?? [])
             .map((t) => Tournament.fromJson(Map<String, dynamic>.from(t)))
             .toList(),
+        assignedCoachId: json['assignedCoachId'],
+        equipment: List<String>.from(json['equipment'] ?? []),
       );
 }

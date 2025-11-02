@@ -1,6 +1,6 @@
-// En tu archivo program.dart
+// lib/src/models/program/program.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:voley_app/src/models/program/mesocycles.dart';
+import 'package:voley_app/src/models/program/mesocycles.dart'; // Ajusta el path si es necesario
 
 class Program {
   final String id;
@@ -9,7 +9,6 @@ class Program {
   final DateTime endDate;
   final List<Mesocycle> mesocycles;
 
-  // (Tu constructor existente)
   Program({
     required this.id,
     required this.source,
@@ -18,23 +17,22 @@ class Program {
     required this.mesocycles,
   });
 
-  // --- AÑADE ESTE CONSTRUCTOR ---
+  // --- CONSTRUCTOR fromJson CORREGIDO Y SEGURO ---
   factory Program.fromJson(Map<String, dynamic> json) {
     return Program(
-      // 'id' vendrá del documento, pero lo mantenemos por si lo guardas
-      id: json['id'] ?? '',
-      source: json['source'] ?? 'Desconocido',
-      // Convertir Timestamp de Firestore a DateTime de Dart
-      startDate: (json['startDate'] as Timestamp).toDate(),
-      endDate: (json['endDate'] as Timestamp).toDate(),
-      // Convertir la lista de mapas anidada a una List<Mesocycle>
+      id: json['id'] as String? ?? '',
+      source: json['source'] as String? ?? 'Automático', // <-- Seguro
+      
+      // Maneja Timestamps nulos (aunque no debería pasar)
+      startDate: (json['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      endDate: (json['endDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      
       mesocycles: (json['mesocycles'] as List<dynamic>? ?? [])
           .map((mesoJson) => Mesocycle.fromJson(mesoJson as Map<String, dynamic>))
           .toList(),
     );
   }
-  
-  // (Tu método toJson existente)
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'source': source,
@@ -43,14 +41,13 @@ class Program {
     'mesocycles': mesocycles.map((m) => m.toJson()).toList(),
   };
 
-  // (Opcional, pero recomendado): Añade este para llamar desde el snapshot
+  // Constructor fromFirestore (para leer el ID del documento)
   factory Program.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    // Usa el ID del documento real
     return Program.fromJson(data).copyWith(id: doc.id); 
   }
 
-  // (Opcional): Añade esto para que 'fromFirestore' funcione
+  // Método auxiliar 'copyWith'
   Program copyWith({String? id}) {
     return Program(
       id: id ?? this.id,
