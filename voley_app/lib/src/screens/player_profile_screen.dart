@@ -1,62 +1,61 @@
 // lib/src/screens/player_profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:voley_app/providers/providers.dart'; // Importa 'ownProfileProvider'
+import 'package:voley_app/providers/providers.dart';
 import 'package:intl/intl.dart';
-import 'package:voley_app/src/models/player_profile/player_profile.dart'; // Importa el modelo
+import 'package:voley_app/src/models/player_profile/player_profile.dart';
 
 class PlayerProfileScreen extends ConsumerWidget {
-  const PlayerProfileScreen({Key? key}) : super(key: key);
+  const PlayerProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 1. Observa el FutureProvider reactivo
-    final profileAsync = ref.watch(ownProfileProvider);
+    // [CORRECCIÓN]: Observamos el FutureProvider. El resultado es un AsyncValue.
+    final profileAsync = ref.watch(playerProfileProvider);
     final theme = Theme.of(context);
 
+    // Usamos .when() para manejar los tres estados: loading, error, y data
     return profileAsync.when(
-      // --- ESTADO DE CARGA ---
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      
-      // --- ESTADO DE ERROR ---
-      error: (e, s) => Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text('Error al cargar tu perfil: $e', textAlign: TextAlign.center),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, s) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Text(
+            'Error al cargar el perfil. Intenta de nuevo. Detalles: $e',
+            textAlign: TextAlign.center,
           ),
         ),
       ),
-
-      // --- ESTADO DE DATOS (Éxito) ---
       data: (profile) {
+        // 'profile' aquí es de tipo PlayerProfile?
         if (profile == null) {
-          // --- MEJORA DE UX: "Empty State" Motivacional ---
+          // Si el perfil es nulo (el jugador aún no lo ha creado)
           return _buildEmptyState(context, theme);
         } else {
-          // --- MEJORA DE UI: El "Panel de Atleta" ---
+          // Si el perfil SÍ existe, lo mostramos
           return _buildProfileView(context, theme, profile);
         }
       },
     );
   }
 
-  /// --- MEJORA DE UI/UX: El "Panel de Atleta" ---
+  // --- Widgets de Vista (Refactorizados para aceptar PlayerProfile) ---
+
+  /// Muestra la vista detallada del perfil del jugador.
   Widget _buildProfileView(BuildContext context, ThemeData theme, PlayerProfile profile) {
-    // Separa las estadísticas clave de las demás
     final keyStats = profile.evaluation.testScores;
-    // (Opcional: puedes definir una lista de "stats clave" y filtrar)
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         child: const Icon(Icons.edit),
         tooltip: 'Editar Evaluación',
         onPressed: () {
+          // El perfil existe, navegamos a la edición
           Navigator.pushNamed(context, '/player_evaluation');
         },
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 80.0), // Padding inferior para el FAB
+        padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 80.0),
         children: [
           // --- 1. Tarjeta "Héroe" (Quién soy) ---
           Card(
@@ -69,12 +68,12 @@ class PlayerProfileScreen extends ConsumerWidget {
                 children: [
                   CircleAvatar(
                     radius: 45,
-                    backgroundColor: theme.colorScheme.primary, // Volt
+                    backgroundColor: theme.colorScheme.primary,
                     child: Text(
                       profile.name.isNotEmpty ? profile.name.substring(0, 2).toUpperCase() : '??',
                       style: theme.textTheme.headlineLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onPrimary, // Texto oscuro
+                        color: theme.colorScheme.onPrimary,
                       ),
                     ),
                   ),
@@ -87,7 +86,7 @@ class PlayerProfileScreen extends ConsumerWidget {
                   Text(
                     '${profile.position} | ${profile.level.isNotEmpty ? profile.level[0].toUpperCase() + profile.level.substring(1) : ""}',
                     style: theme.textTheme.titleMedium
-                        ?.copyWith(color: theme.colorScheme.secondary), // Azul Pro
+                        ?.copyWith(color: theme.colorScheme.secondary),
                   ),
                 ],
               ),
@@ -112,20 +111,19 @@ class PlayerProfileScreen extends ConsumerWidget {
               ),
             )
           else
-            // --- MEJORA DE UI: Grid escaneable ---
             GridView.count(
               crossAxisCount: 2,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 1.5, // Más anchas que altas
+              childAspectRatio: 1.5,
               children: keyStats.entries.map((test) {
                 return _buildStatCard(
                   theme,
-                  title: test.key, // "Salto Vertical"
-                  value: test.value.toString(),
-                  unit: 'cm', // (Necesitarías un modelo de "unidad" aquí, por ahora es fijo)
+                  title: test.key,
+                  value: test.value.toStringAsFixed(1), // Mejor formateo
+                  unit: 'pts', // Usar una unidad genérica si no se conoce
                 );
               }).toList(),
             ),
@@ -181,7 +179,7 @@ class PlayerProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// --- MEJORA DE UX: "Empty State" Motivacional ---
+  /// Muestra el estado vacío (jugador sin perfil). (Sin cambios)
   Widget _buildEmptyState(BuildContext context, ThemeData theme) {
     return Scaffold(
       body: Center(
@@ -191,20 +189,20 @@ class PlayerProfileScreen extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                Icons.assessment_outlined, // Icono más relevante
+                Icons.assessment_outlined,
                 size: 80,
-                color: theme.colorScheme.primary, // Color Volt
+                color: theme.colorScheme.primary,
               ),
               const SizedBox(height: 24),
               Text(
-                '¡Tu viaje comienza ahora!', // Header motivacional
+                '¡Tu viaje comienza ahora!',
                 style: theme.textTheme.headlineSmall
                     ?.copyWith(fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
               Text(
-                'Completa tu evaluación inicial para desbloquear tu perfil, descubrir tus estadísticas y recibir tu plan de entrenamiento.', // El "Por qué"
+                'Completa tu evaluación inicial para desbloquear tu perfil, descubrir tus estadísticas y recibir tu plan de entrenamiento.',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.textTheme.bodySmall?.color
                 ),
@@ -215,7 +213,6 @@ class PlayerProfileScreen extends ConsumerWidget {
                 icon: const Icon(Icons.arrow_forward),
                 label: const Text('Completar Evaluación'),
                 style: ElevatedButton.styleFrom(
-                  // El botón ya usa el color 'primary' (Volt) del tema
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 ),
                 onPressed: () {
@@ -229,7 +226,7 @@ class PlayerProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// --- NUEVO WIDGET: Tarjeta de Estadística para el Grid ---
+  /// Tarjeta de Estadística para el Grid (Sin cambios)
   Widget _buildStatCard(ThemeData theme,
       {required String title, required String value, String? unit}) {
     return Card(
@@ -260,7 +257,7 @@ class PlayerProfileScreen extends ConsumerWidget {
                   value,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary, // Volt
+                    color: theme.colorScheme.primary,
                   ),
                 ),
                 if (unit != null) ...[
@@ -280,7 +277,7 @@ class PlayerProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// --- NUEVO WIDGET: Fila de Información (para listas) ---
+  /// Fila de Información (Sin cambios)
   Widget _InfoRow(ThemeData theme,
       {required IconData icon, required String title, required String value}) {
     return Padding(
@@ -288,7 +285,7 @@ class PlayerProfileScreen extends ConsumerWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: theme.colorScheme.secondary, size: 20), // Azul Pro
+          Icon(icon, color: theme.colorScheme.secondary, size: 20),
           const SizedBox(width: 12),
           Expanded(
             flex: 2,

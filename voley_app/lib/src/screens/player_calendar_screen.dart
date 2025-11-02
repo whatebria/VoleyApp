@@ -2,16 +2,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'package:voley_app/providers/providers.dart'; 
+import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/program/program.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
+import 'package:voley_app/src/models/program/session_log.dart';
 import 'dart:collection';
 import 'package:voley_app/src/screens/workout_session_screen.dart';
+import 'package:collection/collection.dart';
 
 class PlayerCalendarScreen extends ConsumerStatefulWidget {
-  const PlayerCalendarScreen({Key? key}) : super(key: key);
+  const PlayerCalendarScreen({super.key});
 
   @override
+  // ignore: library_private_types_in_public_api
   _PlayerCalendarScreenState createState() => _PlayerCalendarScreenState();
 }
 
@@ -19,6 +22,7 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   LinkedHashMap<DateTime, List<TrainingSession>> _events = LinkedHashMap();
+  CalendarFormat _calendarFormat = CalendarFormat.week;
 
   @override
   void initState() {
@@ -33,26 +37,35 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
 
   String _mapWeekdayToString(int weekday) {
     switch (weekday) {
-      case 1: return 'lunes';
-      case 2: return 'martes';
-      case 3: return 'miércoles';
-      case 4: return 'jueves';
-      case 5: return 'viernes';
-      case 6: return 'sábado';
-      case 7: return 'domingo';
-      default: return '';
+      case 1:
+        return 'lunes';
+      case 2:
+        return 'martes';
+      case 3:
+        return 'miércoles';
+      case 4:
+        return 'jueves';
+      case 5:
+        return 'viernes';
+      case 6:
+        return 'sábado';
+      case 7:
+        return 'domingo';
+      default:
+        return '';
     }
   }
 
-  /// Esta función construye y devuelve el mapa.
-  LinkedHashMap<DateTime, List<TrainingSession>> _buildEventMap(Program program) {
+  LinkedHashMap<DateTime, List<TrainingSession>> _buildEventMap(
+    Program program,
+  ) {
     final newEvents = LinkedHashMap<DateTime, List<TrainingSession>>(
       equals: isSameDay,
       hashCode: (key) => key.day * 1000000 + key.month * 10000 + key.year,
     );
-
-    final allMicrocycles =
-        program.mesocycles.expand((m) => m.microcycles).toList();
+    final allMicrocycles = program.mesocycles
+        .expand((m) => m.microcycles)
+        .toList();
     DateTime currentDate = program.startDate;
 
     for (int weekIndex = 0; weekIndex < allMicrocycles.length; weekIndex++) {
@@ -60,16 +73,20 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
       for (int dayIndex = 0; dayIndex < 7; dayIndex++) {
         final dateForDay = currentDate.add(Duration(days: dayIndex));
         final dayString = _mapWeekdayToString(dateForDay.weekday);
-
-        final normalizedDate =
-            DateTime(dateForDay.year, dateForDay.month, dateForDay.day);
-
+        final normalizedDate = DateTime(
+          dateForDay.year,
+          dateForDay.month,
+          dateForDay.day,
+        );
         final session = micro.sessions.firstWhere(
           (s) => s.day.toLowerCase() == dayString,
           orElse: () => TrainingSession(
-              day: '', objective: 'Descanso', load: 0, exercises: []),
+            day: '',
+            objective: 'Descanso',
+            load: 0,
+            exercises: [],
+          ),
         );
-
         if (session.objective != 'Descanso') {
           if (newEvents[normalizedDate] == null) {
             newEvents[normalizedDate] = [];
@@ -82,23 +99,19 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
     return newEvents;
   }
 
-  /// Devuelve la lista de sesiones para un día específico
   List<TrainingSession> _getEventsForDay(DateTime day) {
     final normalizedDay = DateTime(day.year, day.month, day.day);
     return _events[normalizedDay] ?? [];
   }
 
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    
+    // Observa el provider del programa (que depende del perfil)
+    final programAsync = ref.watch(generatedProgramProvider); 
 
-    // Asumiendo que 'playerProgramProvider' está en 'providers.dart'
-    // y es el StreamProvider<Program?> correcto para el jugador logueado.
-    final programAsync = ref.watch(playerProgramProvider);
-
-    // Escucha el provider
-    ref.listen<AsyncValue<Program?>>(playerProgramProvider, (previous, next) {
+    ref.listen<AsyncValue<Program?>>(generatedProgramProvider, (previous, next) {
       final program = next.value;
       if (program != null) {
         setState(() {
@@ -111,21 +124,37 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
       }
     });
 
-    // --- ¡ERROR 1 CORREGIDO! ---
-    // Se ha eliminado el Scaffold y el AppBar.
-    // Esta pantalla es solo el 'body' de la pestaña.
+    // --- MEJORA: Se eliminó el Scaffold y el AppBar ---
     return programAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, s) => Center(child: Text('Error al cargar programa: $e')),
       data: (program) {
         if (program == null) {
+          // --- MEJORA DE UX: Empty State con tu tema ---
           return Center(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'Aún no tienes un programa asignado.\nPídele a tu entrenador que te genere uno.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyLarge,
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    size: 80,
+                    color: theme.colorScheme.secondary, // Azul Pro
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'No tienes un programa activo',
+                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Habla con tu entrenador para que te asigne un plan de entrenamiento.',
+                    style: theme.textTheme.bodyLarge,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
           );
@@ -138,7 +167,17 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
               firstDay: program.startDate.subtract(const Duration(days: 30)),
               lastDay: program.endDate.add(const Duration(days: 30)),
               focusedDay: _focusedDay,
-              calendarFormat: CalendarFormat.month,
+
+              calendarFormat: _calendarFormat, // Usa la variable de estado
+              onFormatChanged: (format) {
+                setState(() {
+                  _calendarFormat = format; // Actualiza el estado al tocar el botón
+                });
+              },// Inicia en formato semana
+              availableCalendarFormats: const {
+                CalendarFormat.month: 'Mes',
+                CalendarFormat.week: 'Semana',
+              },
               selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
               eventLoader: _getEventsForDay,
               onDaySelected: (selectedDay, focusedDay) {
@@ -185,11 +224,14 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
                     color: theme.colorScheme.onSurface.withOpacity(0.4)),
               ),
             ),
-            const Divider(),
+            const Divider(height: 1, thickness: 1),
+            
             Expanded(
-              // --- ¡ERROR 2 CORREGIDO! ---
-              // La llamada ya no necesita parámetros
-              child: _buildEventList(),
+              child: ref.watch(sessionLogHistoryProvider).when(
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (e, s) => Center(child: Text('Error al cargar historial: $e')),
+                    data: (historyList) => _buildEventList(context, theme, historyList),
+                  ),
             ),
           ],
         );
@@ -197,62 +239,264 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
     );
   }
 
-  /// Lista de eventos interactiva
-  Widget _buildEventList() {
+  /// --- MEJORA DE UX: Lista de eventos rediseñada ---
+Widget _buildEventList(BuildContext context, ThemeData theme, List<SessionLog> historyList) {
     if (_selectedDay == null) return const SizedBox.shrink();
     
     final selectedEvents = _getEventsForDay(_selectedDay!);
 
     if (selectedEvents.isEmpty) {
-      return const Center(
-        child: Text('Día de Descanso', style: TextStyle(fontSize: 18, color: Colors.grey)),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.coffee_outlined, size: 60, color: theme.textTheme.bodySmall?.color),
+            const SizedBox(height: 16),
+            Text(
+              'Día de Descanso',
+              style: theme.textTheme.titleLarge?.copyWith(color: theme.textTheme.bodySmall?.color),
+            ),
+          ],
+        ),
       );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.all(16.0),
       itemCount: selectedEvents.length,
       itemBuilder: (context, index) {
         final session = selectedEvents[index];
+        
+        final SessionLog? completedLog = historyList.firstWhereOrNull(
+          (log) => log.sessionId == session.id,
+        );
+        final bool isCompleted = completedLog != null;
+
         return Card(
+          elevation: 0,
           margin: const EdgeInsets.only(bottom: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${session.day} - ${session.objective}',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const Divider(height: 20),
-                ...session.exercises.map((e) => ListTile(
-                      dense: true,
-                      title: Text(e.name),
-                      subtitle: Text('${e.sets}x${e.reps} @ ${e.intensity}'),
-                    )),
-                
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('Empezar Sesión'),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => WorkoutSessionScreen(session: session),
-                        ),
-                      );
-                    },
-                  ),
-                )
-              ],
+          clipBehavior: Clip.antiAlias, 
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: isCompleted
+                  ? theme.colorScheme.primary // Borde Volt
+                  : theme.colorScheme.secondary.withOpacity(0.5), // Borde Azul Pro
+              width: 1.5,
             ),
+          ),
+          color: isCompleted
+              ? theme.colorScheme.primary.withOpacity(0.1) // Fondo Volt
+              : theme.colorScheme.surfaceVariant.withOpacity(0.6), // Fondo oscuro
+          
+          // --- MEJORA: La tarjeta "Completada" ahora es un ExpansionTile ---
+          // La tarjeta "Pendiente" sigue siendo un InkWell
+          child: isCompleted
+              ? _buildLogSummary(theme, session, completedLog) // Tarjeta de Resumen EXPANDIBLE
+              : _buildPlannedSession(context, theme, session), // Tarjeta de Acción
+        );
+      },
+    );
+  }
+  /// --- MEJORA DE UX: Widget para "Pendiente" (más amigable y accionable) ---
+  Widget _buildPlannedSession(BuildContext context, ThemeData theme, TrainingSession session) {
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => WorkoutSessionScreen(session: session),
           ),
         );
       },
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    session.day,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.secondary,
+                      fontWeight: FontWeight.bold
+                    ),
+                  ),
+                  Text(
+                    session.objective,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: session.exercises.map((e) => Chip(
+                      label: Text(e.name),
+                      backgroundColor: theme.colorScheme.surface,
+                      labelStyle: theme.textTheme.bodySmall,
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    )).toList(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            // --- El "Llamado a la Acción" (CTA) ---
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary, // Volt
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.colorScheme.primary.withOpacity(0.3),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  )
+                ]
+              ),
+              child: Icon(
+                Icons.play_arrow_rounded,
+                size: 60,
+                color: theme.colorScheme.onPrimary, // Oscuro
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogSummary(ThemeData theme, TrainingSession session, SessionLog log) {
+    String bestLift = "N/A";
+    if (log.exercises.isNotEmpty) {
+      final allSets = log.exercises.values.expand((sets) => sets).toList();
+      if (allSets.isNotEmpty) {
+        final bestSet = allSets.reduce((a, b) => a.weight > b.weight ? a : b);
+        bestLift = "${bestSet.weight}kg x ${bestSet.reps} reps";
+      }
+    }
+
+    // --- MEJORA: Convertido en ExpansionTile ---
+    return ExpansionTile(
+      // --- Encabezado Plegado (lo que ves primero) ---
+      title: Text(
+        '${session.day} - COMPLETADO',
+        style: theme.textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: theme.colorScheme.primary, // Volt
+        ),
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 8.0),
+        // --- SOLUCIÓN AL OVERFLOW: Row -> Wrap ---
+        child: Wrap(
+          spacing: 8.0, // Espacio horizontal
+          runSpacing: 4.0, // Espacio vertical si se envuelve
+          children: [
+            _buildSummaryChip(
+              theme,
+              icon: Icons.speed,
+              label: "RPE: ${log.rpe}/10",
+            ),
+            _buildSummaryChip(
+              theme,
+              icon: Icons.emoji_events_outlined,
+              label: "Mejor Set: $bestLift",
+            ),
+          ],
+        ),
+      ),
+      trailing: Icon(
+        Icons.expand_more,
+        color: theme.colorScheme.primary.withOpacity(0.7),
+      ),
+      // --- Contenido Expandido (El desglose) ---
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // --- Notas ---
+              if (log.notes.isNotEmpty) ...[
+                const Divider(height: 16),
+                Text('Notas de la Sesión:', style: theme.textTheme.bodySmall),
+                Text(
+                  log.notes,
+                  style: theme.textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const Divider(height: 16),
+              ] else ... [
+                const Divider(height: 16),
+              ],
+              
+              // --- Título del Desglose ---
+              Text(
+                'Desglose de Series',
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+
+              // --- Lógica del Desglose ---
+              if (log.exercises.isEmpty)
+                const Text('No se registraron series.', style: TextStyle(fontStyle: FontStyle.italic))
+              else
+                ...log.exercises.entries.map((entry) {
+                  final String exerciseId = entry.key;
+                  final List<SetLog> sets = entry.value;
+
+                  final exerciseName = session.exercises
+                      .firstWhereOrNull((ex) => ex.exerciseId == exerciseId)
+                      ?.name ?? 'Ejercicio Borrado';
+                  
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          exerciseName,
+                          style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        ...sets.map((set) {
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 16.0, top: 2.0),
+                            child: Text(
+                              '• Set ${set.setNumber}: ${set.weight}kg x ${set.reps} reps',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                  );
+                }).toList(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Helper para los chips de resumen (sin cambios)
+  Widget _buildSummaryChip(ThemeData theme, {required IconData icon, required String label}) {
+    return Chip(
+      avatar: Icon(icon, size: 16, color: theme.colorScheme.secondary),
+      label: Text(label),
+      labelStyle: TextStyle(
+        color: theme.colorScheme.onSurface,
+        fontWeight: FontWeight.w600
+      ),
+      backgroundColor: theme.colorScheme.surface,
+      side: BorderSide(color: theme.colorScheme.surfaceVariant),
     );
   }
 }

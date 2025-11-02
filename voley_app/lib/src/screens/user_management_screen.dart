@@ -1,8 +1,9 @@
-// lib/src/screens/user_management_screen.dart
+// lib/src/screens/user_management_screen.dart (CORREGIDO)
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/src/models/user.dart' as app_user;
 import 'package:voley_app/providers/providers.dart'; 
+import 'package:voley_app/src/models/player_profile/player_profile.dart'; // Importar PlayerProfile (necesario para PlayerWithProfile)
 import 'package:voley_app/src/screens/create_player_screen.dart';
 
 
@@ -10,10 +11,13 @@ class UserManagementScreen extends ConsumerWidget {
   const UserManagementScreen({super.key});
 
   /// --- MEJORA DE UX: Muestra las opciones del jugador ---
+  // [CORRECCIÓN]: Ahora acepta PlayerWithProfile
   void _showPlayerOptions(
-      BuildContext context, WidgetRef ref, app_user.User player) {
+      BuildContext context, WidgetRef ref, PlayerWithProfile playerCombo) {
     final theme = Theme.of(context);
-    ref.read(explorerSelectedPlayerProvider.notifier).state = player;
+    
+    // [CORRECCIÓN CRÍTICA]: Asigna el objeto PlayerWithProfile completo.
+    ref.read(explorerSelectedPlayerProvider.notifier).state = playerCombo;
 
     // 2. MUESTRA EL MENÚ
     showModalBottomSheet(
@@ -27,7 +31,9 @@ class UserManagementScreen extends ConsumerWidget {
                 leading:
                     Icon(Icons.assessment, color: theme.colorScheme.primary), // Volt
                 title: const Text('Ver/Editar Evaluación'),
-                subtitle: const Text('Perfil, posición, tests, lesiones...'),
+                subtitle: Text(playerCombo.profile == null 
+                  ? 'Perfil, posición, tests, lesiones (Perfil NO CREADO)'
+                  : 'Perfil, posición, tests, lesiones...'),
                 onTap: () {
                   Navigator.pop(ctx); // Cierra el menú
                   Navigator.pushNamed(context, '/evaluation');
@@ -106,12 +112,12 @@ class UserManagementScreen extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, s) => Center(child: Text('Error al cargar jugadores: $e')),
       data: (playersWithProfiles) {
+        
         // --- MEJORA DE UX: RefreshIndicator en la lista ---
         return RefreshIndicator(
+          // Invalida el StreamProvider principal para forzar una nueva lectura
           onRefresh: () async {
-            // Invalida ambos providers para forzar la recarga
-            ref.invalidate(coachPlayersProvider);
-            ref.invalidate(coachPlayersWithProfilesProvider);
+            ref.invalidate(coachPlayersProvider); 
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -146,9 +152,10 @@ class UserManagementScreen extends ConsumerWidget {
                     padding: const EdgeInsets.only(bottom: 80.0), // Espacio para el FAB
                     itemCount: playersWithProfiles.length,
                     itemBuilder: (context, index) {
-                      final item = playersWithProfiles[index];
-                      final player = item.player;
-                      final profile = item.profile;
+                      // [CORRECCIÓN]: El item es PlayerWithProfile
+                      final playerCombo = playersWithProfiles[index];
+                      final player = playerCombo.player;
+                      final profile = playerCombo.profile;
 
                       return Card(
                         margin: const EdgeInsets.symmetric(
@@ -180,9 +187,8 @@ class UserManagementScreen extends ConsumerWidget {
                           trailing:
                               const Icon(Icons.arrow_forward_ios, size: 16),
                           onTap: () {
-                            // --- ¡AQUÍ ESTÁ LA MEJORA DE UX! ---
-                            // Al tocar un jugador, muestra el menú de opciones
-                            _showPlayerOptions(context, ref, player);
+                            // [CORRECCIÓN CRÍTICA]: Pasamos el PlayerWithProfile completo
+                            _showPlayerOptions(context, ref, playerCombo);
                           },
                         ),
                       );

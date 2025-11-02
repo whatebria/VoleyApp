@@ -13,13 +13,7 @@ class AuthWrapper extends ConsumerWidget {
   Future<void> _loadPlayerProfile(WidgetRef ref, String userId) async {
     // Esta función carga el perfil del jugador en el provider 'playerProfileProvider'
     // para que 'generatedProgramProvider' pueda encontrar el programa correcto.
-    if (ref.read(playerProfileProvider) == null) {
-      final firestore = ref.read(firestoreProvider);
-      final profile = await firestore.getPlayerProfileByUserId(userId);
-      if (profile != null) {
-        ref.read(playerProfileProvider.notifier).state = profile;
-      }
-    }
+    
   }
 
   @override

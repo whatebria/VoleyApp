@@ -1,4 +1,4 @@
-// lib/screens/program_view_screen.dart
+// lib/screens/program_view_screen.dart (CORREGIDO)
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
@@ -18,45 +18,19 @@ class ProgramViewScreen extends ConsumerStatefulWidget {
 }
 
 class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
+  // --- ELIMINAMOS _initialPlayerSetup (ver build para la corrección) ---
+
   @override
   void initState() {
     super.initState();
-    
-    // 1. Llama a la configuración inicial del jugador
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initialPlayerSetup();
-    });
-
-    // 
+    // 1. Ya no se necesita _initialPlayerSetup. La lógica de inicialización
+    //    es reactiva y se gestiona en el build/listen.
   }
 
-  /// Configura el jugador seleccionado al entrar a la pantalla
-  void _initialPlayerSetup() async {
-    // Evita configurar si ya hay un jugador
-    if (ref.read(explorerSelectedPlayerProvider) != null) return;
-    
-    final currentUser = ref.read(currentUserAppUserProvider).valueOrNull;
-    if (currentUser == null) return; // Aún no carga
-
-    if (currentUser.isPlayer) {
-      // Es Jugador: seleccionarse a sí mismo
-      ref.read(explorerSelectedPlayerProvider.notifier).state = currentUser;
-    } else {
-      // Es Coach: seleccionar el primer jugador de la lista
-      try {
-        final players = await ref.read(coachPlayersProvider.future);
-        if (players.isNotEmpty) {
-          ref.read(explorerSelectedPlayerProvider.notifier).state = players.first;
-        }
-      } catch (e) {
-        debugPrint("Error al cargar jugadores iniciales: $e");
-      }
-    }
-  }
-
-  // --- MÉTODOS DE ACCIÓN (Ahora gestionan el estado de carga) ---
+  // --- MÉTODOS DE ACCIÓN (Sin cambios funcionales, usan el estado de carga) ---
 
   void _showGenerationChoice(BuildContext context, PlayerProfile profile) {
+    // ... (Tu implementación de showModalBottomSheet)
     showModalBottomSheet(
       context: context,
       builder: (context) {
@@ -65,7 +39,10 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
           child: Wrap(
             children: <Widget>[
               ListTile(
-                leading: Icon(Icons.auto_awesome, color: theme.colorScheme.primary),
+                leading: Icon(
+                  Icons.auto_awesome,
+                  color: theme.colorScheme.primary,
+                ),
                 title: const Text('Generar Programa Automático (IA)'),
                 subtitle: const Text('Crear un programa basado en el perfil.'),
                 onTap: () {
@@ -89,26 +66,34 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     );
   }
 
-  void _runAutomaticGenerator(BuildContext context, PlayerProfile profile) async {
+  void _runAutomaticGenerator(
+    BuildContext context,
+    PlayerProfile profile,
+  ) async {
     // 1. Pone el estado de carga en 'true'
     ref.read(isGeneratingProgramProvider.notifier).state = true;
 
     try {
       // 2. Llama a la acción
-      // Asumiendo que 'programGeneratorAction' es un Provider<Future Function(PlayerProfile)>
       await ref.read(programGeneratorAction)(profile);
-      
+
       // ¡Éxito!
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('¡Programa automático generado!'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('¡Programa automático generado!'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
       // Error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al generar: $e'), backgroundColor: Theme.of(context).colorScheme.error),
+          SnackBar(
+            content: Text('Error al generar: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     } finally {
@@ -123,44 +108,52 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ProgramEditorScreen(
-          profile: profile,
-        ),
+        builder: (context) => ProgramEditorScreen(profile: profile),
       ),
     );
   }
 
+  // --- WIDGET BUILD ---
   @override
   Widget build(BuildContext context) {
-
-    ref.listen<AsyncValue<List<Program>>>(explorerProgramsProvider, (previous, next) {
-      // Solo reacciona cuando hay un nuevo valor
+    // 1. [CORRECCIÓN] Lógica de Sincronización de Programa
+    // Se mantiene esta lógica para asegurar que siempre haya un programa seleccionado
+    // cuando la lista se actualiza, o que se limpie si la lista está vacía.
+    ref.listen<AsyncValue<List<Program>>>(explorerProgramsProvider, (
+      previous,
+      next,
+    ) {
       if (next.hasValue) {
         final programs = next.value!;
-        final selectedProgramNotifier = ref.read(explorerSelectedProgramProvider.notifier);
-        
+        final selectedProgramNotifier = ref.read(
+          explorerSelectedProgramProvider.notifier,
+        );
+
         if (programs.isEmpty) {
-          // Si la nueva lista está vacía, fuerza el programa seleccionado a null.
           selectedProgramNotifier.state = null;
         } else {
-          // Si la lista no está vacía, comprueba si el programa actual
-          // sigue siendo válido. Si no, selecciona el primero.
           final currentProgram = selectedProgramNotifier.state;
-          if (currentProgram == null || !programs.contains(currentProgram)) {
+          // [CORRECCIÓN] Usamos la identidad del objeto para la comparación
+          if (currentProgram == null ||
+              programs.where((p) => p.id == currentProgram.id).isEmpty) {
             selectedProgramNotifier.state = programs.first;
           }
         }
       }
     });
-    // Observa todos los providers. La UI será 100% reactiva.
+
+    // 2. Observa todos los providers.
     final currentUserAsync = ref.watch(currentUserAppUserProvider);
-    final playersAsync = ref.watch(coachPlayersProvider);
-    final selectedPlayer = ref.watch(explorerSelectedPlayerProvider);
-    
-    // --- NUEVOS PROVIDERS REACTIVOS ---
+    // [CORRECCIÓN] Usamos el provider que agrupa Jugador + Perfil
+    final playersWithProfilesAsync = ref.watch(
+      coachPlayersWithProfilesProvider,
+    );
+
+    // [CORRECCIÓN] El explorador selecciona un PlayerWithProfile
+    final selectedPlayerCombo = ref.watch(explorerSelectedPlayerProvider);
+
     final selectedProfileAsync = ref.watch(selectedPlayerProfileProvider);
     final programsAsync = ref.watch(explorerProgramsProvider);
-    
     final selectedProgram = ref.watch(explorerSelectedProgramProvider);
     final isGenerating = ref.watch(isGeneratingProgramProvider);
 
@@ -176,24 +169,65 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                 return const Center(child: Text('Usuario no encontrado.'));
               }
 
+              // 3. [CORRECCIÓN] LÓGICA DE INICIALIZACIÓN DECLARATIVA
+              // Solo corre si es Coach Y no hay un jugador seleccionado.
+              if (currentUser.isCoach && selectedPlayerCombo == null) {
+                // Si aún no hay jugadores, mostramos un cargador (que PlayersWithProfilesAsync ya hace)
+                // Si la lista ya está cargada y no hay selección, intentamos seleccionar el primero.
+                playersWithProfilesAsync.whenData((players) {
+                  if (players.isNotEmpty) {
+                    // [CORRECCIÓN CRÍTICA] Asignamos el objeto PlayerWithProfile
+                    ref.read(explorerSelectedPlayerProvider.notifier).state =
+                        players.first;
+                  }
+                });
+              } else if (currentUser.isPlayer && selectedPlayerCombo == null) {
+                // Si es Jugador y no está seleccionado, forzamos su selección.
+                // Necesitamos el perfil para crear el combo PlayerWithProfile.
+                final playerProfile = ref
+                    .watch(playerProfileProvider)
+                    .valueOrNull;
+
+                if (playerProfile != null) {
+                  // [CORRECCIÓN CRÍTICA] Creamos el objeto PlayerWithProfile para asignarlo
+                  final playerCombo = PlayerWithProfile(
+                    currentUser,
+                    playerProfile,
+                  );
+                  ref.read(explorerSelectedPlayerProvider.notifier).state =
+                      playerCombo;
+                }
+              }
+              // --- FIN LÓGICA DE INICIALIZACIÓN ---
+
               return Column(
                 children: [
                   // --- Dropdown de Jugadores (Solo para Coaches) ---
                   if (currentUser.isCoach)
-                    playersAsync.when(
+                    playersWithProfilesAsync.when(
                       loading: () => const Padding(
                         padding: EdgeInsets.all(16.0),
-                        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                        child: Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
                       ),
                       error: (e, s) => Center(child: Text('Error: $e')),
-                      data: (players) {
-                        if (players.isEmpty) {
+                      // [CORRECCIÓN] Usamos playersWithProfiles
+                      data: (playersCombos) {
+                        if (playersCombos.isEmpty) {
                           return const Padding(
                             padding: EdgeInsets.all(16.0),
-                            child: Center(child: Text('No tienes jugadores vinculados.')),
+                            child: Center(
+                              child: Text('No tienes jugadores vinculados.'),
+                            ),
                           );
                         }
-                        return _buildPlayerSelector(ref, players, selectedPlayer);
+                        // [CORRECCIÓN] Pasamos el combo y el combo seleccionado
+                        return _buildPlayerSelector(
+                          ref,
+                          playersCombos,
+                          selectedPlayerCombo,
+                        );
                       },
                     ),
 
@@ -205,43 +239,44 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                     ),
                     error: (e, s) => Center(child: Text('Error: $e')),
                     data: (programs) {
-                      // Ya no hay 'ref.listen' aquí.
-                      // El listener en initState se encarga de la lógica.
-                      return _buildProgramSelector(ref, programs, selectedProgram);
+                      return _buildProgramSelector(
+                        ref,
+                        programs,
+                        selectedProgram,
+                      );
                     },
                   ),
 
                   // --- Detalles del Programa ---
                   Expanded(
-                    // La lógica ahora es simple: si selectedProgram es null,
-                    // muestra el texto. Si no, muestra los detalles.
-                    // El listener de initState se encarga de que
-                    // selectedProgram esté siempre sincronizado.
                     child: programsAsync.isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : selectedProgram == null
-                            ? Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(24.0),
-                                  child: Text(
-                                    programsAsync.valueOrNull?.isEmpty ?? true
-                                        ? 'Este jugador no tiene programas.'
-                                        : 'Selecciona un programa para ver.',
-                                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                          color: Theme.of(context).textTheme.bodySmall?.color,
-                                        ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              )
-                            : _buildProgramDetails(selectedProgram),
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Text(
+                                programsAsync.valueOrNull?.isEmpty ?? true
+                                    ? 'Este jugador no tiene programas.'
+                                    : 'Selecciona un programa para ver.',
+                                style: Theme.of(context).textTheme.bodyLarge
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall?.color,
+                                    ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          )
+                        : _buildProgramDetails(selectedProgram),
                   ),
                 ],
               );
             },
           ),
-          
-          // --- NUEVO: Overlay de Carga No-Modal ---
+
+          // --- Overlay de Carga No-Modal ---
           if (isGenerating)
             Container(
               color: Colors.black.withOpacity(0.5),
@@ -249,11 +284,15 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
+                    CircularProgressIndicator(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'Generando programa (IA)...',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge?.copyWith(color: Colors.white),
                     ),
                   ],
                 ),
@@ -261,69 +300,78 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
             ),
         ],
       ),
-      
+
       floatingActionButton: FloatingActionButton(
         tooltip: 'Crear Programa',
         child: const Icon(Icons.add),
-        onPressed: isGenerating ? null : () { // Deshabilitado si ya está generando
-          
-          // --- LÓGICA DE PERFIL SIMPLIFICADA ---
-          // Ahora leemos el FutureProvider reactivo
-          final profile = selectedProfileAsync.valueOrNull;
+        onPressed: isGenerating
+            ? null
+            : () {
+                // [CORRECCIÓN CRÍTICA 1]: Usamos el valor del AsyncValue que ya observamos
+                final profile = selectedProfileAsync;
 
-          if (profile != null) {
-            _showGenerationChoice(context, profile);
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Este jugador no tiene un perfil de evaluación.')),
-            );
-          }
-        },
+                // [CORRECCIÓN CRÍTICA 2]: Aseguramos que el perfil sea PlayerProfile
+                if (profile != null) {
+                  // profile aquí es de tipo PlayerProfile, que es lo que espera la función.
+                  _showGenerationChoice(context, profile);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Selecciona un jugador con un perfil de evaluación.',
+                      ),
+                    ),
+                  );
+                }
+              },
       ),
     );
   }
 
-  // --- Widgets de UI (Refactorizados con Colores de Tema) ---
+  // --- WIDGETS AUXILIARES (Con Tipos Corregidos) ---
 
-  Widget _buildPlayerSelector(WidgetRef ref, List<app_user.User> players, app_user.User? selectedPlayer) {
+  // [CORRECCIÓN] Acepta List<PlayerWithProfile> y PlayerWithProfile?
+  Widget _buildPlayerSelector(
+    WidgetRef ref,
+    List<PlayerWithProfile> playersCombos,
+    PlayerWithProfile? selectedPlayerCombo,
+  ) {
     final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(16.0),
-      // --- TEMA ---
-      color: theme.colorScheme.surfaceVariant.withOpacity(0.3), 
-      child: DropdownButtonFormField<app_user.User>(
-        value: selectedPlayer,
+      color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+      // [CORRECCIÓN] Dropdown para PlayerWithProfile
+      child: DropdownButtonFormField<PlayerWithProfile>(
+        value: selectedPlayerCombo,
         isExpanded: true,
         decoration: InputDecoration(
           labelText: 'Seleccionar Jugador',
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          // --- TEMA ---
           filled: true,
           fillColor: theme.colorScheme.surface,
         ),
-        items: players.map((user) {
-          return DropdownMenuItem<app_user.User>(
-            value: user,
-            child: Text(user.name, overflow: TextOverflow.ellipsis),
+        items: playersCombos.map((combo) {
+          return DropdownMenuItem<PlayerWithProfile>(
+            value: combo,
+            child: Text(combo.player.name, overflow: TextOverflow.ellipsis),
           );
         }).toList(),
-        onChanged: (app_user.User? newValue) {
-          // --- LÓGICA SIMPLIFICADA ---
-          // 1. Actualiza el jugador
+        onChanged: (PlayerWithProfile? newValue) {
+          // [CORRECCIÓN CRÍTICA] Asignamos el objeto PlayerWithProfile completo
           ref.read(explorerSelectedPlayerProvider.notifier).state = newValue;
-          // 2. Resetea el programa
           ref.read(explorerSelectedProgramProvider.notifier).state = null;
-          
-          // ¡Y YA ESTÁ! Los otros providers (perfil y programas) 
-          // reaccionarán automáticamente a este cambio.
         },
       ),
     );
   }
 
-  Widget _buildProgramSelector(WidgetRef ref, List<Program> programs, Program? selectedProgram) {
+  Widget _buildProgramSelector(
+    WidgetRef ref,
+    List<Program> programs,
+    Program? selectedProgram,
+  ) {
     final theme = Theme.of(context);
-    
+
     // El listener en initState se encarga de que 'selectedProgram'
     // sea null si 'programs' está vacío.
     if (programs.isEmpty) {
@@ -342,10 +390,8 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
         ),
       );
     }
-      
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      // --- TEMA ---
       color: theme.colorScheme.secondaryContainer.withOpacity(0.2),
       child: DropdownButtonFormField<Program>(
         value: selectedProgram,
@@ -353,7 +399,6 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
         decoration: InputDecoration(
           labelText: 'Seleccionar Programa',
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          // --- TEMA ---
           filled: true,
           fillColor: theme.colorScheme.surface,
         ),
@@ -374,6 +419,7 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
   }
 
   Widget _buildProgramDetails(Program program) {
+    // ... (Tu implementación de _buildProgramDetails)
     final theme = Theme.of(context);
     return ListView.builder(
       padding: const EdgeInsets.all(16.0),
@@ -381,7 +427,6 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
       itemBuilder: (context, i) {
         final m = program.mesocycles[i];
         return Card(
-          // --- TEMA ---
           color: theme.colorScheme.surface,
           surfaceTintColor: theme.colorScheme.surface,
           margin: const EdgeInsets.only(bottom: 12),
@@ -389,18 +434,22 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
           child: ExpansionTile(
             title: Text(
               m.name,
-              style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.primary,
+              ),
             ),
             subtitle: Text('${m.weeks} semanas — Enfoque: ${m.focus}'),
             children: m.microcycles.map((mc) {
               return ListTile(
                 leading: CircleAvatar(
-                  // --- TEMA ---
                   backgroundColor: theme.colorScheme.secondary,
                   child: Text(
                     '${mc.weekNumber}',
-                    // --- TEMA ---
-                    style: TextStyle(color: theme.colorScheme.onSecondary, fontSize: 12),
+                    style: TextStyle(
+                      color: theme.colorScheme.onSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
                 title: Text('Semana ${mc.weekNumber}'),
@@ -418,11 +467,11 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
   }
 
   void _showWeekDetails(BuildContext context, Microcycle mc) {
+    // ... (Tu implementación de _showWeekDetails)
     final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      // --- TEMA ---
       backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -439,8 +488,9 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    // --- TEMA ---
-                    color: theme.colorScheme.secondaryContainer.withOpacity(0.3),
+                    color: theme.colorScheme.secondaryContainer.withOpacity(
+                      0.3,
+                    ),
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(20),
                     ),
@@ -448,11 +498,16 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.calendar_today, color: theme.colorScheme.secondary),
+                      Icon(
+                        Icons.calendar_today,
+                        color: theme.colorScheme.secondary,
+                      ),
                       const SizedBox(width: 12),
                       Text(
                         'Semana ${mc.weekNumber}',
-                        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -466,8 +521,9 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                       final s = mc.sessions[index];
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
-                        // --- TEMA ---
-                        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                        color: theme.colorScheme.surfaceVariant.withOpacity(
+                          0.3,
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: Column(
@@ -477,14 +533,16 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                                 children: [
                                   Icon(
                                     Icons.fitness_center,
-                                    // --- TEMA ---
                                     color: theme.colorScheme.primary,
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       s.day,
-                                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                      style: theme.textTheme.titleLarge
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                     ),
                                   ),
                                 ],
@@ -492,7 +550,9 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                               const SizedBox(height: 8),
                               Text(
                                 'Objetivo: ${s.objective}',
-                                style: theme.textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontStyle: FontStyle.italic,
+                                ),
                               ),
                               const SizedBox(height: 4),
                               Text(
@@ -502,19 +562,34 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                               const Divider(height: 16),
                               Text(
                                 'Ejercicios:',
-                                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                               const SizedBox(height: 8),
-                              ...s.exercises.map((e) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 4),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text('• ', style: TextStyle(fontSize: 16, color: theme.colorScheme.primary)),
-                                        Expanded(child: Text('${e.name} (${e.sets}x${e.reps} @ ${e.intensity})')),
-                                      ],
-                                    ),
-                                  )),
+                              ...s.exercises.map(
+                                (e) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '• ',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Text(
+                                          '${e.name} (${e.sets}x${e.reps} @ ${e.intensity})',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),

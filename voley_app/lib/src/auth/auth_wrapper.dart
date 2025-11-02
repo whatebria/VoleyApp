@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/auth/login_screen.dart';
-import 'package:voley_app/src/screens/home_screen.dart' hide isLoggingOutProvider;
+import 'package:voley_app/src/screens/home_screen.dart';
 import 'package:voley_app/src/screens/player_home_screen.dart';
 // 1. Importa el auth_provider para acceder al authStateProvider
 import 'package:voley_app/providers/auth_provider.dart';
 
 class AuthWrapper extends ConsumerWidget {
-  const AuthWrapper({Key? key}) : super(key: key);
+  const AuthWrapper({super.key});
   
   @override
   Widget build(BuildContext context, WidgetRef ref) {

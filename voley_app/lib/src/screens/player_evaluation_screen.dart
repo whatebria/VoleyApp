@@ -1,8 +1,8 @@
-// lib/src/screens/player_evaluation_screen.dart
+// lib/src/screens/player_evaluation_screen.dart (CORREGIDO)
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
-import 'package:voley_app/providers/providers.dart'; // Importa 'ownProfileProvider'
+import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/availability.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
@@ -19,7 +19,7 @@ class PlayerEvaluationScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen> {
-  // --- Estado del Formulario ---
+  // --- Estado del Formulario y Controladores ---
   final _formKey = GlobalKey<FormState>();
   final nameCtrl = TextEditingController();
   String selectedPosition = 'Central';
@@ -39,17 +39,36 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
 
   // --- Estado de la Pantalla ---
   late final FirestoreService _firestoreService;
-  PlayerProfile? _loadedProfile;
+  PlayerProfile? _loadedProfile; // Usado para saber si es CREAR o EDITAR
   bool _isSubmitting = false;
-  bool _isFormPopulated = false; // Flag para evitar repoblar
 
   @override
   void initState() {
     super.initState();
     _firestoreService = ref.read(firestoreProvider);
+    // [CORRECCIÓN] Eliminamos toda la lógica de carga de initState
   }
 
-  void _populateForm(PlayerProfile p) {
+  // Lógica de llenado de formulario
+  void _populateForm(PlayerProfile? p) {
+    // Si p es null, se usa para inicializar un formulario nuevo
+    if (p == null) {
+      final userName = ref.read(currentUserAppUserProvider).value?.name ?? 'Jugador';
+      setState(() {
+        _loadedProfile = null;
+        nameCtrl.text = userName;
+        selectedPosition = 'Central';
+        selectedLevel = 'Competitivo';
+        selectedDays = [];
+        _selectedDurationMinutes = 60;
+        selectedInjuries = ['Ninguna'];
+        _selectedTournaments = [];
+        _testScores = {};
+      });
+      return;
+    }
+
+    // Si p tiene datos, cargamos el formulario para editar
     setState(() {
       _loadedProfile = p;
       nameCtrl.text = p.name;
@@ -59,18 +78,10 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
       _selectedDurationMinutes = p.availability.sessionMinutes;
       selectedInjuries = p.injuries.isEmpty ? ['Ninguna'] : p.injuries;
       _selectedTournaments = p.tournaments;
-      _testScores = p.evaluation.testScores;
-      _isFormPopulated = true;
+      _testScores = Map.from(p.evaluation.testScores); // Copia defensiva
     });
   }
 
-  void _populateNewForm() {
-    final userName = ref.read(currentUserAppUserProvider).value?.name ?? 'Jugador';
-    setState(() {
-      nameCtrl.text = userName;
-      _isFormPopulated = true;
-    });
-  }
 
   @override
   void dispose() {
@@ -78,7 +89,7 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
     super.dispose();
   }
 
-  // ... (Tus diálogos _showAddTournamentDialog y _showAddTestDialog se quedan igual) ...
+  // --- Diálogos (Omitidos por brevedad, asumiendo que están completos) ---
   Future<void> _showAddTournamentDialog() async { /* ... tu código ... */ }
   Future<void> _showAddTestDialog() async { /* ... tu código ... */ }
 
@@ -99,16 +110,17 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
       return;
     }
 
-    final appUser = ref.read(currentUserAppUserProvider).value;
+    final appUserAsync = ref.read(currentUserAppUserProvider);
+    final appUser = appUserAsync.value; 
+    
     if (appUser == null) {
-      _showError('Error: No se pudo identificar al jugador');
+      _showError('Error: No se pudo identificar al jugador. Intenta cerrar y abrir sesión.');
       return;
     }
 
     setState(() => _isSubmitting = true);
 
     try {
-      // (La lógica de guardado de 'profileToSave' es idéntica a tu código original)
       PlayerProfile profileToSave;
       final availability = Availability(
         trainingDays: selectedDays,
@@ -116,11 +128,13 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
       );
       final evaluation = EvaluationResult(
         testScores: _testScores,
-        strengths: _loadedProfile?.evaluation.strengths ?? [],
+        // Conservamos fortalezas/debilidades si existen
+        strengths: _loadedProfile?.evaluation.strengths ?? [], 
         weaknesses: _loadedProfile?.evaluation.weaknesses ?? [],
       );
 
       if (_loadedProfile != null) {
+        // --- ACTUALIZAR Perfil Existente ---
         profileToSave = _loadedProfile!.copyWith(
           position: selectedPosition,
           level: selectedLevel.toLowerCase(),
@@ -130,6 +144,7 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
           tournaments: _selectedTournaments,
         );
       } else {
+        // --- CREAR Perfil Nuevo ---
         profileToSave = PlayerProfile(
           id: const Uuid().v4(),
           userId: appUser.id,
@@ -137,7 +152,7 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
           name: nameCtrl.text.trim(),
           position: selectedPosition,
           level: selectedLevel.toLowerCase(),
-          goals: [],
+          goals: [], 
           injuries: selectedInjuries.contains('Ninguna') ? [] : selectedInjuries,
           availability: availability,
           evaluation: evaluation,
@@ -147,8 +162,11 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
 
       await _firestoreService.savePlayerProfile(profileToSave);
       
-      ref.read(playerProfileProvider.notifier).state = profileToSave;
-      ref.invalidate(ownProfileProvider); 
+      // --- [CORRECCIÓN CRÍTICA] INVALIDACIÓN DE PROVIDERS ---
+      // Invalidamos el FutureProvider original (que carga el perfil)
+      ref.invalidate(playerProfileProvider); 
+      // El generatedProgramProvider depende de playerProfileProvider, se actualizará solo.
+      // ----------------------------------------------------
 
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -158,7 +176,7 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context); // Vuelve a la pantalla de Perfil
+        Navigator.pop(context); 
       }
     } catch (e) {
       if (mounted) {
@@ -171,72 +189,76 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final profileAsync = ref.watch(ownProfileProvider);
+    
+    // [CORRECCIÓN] Observamos el FutureProvider completo
+    final profileAsync = ref.watch(playerProfileProvider);
+    
+    // [CORRECCIÓN] Escuchamos los cambios para llenar el formulario una vez
+    ref.listen<AsyncValue<PlayerProfile?>>(playerProfileProvider, (_, next) {
+        // El 'listen' solo se activa cuando el provider resuelve o cambia.
+        next.whenOrNull(
+          data: (profile) {
+            // Comprobamos si es la carga inicial o si el perfil ha cambiado
+            // forzamos el llenado solo si _loadedProfile es null (primera carga)
+            // o si el profile es diferente.
+            if (_loadedProfile == null || profile?.id != _loadedProfile?.id) {
+               _populateForm(profile);
+            }
+          },
+          // Si hay un error al cargar, también inicializamos el formulario vacío
+          error: (_, __) => _populateForm(null), 
+        );
+    });
 
     return Scaffold(
       appBar: AppBar(
         title: Text(_loadedProfile == null ? 'Crear Perfil' : 'Editar Perfil'),
       ),
+      // [CORRECCIÓN] Usamos profileAsync.when para el estado principal de la pantalla
       body: profileAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, s) => Center(child: Text('Error al cargar perfil: $e')),
-        data: (profile) {
-          
-          if (!_isFormPopulated) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (profile != null) {
-                _populateForm(profile);
-              } else {
-                _populateNewForm();
-              }
-            });
-            // Muestra un loader mientras se puebla el formulario
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          // --- MEJORA DE UI/UX: Stack para el botón pegajoso ---
-          return Stack(
-            children: [
-              Form(
-                key: _formKey,
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0), // Padding para el botón
-                  children: [
-                    // --- Sección 1: Perfil ---
-                    _buildSectionHeader(theme, Icons.person, "Perfil Básico"),
-                    _buildPerfilSection(theme),
-                    const SizedBox(height: 24),
-
-                    // --- Sección 2: Disponibilidad ---
-                    _buildSectionHeader(theme, Icons.calendar_today, "Disponibilidad"),
-                    _buildDisponibilidadSection(theme),
-                    const SizedBox(height: 24),
-
-                    // --- Sección 3: Estado Físico ---
-                    _buildSectionHeader(theme, Icons.healing, "Estado Físico"),
-                    _buildEstadoFisicoSection(theme),
-                    const SizedBox(height: 24),
-
-                    // --- Sección 4: Rendimiento ---
-                    _buildSectionHeader(theme, Icons.bar_chart, "Rendimiento"),
-                    _buildRendimientoSection(theme),
-                  ],
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Text('Error al cargar datos: $e', textAlign: TextAlign.center),
                 ),
               ),
+          data: (profile) {
+            // El resto del formulario se mantiene igual, ya que usa los estados locales
+            return Stack(
+              children: [
+                Form(
+                  key: _formKey,
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
+                    children: [
+                      _buildSectionHeader(theme, Icons.person, "Perfil Básico"),
+                      _buildPerfilSection(theme),
+                      const SizedBox(height: 24),
 
-              // --- MEJORA DE UI/UX: Botón de Guardar Pegajoso ---
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: _buildStickySaveButton(theme, _isSubmitting),
-              )
-            ],
-          );
-        },
-      ),
+                      _buildSectionHeader(theme, Icons.calendar_today, "Disponibilidad"),
+                      _buildDisponibilidadSection(theme),
+                      const SizedBox(height: 24),
+
+                      _buildSectionHeader(theme, Icons.healing, "Estado Físico"),
+                      _buildEstadoFisicoSection(theme),
+                      const SizedBox(height: 24),
+
+                      _buildSectionHeader(theme, Icons.bar_chart, "Rendimiento"),
+                      _buildRendimientoSection(theme),
+                    ],
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: _buildStickySaveButton(theme, _isSubmitting),
+                )
+              ],
+            );
+          }),
     );
   }
-
-  /// --- MEJORA DE UI: Encabezado de Sección ---
+  
   Widget _buildSectionHeader(ThemeData theme, IconData icon, String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),

@@ -125,7 +125,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
     if (feedback == null) return; // El usuario canceló
 
     ref.read(isSubmittingWorkoutProvider.notifier).state = true;
-    final profile = ref.read(ownProfileProvider).valueOrNull;
+    final profile = ref.read(playerProfileProvider).value;
 
     if (profile == null) {
       _showError('Error: No se encontró el perfil');
@@ -154,6 +154,8 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
     try {
       final firestore = ref.read(firestoreProvider);
       await firestore.saveSessionLog(log);
+      ref.invalidate(sessionLogHistoryProvider);
+      
       if (mounted) Navigator.pop(context);
     } catch (e) {
       _showError('Error al guardar: $e');
@@ -406,7 +408,6 @@ class _WorkoutExerciseCard extends ConsumerWidget {
   final Function(int, SetLog) onSetLogged;
 
   const _WorkoutExerciseCard({
-    Key? key,
     required this.exercise,
     required this.loggedSets,
     required this.onSetLogged,

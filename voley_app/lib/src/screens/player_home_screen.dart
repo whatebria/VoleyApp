@@ -2,13 +2,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/auth_provider.dart';
-import 'package:voley_app/providers/providers.dart';
-import 'package:voley_app/src/screens/exercise_library_screen.dart';
+// (Importa tus 3 pantallas de pestañas)
 import 'package:voley_app/src/screens/player_calendar_screen.dart';
+import 'package:voley_app/src/screens/exercise_library_screen.dart';
 import 'package:voley_app/src/screens/player_profile_screen.dart';
 
+// --- (CAMBIADO A ConsumerStatefulWidget) ---
 class PlayerHomeScreen extends ConsumerStatefulWidget {
-  const PlayerHomeScreen({super.key});
+  const PlayerHomeScreen({Key? key}) : super(key: key);
 
   @override
   _PlayerHomeScreenState createState() => _PlayerHomeScreenState();
@@ -16,13 +17,12 @@ class PlayerHomeScreen extends ConsumerStatefulWidget {
 
 class _PlayerHomeScreenState extends ConsumerState<PlayerHomeScreen> {
   int _selectedIndex = 0;
-  bool _isLoadingProfile = true;
 
   // 1. Define las pantallas para tu navbar
   static const List<Widget> _widgetOptions = <Widget>[
-    PlayerCalendarScreen(), // Pestaña 0
+    PlayerCalendarScreen(),  // Pestaña 0
     ExerciseLibraryScreen(), // Pestaña 1
-    PlayerProfileScreen(), 
+    PlayerProfileScreen(), // Pestaña 2
   ];
 
   // 2. Define los títulos para la AppBar
@@ -32,31 +32,6 @@ class _PlayerHomeScreenState extends ConsumerState<PlayerHomeScreen> {
     'Mi Perfil'
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    // 3. Carga el perfil del jugador en cuanto entra a la app
-    //    Esto es crucial para que el calendario ('PlayerCalendarScreen')
-    //    y el perfil ('EvaluationScreen') funcionen.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadPlayerProfile();
-    });
-  }
-
-  Future<void> _loadPlayerProfile() async {
-    final authUser = ref.read(authStateProvider).value;
-    if (authUser != null) {
-      final firestore = ref.read(firestoreProvider);
-      final profile = await firestore.getPlayerProfileByUserId(authUser.uid);
-      if (profile != null) {
-        // Carga el perfil en el provider que las otras pantallas escuchan
-        ref.read(playerProfileProvider.notifier).state = profile;
-      }
-    }
-    if (mounted) {
-      setState(() { _isLoadingProfile = false; });
-    }
-  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -66,11 +41,7 @@ class _PlayerHomeScreenState extends ConsumerState<PlayerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Muestra una carga inicial mientras se busca el perfil
-    if (_isLoadingProfile) {
-       return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
+    // 4. --- (Ya no hay '_isLoadingProfile') ---
     return Scaffold(
       appBar: AppBar(
         title: Text(_widgetTitles[_selectedIndex]),
@@ -84,12 +55,10 @@ class _PlayerHomeScreenState extends ConsumerState<PlayerHomeScreen> {
           )
         ],
       ),
-      // Muestra la pantalla seleccionada
       body: IndexedStack(
         index: _selectedIndex,
         children: _widgetOptions,
       ),
-      // 4. La "Navbar" (BottomNavigationBar)
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(

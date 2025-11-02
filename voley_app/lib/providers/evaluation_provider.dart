@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:voley_app/providers/providers.dart';
+import 'package:voley_app/providers/providers.dart'; // Importa el archivo principal
 import 'package:voley_app/src/models/user.dart' as app_user;
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/availability.dart';
@@ -10,8 +10,7 @@ import 'package:voley_app/src/models/player_profile/tournament.dart';
 import 'package:uuid/uuid.dart';
 
 // --- 1. Define el ESTADO que gestionará el controlador ---
-// Este estado SÍ incluye el modo/usuario seleccionado,
-// pero NO incluye los valores de los TextFields.
+// (Sin cambios, tu clase EvaluationState es correcta)
 @immutable
 class EvaluationState {
   // --- Estados de carga y UI ---
@@ -25,7 +24,9 @@ class EvaluationState {
   
   // --- Datos cargados ---
   final AsyncValue<app_user.User?> currentUser; // El usuario logueado
-  final AsyncValue<List<app_user.User>> availablePlayers; // Jugadores del coach
+  // [CAMBIO] Cambiado a usar el provider `coachPlayersWithProfilesProvider`
+  // para tener perfiles y jugadores juntos, simplificando la lógica.
+  final AsyncValue<List<PlayerWithProfile>> availablePlayersWithProfiles;
   final AsyncValue<PlayerProfile?> loadedProfile; // El perfil del selectedUser
 
   // --- Constructor ---
@@ -36,7 +37,7 @@ class EvaluationState {
     this.isCreatingNewUser = true,
     this.selectedUser,
     this.currentUser = const AsyncLoading(),
-    this.availablePlayers = const AsyncLoading(),
+    this.availablePlayersWithProfiles = const AsyncLoading(),
     this.loadedProfile = const AsyncLoading(),
   });
 
@@ -46,20 +47,25 @@ class EvaluationState {
     String? successMessage,
     String? errorMessage,
     bool? isCreatingNewUser,
+    // [CAMBIO] Hacemos 'selectedUser' nulleable en copyWith
     app_user.User? selectedUser,
+    bool clearSelectedUser = false, // Flag para limpiar
     AsyncValue<app_user.User?>? currentUser,
-    AsyncValue<List<app_user.User>>? availablePlayers,
+    AsyncValue<List<PlayerWithProfile>>? availablePlayersWithProfiles,
     AsyncValue<PlayerProfile?>? loadedProfile,
+    bool clearLoadedProfile = false, // Flag para limpiar
   }) {
     return EvaluationState(
       isSubmitting: isSubmitting ?? this.isSubmitting,
       successMessage: successMessage, // Null por defecto para limpiar
       errorMessage: errorMessage, // Null por defecto para limpiar
       isCreatingNewUser: isCreatingNewUser ?? this.isCreatingNewUser,
-      selectedUser: selectedUser ?? this.selectedUser,
+      selectedUser: clearSelectedUser ? null : (selectedUser ?? this.selectedUser),
       currentUser: currentUser ?? this.currentUser,
-      availablePlayers: availablePlayers ?? this.availablePlayers,
-      loadedProfile: loadedProfile ?? this.loadedProfile,
+      availablePlayersWithProfiles:
+          availablePlayersWithProfiles ?? this.availablePlayersWithProfiles,
+      loadedProfile:
+          clearLoadedProfile ? const AsyncData(null) : (loadedProfile ?? this.loadedProfile),
     );
   }
 }
@@ -73,17 +79,16 @@ class EvaluationController extends AutoDisposeNotifier<EvaluationState> {
 
   @override
   EvaluationState build() {
+    // El 'build' está vacío, la lógica se dispara con `init()`
+    // Esto es un patrón válido para controladores de "página".
     return const EvaluationState();
   }
 
- Future<void> init() async {
-    
-
-
+  Future<void> init() async {
     state = state.copyWith(currentUser: const AsyncLoading());
     
     try {
-      // ¡ARREGLO! Usa 'ref.read' aquí, no 'ref.watch'.
+      // Usa 'ref.read' para obtener el valor de un Future una vez.
       final user = await ref.read(currentUserAppUserProvider.future);
 
       if (user == null) throw Exception("Usuario no encontrado.");
@@ -91,34 +96,38 @@ class EvaluationController extends AutoDisposeNotifier<EvaluationState> {
       state = state.copyWith(currentUser: AsyncData(user));
       
       if (user.isCoach) {
-        await _loadCoachPlayers(); // Espera a que carguen
+        // [CAMBIO] Llama a la función corregida
+        await _loadCoachPlayersWithProfiles();
       } else {
         // Es Jugador: Forzar modo edición y cargar su propio perfil
         state = state.copyWith(
           isCreatingNewUser: false, 
           selectedUser: user
         );
-        // No necesitas 'await' aquí si no depende de _loadCoachPlayers
-        _loadProfileForUser(user.id);
+        // Carga su propio perfil
+        await _loadProfileForUser(user.id);
       }
     } catch (e, s) {
       state = state.copyWith(currentUser: AsyncError(e, s));
     }
   }
 
-  /// Carga los jugadores de un coach
-  Future<void> _loadCoachPlayers() async {
-    state = state.copyWith(availablePlayers: const AsyncLoading());
-    final playersAsync = ref.watch(coachPlayersProvider.future);
+  /// [REFACTORIZADO] Carga jugadores y perfiles de un coach
+  Future<void> _loadCoachPlayersWithProfiles() async {
+    state = state.copyWith(availablePlayersWithProfiles: const AsyncLoading());
     try {
-      final players = await playersAsync;
-      state = state.copyWith(availablePlayers: AsyncData(players));
+      // [CAMBIO] Usa `ref.read` (no `watch`) y lee el provider que ya
+      // agrupa jugadores con perfiles.
+      final playersWithProfiles =
+          await ref.read(coachPlayersWithProfilesProvider.future);
+      state = state.copyWith(
+          availablePlayersWithProfiles: AsyncData(playersWithProfiles));
     } catch (e, s) {
-      state = state.copyWith(availablePlayers: AsyncError(e, s));
+      state = state.copyWith(availablePlayersWithProfiles: AsyncError(e, s));
     }
   }
   
-  /// Carga el perfil de un jugador específico
+  /// Carga el perfil de un jugador específico (sin cambios)
   Future<void> _loadProfileForUser(String userId) async {
     state = state.copyWith(loadedProfile: const AsyncLoading());
     try {
@@ -134,21 +143,25 @@ class EvaluationController extends AutoDisposeNotifier<EvaluationState> {
   void setMode(bool isCreating) {
     state = state.copyWith(
       isCreatingNewUser: isCreating,
-      selectedUser: null, // Limpia la selección
-      loadedProfile: const AsyncData(null), // Limpia el perfil cargado
+      clearSelectedUser: true, // Limpia la selección
+      clearLoadedProfile: true, // Limpia el perfil cargado
     );
   }
 
-  /// Selecciona un jugador del Dropdown
-  void selectUser(app_user.User? user) {
-    if (user == null) {
+  /// [REFACTORIZADO] Selecciona un jugador (con perfil) del Dropdown
+  void selectPlayer(PlayerWithProfile? playerWithProfile) {
+    if (playerWithProfile == null) {
       state = state.copyWith(
-        selectedUser: null,
-        loadedProfile: const AsyncData(null)
+        clearSelectedUser: true,
+        clearLoadedProfile: true,
       );
     } else {
-      state = state.copyWith(selectedUser: user);
-      _loadProfileForUser(user.id);
+      // Almacenamos el usuario y su perfil ya cargado.
+      // No necesitamos volver a buscarlo en Firestore.
+      state = state.copyWith(
+        selectedUser: playerWithProfile.player,
+        loadedProfile: AsyncData(playerWithProfile.profile),
+      );
     }
   }
   
@@ -158,7 +171,6 @@ class EvaluationController extends AutoDisposeNotifier<EvaluationState> {
   }
 
   /// --- LÓGICA DE GUARDADO CENTRALIZADA ---
-  /// Recibe los datos del formulario desde la UI
   Future<void> handleSubmit({
     // Datos del formulario
     required String name,
@@ -230,14 +242,13 @@ class EvaluationController extends AutoDisposeNotifier<EvaluationState> {
         if (loadedProfile != null) {
           // A. Actualizar Perfil Existente
           profileToSave = loadedProfile.copyWith(
-            // El jugador o coach solo puede actualizar estas partes
             position: position,
             level: level.toLowerCase(),
             injuries: injuries.contains('Ninguna') ? [] : injuries,
             availability: availability,
             tournaments: tournaments,
             evaluation: loadedProfile.evaluation.copyWith(
-              testScores: testScores, // El coach actualiza esto
+              testScores: testScores, 
             ),
           );
         } else {
@@ -246,7 +257,9 @@ class EvaluationController extends AutoDisposeNotifier<EvaluationState> {
             id: _uuid.v4(),
             userId: selectedUser.id,
             assignedCoachId: coachIdToAssign,
-            name: name, // El nombre viene del 'selectedUser'
+            // [CAMBIO] Usamos el nombre del usuario existente, no el del formulario.
+            // El campo 'name' del formulario solo debería usarse para 'isCreatingNewUser'
+            name: selectedUser.name, 
             position: position,
             level: level.toLowerCase(),
             goals: [],
@@ -262,14 +275,34 @@ class EvaluationController extends AutoDisposeNotifier<EvaluationState> {
         }
       }
 
-      // --- PASO FINAL: GUARDAR ---
+      // --- [REFACTORIZADO] PASO FINAL: GUARDAR E INVALIDAR ---
       await _firestore.savePlayerProfile(profileToSave);
-      ref.read(playerProfileProvider.notifier).state = profileToSave; // Actualiza el provider global
+      
+      // ¡Esta es la parte clave!
+      // Invalidamos los providers correctos para que la app se actualice
+      // automáticamente en todas las pantallas.
+      
+      if (currentUser.isCoach) {
+        // Un coach está editando/creando.
+        // Refrescar la lista de jugadores con perfiles en el explorador.
+        ref.invalidate(coachPlayersWithProfilesProvider);
+        
+        // Si el jugador editado es el que estaba seleccionado,
+        // refrescar también su perfil detallado.
+        if (state.selectedUser?.id == ref.read(explorerSelectedPlayerProvider)?.player.id) {
+           ref.invalidate(selectedPlayerProfileProvider);
+        }
+
+      } else {
+        // Un jugador está editando su *propio* perfil.
+        // Refrescar el provider global de su perfil.
+        ref.invalidate(playerProfileProvider);
+      }
       
       state = state.copyWith(
         isSubmitting: false, 
         successMessage: "Evaluación guardada exitosamente",
-        loadedProfile: AsyncData(profileToSave), // Asegura que el estado se actualice
+        loadedProfile: AsyncData(profileToSave), // Asegura que el estado local se actualice
       );
 
     } catch (e) {

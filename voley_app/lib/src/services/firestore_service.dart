@@ -252,7 +252,7 @@ class FirestoreService {
     final snap = await _db
         .collection('players')
         .doc(profileId)
-        .collection('feedback') // O 'session_logs', como lo hayas llamado
+        .collection('session_logs') // O 'session_logs', como lo hayas llamado
         .orderBy('completedAt', descending: true)
         .limit(50) // Limita a las últimas 50 sesiones para performance
         .get();
@@ -383,25 +383,7 @@ class FirestoreService {
 
   /// Observa el perfil del jugador y, si existe,
   /// obtiene un [Stream] de su programa más reciente.
-  final playerProgramProvider = StreamProvider<Program?>((ref) {
-    // 1. Depende del FutureProvider del perfil
-    final profileAsync = ref.watch(ownProfileProvider);
-
-    // 2. Mapea el estado del perfil al stream del programa
-    return profileAsync.when(
-      data: (profile) {
-        if (profile == null) {
-          // Si no hay perfil, no hay programa.
-          return Stream.value(null);
-        }
-        // Si hay perfil, escucha el stream del programa
-        return ref.read(firestoreProvider).getLatestProgramStream(profile.id);
-      },
-      // Mientras el perfil carga o da error, no hay programa.
-      loading: () => Stream.value(null),
-      error: (e, s) => Stream.error(e, s),
-    );
-  });
+  
   Future<void> saveSessionLog(SessionLog log) {
     return _db
         .collection('players')
@@ -410,4 +392,40 @@ class FirestoreService {
         .doc(log.id)
         .set(log.toJson());
   }
+
+  Stream<List<SessionLog>> getSessionHistoryStream(String profileId) {
+    return _db
+        .collection('players')
+        .doc(profileId)
+        .collection('session_logs') // La colección donde se guardan los SessionLog
+        .orderBy('completedAt', descending: true) 
+        .snapshots() // <-- USA .snapshots() EN LUGAR DE .get()
+        .map((snapshot) {
+      if (snapshot.docs.isEmpty) {
+        return []; 
+      }
+      return snapshot.docs
+          .map((doc) => SessionLog.fromJson(doc.data()))
+          .toList();
+    });
+  }
+final playerProgramProvider = StreamProvider<Program?>((ref) {
+  // 1. "Observa" (watch) el resultado del FutureProvider de perfil
+  final profileAsync = ref.watch(playerProfileProvider);
+
+  // 2. Mapea el resultado
+  return profileAsync.when(
+    data: (profile) {
+      if (profile == null) {
+        return Stream.value(null); // Sin perfil -> Sin programa
+      }
+      // 3. Si hay perfil, escucha el stream del programa
+      return ref.read(firestoreProvider).getLatestProgramStream(profile.id);
+    },
+    loading: () => Stream.value(null), // Cargando perfil -> Cargando programa
+    error: (e, s) => Stream.error(e, s), // Error de perfil -> Error de programa
+  );
+});
 }
+
+
