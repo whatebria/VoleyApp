@@ -13,6 +13,8 @@ class PlayerProfile {
   final Availability availability;
   final EvaluationResult evaluation;
   final List<Tournament> tournaments;
+  final String? assignedCoachId; // UID del entrenador asignado
+  final List<String> equipment; // Equipamiento disponible
 
   PlayerProfile({
     required this.id,
@@ -25,6 +27,8 @@ class PlayerProfile {
     required this.availability,
     required this.evaluation,
     required this.tournaments,
+    this.assignedCoachId,
+    this.equipment = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -38,6 +42,8 @@ class PlayerProfile {
         'availability': availability.toJson(),
         'evaluation': evaluation.toJson(),
         'tournaments': tournaments.map((t) => t.toJson()).toList(),
+        'assignedCoachId': assignedCoachId,
+        'equipment': equipment,
       };
 
   static PlayerProfile fromJson(Map<String, dynamic> json) => PlayerProfile(
@@ -53,5 +59,7 @@ class PlayerProfile {
         tournaments: (json['tournaments'] as List<dynamic>? ?? [])
             .map((t) => Tournament.fromJson(Map<String, dynamic>.from(t)))
             .toList(),
+        assignedCoachId: json['assignedCoachId'],
+        equipment: List<String>.from(json['equipment'] ?? []),
       );
 }

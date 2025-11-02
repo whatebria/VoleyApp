@@ -1,6 +1,5 @@
 import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import * as functions from "firebase-functions";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -244,7 +243,7 @@ export const generateMyProgram = onCall(async (request) => {
     );
 
     // 2. Recolección de Datos
-    const userDoc = await db.collection("users").doc(targetPlayerId).get();
+    const userDoc = await db.collection("players").doc(targetPlayerId).get();
     if (!userDoc.exists) {
       throw new HttpsError("not-found", "Perfil de jugador no encontrado.");
     }
@@ -280,7 +279,7 @@ export const generateMyProgram = onCall(async (request) => {
 
     // Guardar el programa en la subcolección del JUGADOR OBJETIVO
     const programRef = await db
-      .collection("users")
+      .collection("players")
       .doc(targetPlayerId) // <-- Guardar en el perfil del jugador
       .collection("programs")
       .add(programData);
