@@ -25,6 +25,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
   final positionCtrl = TextEditingController();
   final levelCtrl = TextEditingController();
   final testScoreCtrl = TextEditingController();
+  final testScoreNameCtrl = TextEditingController(); // New: for test score name
   final sessionMinutesCtrl = TextEditingController(); // <-- 1. AÑADIDO
   final uuid = Uuid();
   final _firestoreService = FirestoreService();
@@ -39,6 +40,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
   // User selection state
   bool _isCreatingNewUser = true;
   app_user.User? _selectedUser;
+  PlayerProfile? _selectedUserProfile; // New: to store loaded profile
   List<app_user.User> _availablePlayers = [];
   bool _isLoading = true;
   String? _currentCoachId;
@@ -58,6 +60,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
     positionCtrl.dispose();
     levelCtrl.dispose();
     testScoreCtrl.dispose();
+    testScoreNameCtrl.dispose();
     sessionMinutesCtrl.dispose(); // <-- 3. AÑADIDO
     super.dispose();
   }
@@ -101,17 +104,57 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
     }
   }
 
-  void _onUserSelected(app_user.User? user) {
+  Future<void> _onUserSelected(app_user.User? user) async {
     setState(() {
       _selectedUser = user;
-      if (user != null) {
-        nameCtrl.text = user.name;
-        emailCtrl.text = user.email;
-      } else {
+      _selectedUserProfile = null;
+    });
+
+    if (user != null) {
+      // Load the player's profile
+      try {
+        final profile = await _firestoreService.getPlayerProfileByUserId(user.id);
+        
+        if (mounted) {
+          setState(() {
+            _selectedUserProfile = profile;
+            
+            // Populate all fields with existing data
+            nameCtrl.text = user.name;
+            emailCtrl.text = user.email;
+            
+            if (profile != null) {
+              selectedPosition = profile.position;
+              selectedLevel = profile.level;
+              selectedDays = List.from(profile.availability.trainingDays);
+              sessionMinutesCtrl.text = profile.availability.sessionMinutes.toString();
+              selectedInjuries = List.from(profile.injuries);
+              _selectedTournaments = List.from(profile.tournaments);
+              
+              // Clear test score fields for new entry
+              testScoreNameCtrl.clear();
+              testScoreCtrl.clear();
+            }
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al cargar perfil: $e'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } else {
+      setState(() {
         nameCtrl.clear();
         emailCtrl.clear();
-      }
-    });
+        testScoreNameCtrl.clear();
+        testScoreCtrl.clear();
+      });
+    }
   }
 
   Future<void> _showAddTournamentDialog() async {
@@ -352,7 +395,8 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                         labelText: 'Nombre *',
                         border: OutlineInputBorder(),
                       ),
-                      enabled: _isCreatingNewUser || _selectedUser != null,
+                      enabled: _isCreatingNewUser,
+                      readOnly: !_isCreatingNewUser,
                     ),
                   ],
                 ),
@@ -386,15 +430,15 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                                 );
                               })
                               .toList(),
-                      onChanged: (newValue) {
+                      onChanged: _isCreatingNewUser ? (newValue) {
                         setState(() {
                           selectedPosition = newValue!;
                         });
-                      },
+                      } : null,
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: selectedLevel,
+                      value: selectedLevel,
                       decoration: const InputDecoration(
                         labelText: 'Nivel',
                         border: OutlineInputBorder(),
@@ -405,11 +449,11 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                           child: Text(value),
                         );
                       }).toList(),
-                      onChanged: (newValue) {
+                      onChanged: _isCreatingNewUser ? (newValue) {
                         setState(() {
                           selectedLevel = newValue!;
                         });
-                      },
+                      } : null,
                     ),
                   ],
                 ),
@@ -431,7 +475,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                     CheckboxListTile(
                       title: const Text('Lunes'),
                       value: selectedDays.contains('Lunes'),
-                      onChanged: (bool? value) {
+                      onChanged: _isCreatingNewUser ? (bool? value) {
                         setState(() {
                           if (value == true) {
                             selectedDays.add('Lunes');
@@ -439,12 +483,12 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                             selectedDays.remove('Lunes');
                           }
                         });
-                      },
+                      } : null,
                     ),
                     CheckboxListTile(
                       title: const Text('Miércoles'),
                       value: selectedDays.contains('Miércoles'),
-                      onChanged: (bool? value) {
+                      onChanged: _isCreatingNewUser ? (bool? value) {
                         setState(() {
                           if (value == true) {
                             selectedDays.add('Miércoles');
@@ -452,12 +496,12 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                             selectedDays.remove('Miércoles');
                           }
                         });
-                      },
+                      } : null,
                     ),
                     CheckboxListTile(
                       title: const Text('Viernes'),
                       value: selectedDays.contains('Viernes'),
-                      onChanged: (bool? value) {
+                      onChanged: _isCreatingNewUser ? (bool? value) {
                         setState(() {
                           if (value == true) {
                             selectedDays.add('Viernes');
@@ -465,7 +509,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                             selectedDays.remove('Viernes');
                           }
                         });
-                      },
+                      } : null,
                     ),
                     // --- CAMPO AÑADIDO ---
                     const SizedBox(height: 8),
@@ -476,6 +520,8 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                         border: OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.number,
+                      enabled: _isCreatingNewUser,
+                      readOnly: !_isCreatingNewUser,
                     ),
                     // --- FIN DEL CAMPO AÑADIDO ---
                   ],
@@ -513,7 +559,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                         return FilterChip(
                           label: Text(injury),
                           selected: isSelected,
-                          onSelected: (bool selected) {
+                          onSelected: _isCreatingNewUser ? (bool selected) {
                             setState(() {
                               if (injury == 'Ninguna') {
                                 // Si selecciona "Ninguna", limpiar todas las demás
@@ -533,7 +579,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                                 }
                               }
                             });
-                          },
+                          } : null,
                         );
                       }).toList(),
                     ),
