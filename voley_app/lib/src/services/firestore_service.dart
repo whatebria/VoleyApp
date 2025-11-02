@@ -338,4 +338,29 @@ class FirestoreService {
         .doc(sessionId)
         .set(feedback);
   }
+  Stream<List<app_user.User>> getPlayersByCoachStream(String coachId) {
+    return _db
+        .collection('coach_player_permissions')
+        .where('coachId', isEqualTo: coachId)
+        .where('status', isEqualTo: 'accepted')
+        .snapshots() // <-- 1. Usa .snapshots() para escuchar en tiempo real
+        .asyncMap((permissionsSnap) async { // <-- 2. Mapea el stream
+      
+      if (permissionsSnap.docs.isEmpty) return [];
+
+      // 3. Obtiene los IDs de los jugadores
+      final playerIds = permissionsSnap.docs
+          .map((doc) => doc.data()['playerId'] as String)
+          .toList();
+
+      if (playerIds.isEmpty) return [];
+
+      // 4. Busca todos los documentos de 'users' en paralelo (muy eficiente)
+      final playerFutures = playerIds.map((id) => getUser(id)).toList();
+      final players = await Future.wait(playerFutures);
+
+      // 5. Filtra los que no sean nulos y devuelve la lista
+      return players.whereType<app_user.User>().toList();
+    });
+  }
 }

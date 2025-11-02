@@ -1,7 +1,7 @@
 // lib/screens/evaluation_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:voley_app/providers/providers.dart';
+import 'package:voley_app/providers/providers.dart'; // Importa TODOS tus providers
 import 'package:voley_app/providers/auth_provider.dart';
 import 'package:voley_app/src/models/player_profile/availability.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
@@ -11,7 +11,7 @@ import 'package:voley_app/src/models/user.dart' as app_user;
 import 'package:voley_app/src/services/firestore_service.dart';
 import 'package:voley_app/src/auth/auth_service.dart';
 import 'package:uuid/uuid.dart';
-import 'package:intl/intl.dart'; // Import para el DatePicker
+import 'package:intl/intl.dart';
 
 class EvaluationScreen extends ConsumerStatefulWidget {
   @override
@@ -19,58 +19,49 @@ class EvaluationScreen extends ConsumerStatefulWidget {
 }
 
 class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
+  // Controladores
   final nameCtrl = TextEditingController();
   final emailCtrl = TextEditingController();
   final passwordCtrl = TextEditingController();
-  final positionCtrl = TextEditingController();
-  final levelCtrl = TextEditingController();
-  final testScoreCtrl = TextEditingController();
-  // final sessionMinutesCtrl = TextEditingController(); // <-- 1. ELIMINADO
   final uuid = Uuid();
-  final _firestoreService = FirestoreService();
-  final _authService = AuthService();
+  
+  // Instancias de servicios (leídas desde Riverpod)
+  late final FirestoreService _firestoreService;
+  late final AuthService _authService;
 
+  // Estado del formulario
   String selectedPosition = 'Central';
   String selectedLevel = 'Competitivo';
   List<Tournament> _selectedTournaments = [];
   List<String> selectedInjuries = [];
+  Map<String, double> _testScores = {};
 
-  // --- 1. CAMBIOS EN DISPONIBILIDAD ---
-  final List<String> _allDays = [
-    'Lunes',
-    'Martes',
-    'Miércoles',
-    'Jueves',
-    'Viernes',
-    'Sábado',
-    'Domingo',
-  ];
+  // Estado de Disponibilidad
+  final List<String> _allDays = [ 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo' ];
   List<String> selectedDays = [];
-
-  // Opciones para los rangos de duración (Texto amigable -> Valor en minutos)
   final Map<String, int> _durationOptions = {
-    '30-45 minutos': 45,
-    '45-60 minutos': 60,
-    '60-75 minutos': 75,
-    '75-90 minutos': 90,
-    '90+ minutos': 120,
+    '30-45 minutos': 45, '45-60 minutos': 60, '60-75 minutos': 75,
+    '75-90 minutos': 90, '90+ minutos': 120,
   };
-  // Valor seleccionado (60 minutos por defecto)
-  int _selectedDurationMinutes = 60;
-  // --- FIN CAMBIOS EN DISPONIBILIDAD ---
+  int _selectedDurationMinutes = 60; 
 
-  // User selection state
+  // Estado de la pantalla
   bool _isCreatingNewUser = true;
   app_user.User? _selectedUser;
-  List<app_user.User> _availablePlayers = [];
-  bool _isLoading = true;
+  PlayerProfile? _loadedProfile;
+  bool _isSubmitting = false; // Para el overlay de envío
   String? _currentCoachId;
+
+  /// Getter para saber si estamos en modo edición (y bloquear campos)
+  bool get _isExistingUser => !_isCreatingNewUser && _selectedUser != null;
 
   @override
   void initState() {
     super.initState();
-    // sessionMinutesCtrl.text = '60'; // <-- 2. ELIMINADO
-    _loadCoachPlayers();
+    // Obtenemos los servicios de Riverpod aquí
+    // Usamos 'read' porque están en initState, no cambiarán
+    _firestoreService = ref.read(firestoreProvider);
+    _authService = ref.read(authServiceProvider);
   }
 
   @override
@@ -78,67 +69,75 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
     nameCtrl.dispose();
     emailCtrl.dispose();
     passwordCtrl.dispose();
-    positionCtrl.dispose();
-    levelCtrl.dispose();
-    testScoreCtrl.dispose();
-    // sessionMinutesCtrl.dispose(); // <-- 3. ELIMINADO
     super.dispose();
   }
+  
+  /// Limpia todos los campos del formulario
+  void _clearForm() {
+      nameCtrl.clear();
+      emailCtrl.clear();
+      passwordCtrl.clear();
+      selectedPosition = 'Central';
+      selectedLevel = 'Competitivo';
+      selectedDays = [];
+      _selectedDurationMinutes = 60;
+      selectedInjuries = [];
+      _selectedTournaments = [];
+      _testScores = {};
+  }
 
-  Future<void> _loadCoachPlayers() async {
-    setState(() => _isLoading = true);
-
+  /// Carga el perfil completo del jugador seleccionado y rellena el formulario
+  Future<void> _loadProfileForUser(String userId) async {
+    setState(() => _isSubmitting = true); // Usamos el mismo overlay de carga
     try {
-      final currentFirebaseUser = ref.read(currentUserProvider);
-      if (currentFirebaseUser == null) {
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      _currentCoachId = currentFirebaseUser.uid;
-
-      final currentUser = await _firestoreService.getUser(
-        currentFirebaseUser.uid,
-      );
-
-      if (currentUser != null && currentUser.isCoach) {
-        _availablePlayers = await _firestoreService.getPlayersByCoach(
-          currentFirebaseUser.uid,
-        );
+      // Usamos el 'userId' (Auth ID) para buscar el perfil
+      _loadedProfile = await _firestoreService.getPlayerProfileByUserId(userId);
+      
+      if (_loadedProfile != null && mounted) {
+        final p = _loadedProfile!;
+        // Rellena el estado local con los datos del perfil cargado
+        setState(() {
+          nameCtrl.text = p.name;
+          selectedPosition = p.position;
+          selectedLevel = p.level.isNotEmpty ? p.level[0].toUpperCase() + p.level.substring(1) : 'Competitivo';
+          selectedDays = p.availability.trainingDays;
+          _selectedDurationMinutes = p.availability.sessionMinutes;
+          selectedInjuries = p.injuries;
+          _selectedTournaments = p.tournaments;
+          _testScores = p.evaluation.testScores;
+        });
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al cargar jugadores: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _showError('Error al cargar perfil: $e');
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() => _isSubmitting = false);
       }
     }
   }
 
+  /// Se llama al cambiar el Dropdown de "Usuario Existente"
   void _onUserSelected(app_user.User? user) {
     setState(() {
       _selectedUser = user;
+      _loadedProfile = null; 
+      _clearForm(); // Limpia todos los campos
+
       if (user != null) {
+        // Rellena los datos básicos del app_user.User
         nameCtrl.text = user.name;
-        emailCtrl.text = user.email;
-      } else {
-        nameCtrl.clear();
-        emailCtrl.clear();
+        emailCtrl.text = user.email; 
+        
+        // Carga el resto (Posición, Nivel, etc.) desde el PlayerProfile
+        _loadProfileForUser(user.id); 
       }
     });
   }
 
+  // ... (Diálogos _showAddTournamentDialog y _showAddTestDialog - sin cambios) ...
   Future<void> _showAddTournamentDialog() async {
     final nameController = TextEditingController();
     DateTime? pickedDate;
-
     await showDialog(
       context: context,
       builder: (context) {
@@ -151,9 +150,7 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                 children: [
                   TextField(
                     controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre del Torneo',
-                    ),
+                    decoration: const InputDecoration(labelText: 'Nombre del Torneo'),
                     autofocus: true,
                   ),
                   const SizedBox(height: 16),
@@ -189,12 +186,10 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                   onPressed: () {
                     if (nameController.text.isNotEmpty && pickedDate != null) {
                       setState(() {
-                        _selectedTournaments.add(
-                          Tournament(
-                            name: nameController.text,
-                            date: pickedDate!,
-                          ),
-                        );
+                        _selectedTournaments.add(Tournament(
+                          name: nameController.text,
+                          date: pickedDate!,
+                        ));
                       });
                       Navigator.pop(context);
                     }
@@ -209,251 +204,296 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Evaluación Inicial')),
-        body: const Center(child: CircularProgressIndicator()),
+  Future<void> _showAddTestDialog() async {
+    final nameController = TextEditingController();
+    final scoreController = TextEditingController();
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Añadir Puntuación de Test'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Nombre del Test (Ej: Salto Vertical)'),
+                autofocus: true,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: scoreController,
+                decoration: const InputDecoration(labelText: 'Puntuación (Ej: 55.5)'),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final score = double.tryParse(scoreController.text);
+                if (nameController.text.isNotEmpty && score != null) {
+                  setState(() {
+                    _testScores[nameController.text] = score;
+                  });
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Añadir'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showError(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
       );
     }
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+    // Carga reactiva de los datos del coach y sus jugadores
+    final coachUserAsync = ref.watch(currentUserAppUserProvider);
+    final availablePlayersAsync = ref.watch(coachPlayersProvider);
+    
+    // Widget de overlay de carga
+    final loadingOverlay = _isSubmitting
+        ? Container(
+            color: Colors.black.withOpacity(0.3),
+            child: const Center(child: CircularProgressIndicator()),
+          )
+        : const SizedBox.shrink();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Evaluación Inicial')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ... (Card de Selección de Usuario - sin cambios) ...
+      body: Stack(
+        children: [
+          // Espera a que el usuario (coach) esté cargado
+          coachUserAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e,s) => Center(child: Text("Error al cargar usuario: $e")),
+            data: (currentUser) {
+              if (currentUser == null) {
+                 return const Center(child: Text("No se pudo cargar el usuario."));
+              }
+              // Asigna el ID del coach (necesario para crear usuarios)
+              _currentCoachId = currentUser.id;
+
+              // Si es coach, esperamos a que carguen sus jugadores
+              if (currentUser.isCoach) {
+                return availablePlayersAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e,s) => Center(child: Text("Error al cargar jugadores: $e")),
+                  data: (players) => _buildForm(context, players), // Pasa la lista de jugadores
+                );
+              }
+              // Si es jugador, no necesita cargar jugadores
+              return _buildForm(context, []);
+            },
+          ),
+          // Overlay de Carga (para el submit y _loadProfile)
+          loadingOverlay,
+        ],
+      ),
+    );
+  }
+
+
+  /// --- WIDGET QUE CONSTRUYE EL FORMULARIO ---
+  Widget _buildForm(BuildContext context, List<app_user.User> availablePlayers) {
+     return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Card de Selección de Usuario
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Seleccionar Usuario',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                        value: false,
+                        label: Text('Usuario Existente'),
+                        icon: Icon(Icons.person),
+                      ),
+                      ButtonSegment(
+                        value: true,
+                        label: Text('Crear Nuevo'),
+                        icon: Icon(Icons.person_add),
+                      ),
+                    ],
+                    selected: {_isCreatingNewUser},
+                    onSelectionChanged: (Set<bool> newSelection) {
+                      setState(() {
+                        _isCreatingNewUser = newSelection.first;
+                        _onUserSelected(null); // Limpia el formulario
+                        passwordCtrl.clear();
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Campos de Usuario Existente/Nuevo
+          if (!_isCreatingNewUser) ...[
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Seleccionar Usuario',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    if (availablePlayers.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text(
+                          'No tienes jugadores vinculados. Crea un nuevo usuario.',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      )
+                    else
+                      DropdownButtonFormField<app_user.User>(
+                        value: _selectedUser,
+                        decoration: const InputDecoration(
+                          labelText: 'Jugador',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: availablePlayers.map((user) {
+                          return DropdownMenuItem<app_user.User>(
+                            value: user,
+                            child: Text(user.name),
+                          );
+                        }).toList(),
+                        onChanged: _onUserSelected, // Esto cargará el perfil
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    SegmentedButton<bool>(
-                      segments: const [
-                        ButtonSegment(
-                          value: false,
-                          label: Text('Usuario Existente'),
-                          icon: Icon(Icons.person),
-                        ),
-                        ButtonSegment(
-                          value: true,
-                          label: Text('Crear Nuevo'),
-                          icon: Icon(Icons.person_add),
-                        ),
-                      ],
-                      selected: {_isCreatingNewUser},
-                      onSelectionChanged: (Set<bool> newSelection) {
-                        setState(() {
-                          _isCreatingNewUser = newSelection.first;
-                          if (_isCreatingNewUser) {
-                            _selectedUser = null;
-                            nameCtrl.clear();
-                            emailCtrl.clear();
-                            passwordCtrl.clear();
-                          }
-                        });
-                      },
-                    ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-
-            // ... (Campos de Usuario Existente/Nuevo - sin cambios) ...
-            if (!_isCreatingNewUser) ...[
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Seleccionar Jugador',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      const SizedBox(height: 8),
-                      if (_availablePlayers.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8.0),
-                          child: Text(
-                            'No tienes jugadores vinculados. Crea un nuevo usuario.',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        )
-                      else
-                        DropdownButtonFormField<app_user.User>(
-                          value: _selectedUser,
-                          decoration: const InputDecoration(
-                            labelText: 'Jugador',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: _availablePlayers.map((user) {
-                            return DropdownMenuItem<app_user.User>(
-                              value: user,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [Text(user.name)],
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: _onUserSelected,
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ] else ...[
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Datos del Nuevo Usuario',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: emailCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Email *',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.email),
-                        ),
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: passwordCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Contraseña *',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.lock),
-                        ),
-                        obscureText: true,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-
-            // ... (Card de Datos del Jugador - sin cambios) ...
+          ] else ...[
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Datos del Jugador',
-                      style: Theme.of(context).textTheme.titleSmall,
+                    TextField(
+                      controller: emailCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Email *',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 12),
                     TextField(
-                      controller: nameCtrl,
+                      controller: passwordCtrl,
                       decoration: const InputDecoration(
-                        labelText: 'Nombre *',
+                        labelText: 'Contraseña *',
                         border: OutlineInputBorder(),
                       ),
-                      enabled: _isCreatingNewUser || _selectedUser != null,
+                      obscureText: true,
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+          ],
+          const SizedBox(height: 16),
 
-            // ... (Card de Posición y Nivel - sin cambios) ...
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  children: [
-                    DropdownButtonFormField<String>(
-                      value: selectedPosition,
-                      decoration: const InputDecoration(
-                        labelText: 'Posición',
-                        border: OutlineInputBorder(),
-                      ),
-                      items:
-                          [
-                            'Central',
-                            'Libero',
-                            'Punta',
-                            'Opuesto',
-                            'Armadora',
-                          ].map((String value) {
-                            return DropdownMenuItem<String>(
+          // Card de Datos del Jugador
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: nameCtrl,
+                    enabled: !_isExistingUser, // Bloqueado si es existente
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre *',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: selectedPosition,
+                    decoration: const InputDecoration(
+                      labelText: 'Posición',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: ['Central', 'Libero', 'Punta', 'Opuesto', 'Armadora']
+                        .map((String value) => DropdownMenuItem<String>(
                               value: value,
                               child: Text(value),
-                            );
-                          }).toList(),
-                      onChanged: (newValue) {
-                        setState(() {
-                          selectedPosition = newValue!;
-                        });
-                      },
+                            ))
+                        .toList(),
+                    onChanged: _isExistingUser ? null : (newValue) { // Bloqueado
+                      setState(() => selectedPosition = newValue!);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: selectedLevel,
+                    decoration: const InputDecoration(
+                      labelText: 'Nivel',
+                      border: OutlineInputBorder(),
                     ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      // No uses 'initialValue' y 'value' juntos. 'value' es suficiente.
-                      value: selectedLevel,
-                      decoration: const InputDecoration(
-                        labelText: 'Nivel',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: ['Competitivo', 'Recreativo'].map((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
-                      onChanged: (newValue) {
-                        setState(() {
-                          selectedLevel = newValue!;
-                        });
-                      },
-                    ),
-                  ],
-                ),
+                    items: ['Competitivo', 'Recreativo']
+                        .map((String value) => DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value),
+                            ))
+                        .toList(),
+                    onChanged: _isExistingUser ? null : (newValue) { // Bloqueado
+                      setState(() => selectedLevel = newValue!);
+                    },
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
+          ),
+          const SizedBox(height: 12),
 
-            // --- 4. INICIO DE LA UI DE DISPONIBILIDAD MODIFICADA ---
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Disponibilidad',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    // Checkbox para todos los días
-                    ..._allDays.map((day) {
-                      return CheckboxListTile(
+          // Card de Disponibilidad
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Disponibilidad',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  ..._allDays.map((day) => CheckboxListTile(
                         title: Text(day),
                         value: selectedDays.contains(day),
-                        onChanged: (bool? value) {
+                        onChanged: _isExistingUser ? null : (bool? value) { // Bloqueado
                           setState(() {
                             if (value == true) {
                               selectedDays.add(day);
@@ -465,304 +505,286 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                         controlAffinity: ListTileControlAffinity.leading,
-                      );
-                    }).toList(),
-
-                    const SizedBox(height: 16),
-
-                    // Dropdown para los rangos de sesión
-                    DropdownButtonFormField<int>(
-                      value: _selectedDurationMinutes,
-                      decoration: const InputDecoration(
-                        labelText: 'Duración por Sesión',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: _durationOptions.entries.map((entry) {
-                        // entry.key = "45-60 minutos", entry.value = 60
-                        return DropdownMenuItem<int>(
-                          value: entry.value,
-                          child: Text(entry.key),
-                        );
-                      }).toList(),
-                      onChanged: (newValue) {
-                        if (newValue != null) {
-                          setState(() {
-                            _selectedDurationMinutes = newValue;
-                          });
-                        }
-                      },
+                      )),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<int>(
+                    value: _selectedDurationMinutes,
+                    decoration: const InputDecoration(
+                      labelText: 'Duración por Sesión',
+                      border: OutlineInputBorder(),
                     ),
-                  ],
-                ),
+                    items: _durationOptions.entries
+                        .map((entry) => DropdownMenuItem<int>(
+                              value: entry.value,
+                              child: Text(entry.key),
+                            ))
+                        .toList(),
+                    onChanged: _isExistingUser ? null : (newValue) { // Bloqueado
+                      if (newValue != null) {
+                        setState(() => _selectedDurationMinutes = newValue);
+                      }
+                    },
+                  ),
+                ],
               ),
             ),
+          ),
+          const SizedBox(height: 12),
 
-            // --- FIN DE LA UI DE DISPONIBILIDAD MODIFICADA ---
-            const SizedBox(height: 12),
+          // Card de Lesiones
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Lesiones',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8.0,
+                    runSpacing: 4.0,
+                    children: [ 'Rodilla', 'Tobillo', 'Hombro', 'Espalda', 'Muñeca', 'Dedo', 'Ninguna']
+                        .map((injury) {
+                      final isSelected = selectedInjuries.contains(injury);
+                      return FilterChip(
+                        label: Text(injury),
+                        selected: isSelected,
+                        onSelected: _isExistingUser ? null : (bool selected) { // Bloqueado
+                          setState(() {
+                            if (injury == 'Ninguna') {
+                              if (selected) {
+                                selectedInjuries.clear();
+                                selectedInjuries.add('Ninguna');
+                              } else {
+                                selectedInjuries.remove('Ninguna');
+                              }
+                            } else {
+                              selectedInjuries.remove('Ninguna');
+                              if (selected) {
+                                selectedInjuries.add(injury);
+                              } else {
+                                selectedInjuries.remove(injury);
+                              }
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
 
-            // ... (Card de Lesiones - sin cambios) ...
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Lesiones',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8.0,
-                      runSpacing: 4.0,
-                      children:
-                          [
-                            'Rodilla',
-                            'Tobillo',
-                            'Hombro',
-                            'Espalda',
-                            'Muñeca',
-                            'Dedo',
-                            'Ninguna',
-                          ].map((injury) {
-                            final isSelected = selectedInjuries.contains(
-                              injury,
-                            );
-                            return FilterChip(
-                              label: Text(injury),
-                              selected: isSelected,
-                              onSelected: (bool selected) {
-                                setState(() {
-                                  if (injury == 'Ninguna') {
-                                    if (selected) {
-                                      selectedInjuries.clear();
-                                      selectedInjuries.add('Ninguna');
-                                    } else {
-                                      selectedInjuries.remove('Ninguna');
-                                    }
-                                  } else {
-                                    selectedInjuries.remove('Ninguna');
-                                    if (selected) {
-                                      selectedInjuries.add(injury);
-                                    } else {
-                                      selectedInjuries.remove(injury);
-                                    }
-                                  }
-                                });
+          // Card de Evaluación y Torneos
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Torneos',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle, color: Colors.blue),
+                        tooltip: 'Añadir Torneo',
+                        onPressed: _isExistingUser ? null : _showAddTournamentDialog, // Bloqueado
+                      ),
+                    ],
+                  ),
+                  _selectedTournaments.isEmpty
+                      ? Text(
+                          _isExistingUser 
+                            ? 'Los torneos del jugador se muestran aquí.'
+                            : 'Añade torneos (solo para usuarios nuevos).',
+                          style: const TextStyle(color: Colors.grey),
+                        )
+                      : Wrap(
+                          spacing: 8.0,
+                          runSpacing: 4.0,
+                          children: _selectedTournaments.map((tournament) {
+                            return Chip(
+                              label: Text(
+                                '${tournament.name} (${DateFormat('dd/MM/yy').format(tournament.date)})',
+                              ),
+                              deleteIcon: const Icon(Icons.cancel, size: 18),
+                              onDeleted: _isExistingUser ? null : () { // Bloqueado
+                                setState(() => _selectedTournaments.remove(tournament));
                               },
                             );
                           }).toList(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // ... (Card de Evaluación y Torneos - sin cambios) ...
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Evaluación y Torneos',
-                          style: Theme.of(context).textTheme.titleSmall,
                         ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.add_circle,
-                            color: Colors.blue,
-                          ),
-                          tooltip: 'Añadir Torneo',
-                          onPressed: _showAddTournamentDialog,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    if (_selectedTournaments.isEmpty)
-                      const Text(
-                        'Añade torneos presionando el botón "+".',
-                        style: TextStyle(color: Colors.grey),
-                      )
-                    else
-                      Wrap(
-                        spacing: 8.0,
-                        runSpacing: 4.0,
-                        children: _selectedTournaments.map((tournament) {
-                          return Chip(
-                            label: Text(
-                              '${tournament.name} (${DateFormat('dd/MM/yy').format(tournament.date)})',
-                            ),
-                            deleteIcon: const Icon(Icons.cancel, size: 18),
-                            onDeleted: () {
-                              setState(() {
-                                _selectedTournaments.remove(tournament);
-                              });
-                            },
-                          );
-                        }).toList(),
+                  const Divider(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Puntuaciones de Test',
+                        style: Theme.of(context).textTheme.titleSmall,
                       ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: testScoreCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Puntuación de Test (Ej: Salto)',
-                        border: OutlineInputBorder(),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                        tooltip: 'Añadir Test',
+                        onPressed: _showAddTestDialog, // ¡SIEMPRE HABILITADO!
                       ),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                  if (_testScores.isEmpty)
+                    const Text(
+                      'Añade puntuaciones de test presionando el botón "+".',
+                      style: TextStyle(color: Colors.grey),
+                    )
+                  else
+                    ..._testScores.entries.map((entry) {
+                      return ListTile(
+                        title: Text(entry.key),
+                        trailing: Text(entry.value.toString()),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      );
+                    }).toList(),
+                ],
               ),
             ),
+          ),
+          const SizedBox(height: 24),
 
-            const SizedBox(height: 24),
-
-            ElevatedButton(
-              onPressed: _handleSubmit,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: const Text(
-                'Guardar evaluación y generar programa',
-                style: TextStyle(fontSize: 16),
-              ),
+          // Botón de Envío
+          ElevatedButton(
+            onPressed: _isSubmitting ? null : _handleSubmit,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
-          ],
-        ),
+            child: _isSubmitting 
+                ? const CircularProgressIndicator(color: Colors.white)
+                : Text(
+              _isExistingUser 
+                ? 'Actualizar Tests y Generar' 
+                : 'Guardar y Generar Programa',
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
+        ],
       ),
     );
   }
 
+  /// --- Método de Envío (con lógica de 'id' corregida) ---
   Future<void> _handleSubmit() async {
-    // ... (Validaciones - sin cambios) ...
+    // Validaciones
     if (nameCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor ingresa el nombre del jugador'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showError('Por favor ingresa el nombre del jugador');
       return;
     }
-
     if (_isCreatingNewUser) {
+      // Si estamos creando, valida email y contraseña
       if (emailCtrl.text.trim().isEmpty || passwordCtrl.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Por favor completa email y contraseña'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showError('Por favor completa email y contraseña');
         return;
       }
     } else {
+      // Si estamos editando, valida que haya un usuario seleccionado
       if (_selectedUser == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Por favor selecciona un usuario'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showError('Por favor selecciona un usuario');
         return;
       }
     }
-
     if (_currentCoachId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error: No se pudo identificar al entrenador'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showError('Error: No se pudo identificar al entrenador');
       return;
     }
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
+    setState(() => _isSubmitting = true);
 
     try {
-      String userId;
+      PlayerProfile profileToSave;
+
+      final availability = Availability(
+        trainingDays: selectedDays,
+        sessionMinutes: _selectedDurationMinutes,
+      );
 
       if (_isCreatingNewUser) {
-        // ... (Lógica de creación de usuario - sin cambios) ...
-        final result = await _authService.register(
-          emailCtrl.text.trim(),
-          passwordCtrl.text.trim(),
-          nameCtrl.text.trim(),
-          app_user.UserRole.player,
+        // --- LÓGICA DE CREAR NUEVO USUARIO ---
+        // 1. Llama a la Cloud Function
+        final functions = ref.read(functionsProvider);
+        final callable = functions.httpsCallable('createPlayerAccount');
+        final result = await callable.call(<String, dynamic>{
+          'email': emailCtrl.text.trim(),
+          'password': passwordCtrl.text.trim(),
+          'name': nameCtrl.text.trim(),
+          'coachId': _currentCoachId!,
+        });
+        
+        final userId = result.data['userId'];
+        if (userId == null) {
+           throw Exception('La Cloud Function no devolvió un userId.');
+        }
+
+        // 2. Crea el Perfil NUEVO con un ID NUEVO
+        profileToSave = PlayerProfile(
+          id: uuid.v4(), // ID Nuevo
+          userId: userId, // El ID de Auth que devolvió la función
+          assignedCoachId: _currentCoachId!,
+          name: nameCtrl.text.trim(),
+          position: selectedPosition,
+          level: selectedLevel.toLowerCase(),
+          goals: ['salto', 'fuerza'],
+          injuries: selectedInjuries.contains('Ninguna') ? [] : selectedInjuries,
+          availability: availability,
+          evaluation: EvaluationResult(
+            testScores: _testScores,
+            strengths: ['potencia'],
+            weaknesses: ['resistencia'],
+          ),
+          tournaments: _selectedTournaments,
         );
 
-        if (result != "success") {
-          if (mounted) {
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error al crear usuario: $result'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
+      } else {
+        // --- LÓGICA DE ACTUALIZAR USUARIO EXISTENTE ---
+        if (_loadedProfile == null) {
+          _showError('Error: No se cargó ningún perfil para actualizar.');
+          setState(() => _isSubmitting = false);
           return;
         }
 
-        final createdUsers = await _firestoreService.getAllPlayers();
-        final newUser = createdUsers.firstWhere(
-          (u) => u.email == emailCtrl.text.trim(),
+        // Reconstruye el perfil usando los datos cargados,
+        // pero con el nuevo mapa de 'testScores'.
+        profileToSave = PlayerProfile(
+          id: _loadedProfile!.id, // ¡USA EL ID EXISTENTE!
+          userId: _loadedProfile!.userId,
+          assignedCoachId: _loadedProfile!.assignedCoachId,
+          name: _loadedProfile!.name,
+          position: _loadedProfile!.position,
+          level: _loadedProfile!.level,
+          goals: _loadedProfile!.goals,
+          injuries: _loadedProfile!.injuries,
+          availability: _loadedProfile!.availability,
+          tournaments: _loadedProfile!.tournaments,
+          
+          evaluation: EvaluationResult(
+            testScores: _testScores, // El mapa de tests actualizado
+            strengths: _loadedProfile!.evaluation.strengths,
+            weaknesses: _loadedProfile!.evaluation.weaknesses,
+          ),
         );
-        userId = newUser.id;
-
-        await _firestoreService.createPermission(
-          coachId: _currentCoachId!,
-          playerId: userId,
-        );
-      } else {
-        userId = _selectedUser!.id;
       }
 
-      // --- 5. LÓGICA DE AVAILABILITY MODIFICADA ---
-      final availability = Availability(
-        trainingDays: selectedDays,
-        sessionMinutes:
-            _selectedDurationMinutes, // <-- USA EL VALOR DEL DROPDOWN
-      );
-      // --- FIN DE LA LÓGICA ---
-
-      // Create player profile
-      final profile = PlayerProfile(
-        id: uuid.v4(),
-        userId: userId,
-        name: nameCtrl.text.trim(),
-        assignedCoachId: _currentCoachId!,
-        position: selectedPosition,
-        level: selectedLevel.toLowerCase(), // Guardar en minúsculas
-        goals: ['salto', 'fuerza'], // (hardcoded, añade UI para esto)
-        injuries: selectedInjuries.contains('Ninguna') ? [] : selectedInjuries,
-        availability: availability, // <-- USA EL OBJETO CREADO
-        evaluation: EvaluationResult(
-          testScores: {'salto': double.tryParse(testScoreCtrl.text) ?? 0.0},
-          strengths: ['potencia'], // (hardcoded, añade UI para esto)
-          weaknesses: ['resistencia'], // (hardcoded, añade UI para esto)
-        ),
-        tournaments: _selectedTournaments,
-      );
-
-      // Save profile to Firestore
-      await _firestoreService.savePlayerProfile(profile);
-
-      // Update provider
-      ref.read(playerProfileProvider.notifier).state = profile;
+      // --- PASOS FINALES ---
+      await _firestoreService.savePlayerProfile(profileToSave);
+      ref.read(playerProfileProvider.notifier).state = profileToSave;
 
       if (mounted) {
-        Navigator.pop(context); // Close loading dialog
+        setState(() => _isSubmitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Evaluación guardada exitosamente'),
@@ -773,10 +795,8 @@ class _EvaluationScreenState extends ConsumerState<EvaluationScreen> {
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // Close loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        setState(() => _isSubmitting = false);
+        _showError('Error al guardar: $e');
       }
     }
   }

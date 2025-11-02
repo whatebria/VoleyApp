@@ -68,15 +68,18 @@ final generatedProgramProvider = StreamProvider<Program?>((ref) {
 // --- SECCIÓN 4: FLUJO DEL "EXPLORADOR" (Para ProgramViewScreen) ---
 
 /// Provee la lista de jugadores (app_user.User) asignados al coach logueado.
-final coachPlayersProvider = FutureProvider<List<app_user.User>>((ref) async {
-  final currentUser = await ref.watch(currentUserAppUserProvider.future);
+final coachPlayersProvider = StreamProvider<List<app_user.User>>((ref) { // <-- 1. Cambiado a StreamProvider
+  // 2. Observa el .value (ya no se usa .future)
+  final currentUser = ref.watch(currentUserAppUserProvider).value; 
   
-  if (currentUser == null || !currentUser.isCoach) return [];
+  if (currentUser == null || !currentUser.isCoach) {
+    return Stream.value([]); // 3. Devuelve un stream vacío
+  }
   
   final firestore = ref.read(firestoreProvider);
-  return firestore.getPlayersByCoach(currentUser.id);
+  // 4. Llama al nuevo método de Stream
+  return firestore.getPlayersByCoachStream(currentUser.id); 
 });
-
 /// Almacena el jugador (app_user.User) que el coach selecciona en el Dropdown.
 final explorerSelectedPlayerProvider = StateProvider<app_user.User?>((ref) => null);
 
