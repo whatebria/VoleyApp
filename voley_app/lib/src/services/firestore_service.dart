@@ -5,6 +5,7 @@ import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/bd/exercise.dart';
 import 'package:voley_app/src/models/program/program.dart';
+import 'package:voley_app/src/models/program/session_log.dart';
 import 'package:voley_app/src/models/user.dart' as app_user;
 import 'package:voley_app/src/models/coach_player_permission.dart';
 
@@ -247,20 +248,32 @@ class FirestoreService {
     return _db.collection('players').doc(profile.id).set(profile.toJson());
   }
 
-Stream<Program?> getLatestProgramStream(String profileId) {
+  Future<List<SessionLog>> getSessionLogHistory(String profileId) async {
+    final snap = await _db
+        .collection('players')
+        .doc(profileId)
+        .collection('feedback') // O 'session_logs', como lo hayas llamado
+        .orderBy('completedAt', descending: true)
+        .limit(50) // Limita a las últimas 50 sesiones para performance
+        .get();
+
+    return snap.docs.map((doc) => SessionLog.fromJson(doc.data())).toList();
+  }
+
+  Stream<Program?> getLatestProgramStream(String profileId) {
     return _db
-        .collection('players') 
+        .collection('players')
         .doc(profileId)
         .collection('programs')
-        .orderBy('startDate', descending: true) 
-        .limit(1) 
+        .orderBy('startDate', descending: true)
+        .limit(1)
         .snapshots()
         .map((snapshot) {
-      if (snapshot.docs.isEmpty) {
-        return null; 
-      }
-      return Program.fromFirestore(snapshot.docs.first); 
-    });
+          if (snapshot.docs.isEmpty) {
+            return null;
+          }
+          return Program.fromFirestore(snapshot.docs.first);
+        });
   }
 
   Future<PlayerProfile?> getPlayerProfile(String id) async {
@@ -340,53 +353,61 @@ Stream<Program?> getLatestProgramStream(String profileId) {
         .doc(sessionId)
         .set(feedback);
   }
+
   Stream<List<app_user.User>> getPlayersByCoachStream(String coachId) {
     return _db
         .collection('coach_player_permissions')
         .where('coachId', isEqualTo: coachId)
         .where('status', isEqualTo: 'accepted')
         .snapshots() // <-- 1. Usa .snapshots() para escuchar en tiempo real
-        .asyncMap((permissionsSnap) async { // <-- 2. Mapea el stream
-      
-      if (permissionsSnap.docs.isEmpty) return [];
+        .asyncMap((permissionsSnap) async {
+          // <-- 2. Mapea el stream
 
-      // 3. Obtiene los IDs de los jugadores
-      final playerIds = permissionsSnap.docs
-          .map((doc) => doc.data()['playerId'] as String)
-          .toList();
+          if (permissionsSnap.docs.isEmpty) return [];
 
-      if (playerIds.isEmpty) return [];
+          // 3. Obtiene los IDs de los jugadores
+          final playerIds = permissionsSnap.docs
+              .map((doc) => doc.data()['playerId'] as String)
+              .toList();
 
-      // 4. Busca todos los documentos de 'users' en paralelo (muy eficiente)
-      final playerFutures = playerIds.map((id) => getUser(id)).toList();
-      final players = await Future.wait(playerFutures);
+          if (playerIds.isEmpty) return [];
 
-      // 5. Filtra los que no sean nulos y devuelve la lista
-      return players.whereType<app_user.User>().toList();
-    });
-    
+          // 4. Busca todos los documentos de 'users' en paralelo (muy eficiente)
+          final playerFutures = playerIds.map((id) => getUser(id)).toList();
+          final players = await Future.wait(playerFutures);
+
+          // 5. Filtra los que no sean nulos y devuelve la lista
+          return players.whereType<app_user.User>().toList();
+        });
   }
+
   /// Observa el perfil del jugador y, si existe,
-/// obtiene un [Stream] de su programa más reciente.
-final playerProgramProvider = StreamProvider<Program?>((ref) {
-  
-  // 1. Depende del FutureProvider del perfil
-  final profileAsync = ref.watch(ownProfileProvider);
-  
-  // 2. Mapea el estado del perfil al stream del programa
-  return profileAsync.when(
-    data: (profile) {
-      if (profile == null) {
-        // Si no hay perfil, no hay programa.
-        return Stream.value(null);
-      }
-      // Si hay perfil, escucha el stream del programa
-      return ref.read(firestoreProvider).getLatestProgramStream(profile.id);
-    },
-    // Mientras el perfil carga o da error, no hay programa.
-    loading: () => Stream.value(null),
-    error: (e, s) => Stream.error(e, s),
-  );
-});
-  
+  /// obtiene un [Stream] de su programa más reciente.
+  final playerProgramProvider = StreamProvider<Program?>((ref) {
+    // 1. Depende del FutureProvider del perfil
+    final profileAsync = ref.watch(ownProfileProvider);
+
+    // 2. Mapea el estado del perfil al stream del programa
+    return profileAsync.when(
+      data: (profile) {
+        if (profile == null) {
+          // Si no hay perfil, no hay programa.
+          return Stream.value(null);
+        }
+        // Si hay perfil, escucha el stream del programa
+        return ref.read(firestoreProvider).getLatestProgramStream(profile.id);
+      },
+      // Mientras el perfil carga o da error, no hay programa.
+      loading: () => Stream.value(null),
+      error: (e, s) => Stream.error(e, s),
+    );
+  });
+  Future<void> saveSessionLog(SessionLog log) {
+    return _db
+        .collection('players')
+        .doc(log.profileId)
+        .collection('session_logs') // O 'session_logs', como prefieras llamarla
+        .doc(log.id)
+        .set(log.toJson());
+  }
 }

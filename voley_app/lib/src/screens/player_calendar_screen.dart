@@ -20,10 +20,6 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
   DateTime? _selectedDay;
   LinkedHashMap<DateTime, List<TrainingSession>> _events = LinkedHashMap();
 
-  // (Variables de feedback eliminadas por no usarse)
-  // final _notesController = TextEditingController();
-  // double _rpeValue = 5;
-
   @override
   void initState() {
     super.initState();
@@ -32,11 +28,9 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
   
   @override
   void dispose() {
-    // _notesController.dispose(); // (Eliminado)
     super.dispose();
   }
 
-  // Mapea el weekday de DateTime (Lunes=1...Domingo=7) a tus Strings
   String _mapWeekdayToString(int weekday) {
     switch (weekday) {
       case 1: return 'lunes';

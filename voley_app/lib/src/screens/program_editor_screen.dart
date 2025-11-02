@@ -6,7 +6,6 @@ import 'package:voley_app/src/models/program/program.dart';
 import 'package:voley_app/src/models/program/mesocycles.dart';
 import 'package:voley_app/src/models/program/microcicle.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
-import 'package:voley_app/src/models/program/workout_exercise.dart';
 import 'package:voley_app/src/screens/exercise_picker_screen.dart';
 import 'package:uuid/uuid.dart';
 

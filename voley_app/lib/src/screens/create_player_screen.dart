@@ -2,12 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
-import 'package:voley_app/providers/auth_provider.dart';
 import 'package:voley_app/src/models/player_profile/availability.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
-import 'package:voley_app/src/models/user.dart' as app_user;
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 
