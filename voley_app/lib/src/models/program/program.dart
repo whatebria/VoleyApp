@@ -70,4 +70,15 @@ class Program {
       mesocycles: mesocycles ?? this.mesocycles,
     );
   }
+
+  // Implementación de operator == y hashCode para comparación por ID
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Program &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }

@@ -15,9 +15,9 @@ class Microcycle {
   // Método de fábrica para crear desde JSON (Firestore)
   factory Microcycle.fromJson(Map<String, dynamic> json) {
     return Microcycle(
-      id: json['id'] as String,
-      weekNumber: json['weekNumber'] as int,
-      sessions: (json['sessions'] as List<dynamic>)
+      id: json['id'] as String? ?? '',
+      weekNumber: json['weekNumber'] as int? ?? 0,
+      sessions: (json['sessions'] as List<dynamic>? ?? [])
           .map((s) => TrainingSession.fromJson(s as Map<String, dynamic>))
           .toList(),
     );
