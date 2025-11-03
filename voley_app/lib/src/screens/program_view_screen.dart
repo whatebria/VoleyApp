@@ -66,6 +66,9 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     BuildContext context,
     PlayerProfile profile,
   ) async {
+    // Capturar el ScaffoldMessenger ANTES de la operación async
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
     // 1. Pone el estado de carga en 'true'
     ref.read(isGeneratingProgramProvider.notifier).state = true;
 
@@ -75,7 +78,7 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
 
       // ¡Éxito!
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           const SnackBar(
             content: Text('¡Programa automático generado!'),
             backgroundColor: Colors.green,
@@ -85,10 +88,10 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     } catch (e) {
       // Error
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(
             content: Text('Error al generar: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+            backgroundColor: Colors.red,
           ),
         );
       }
