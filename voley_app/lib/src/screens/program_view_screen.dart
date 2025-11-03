@@ -23,14 +23,10 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
   @override
   void initState() {
     super.initState();
-    // 1. Ya no se necesita _initialPlayerSetup. La lógica de inicialización
-    //    es reactiva y se gestiona en el build/listen.
   }
 
-  // --- MÉTODOS DE ACCIÓN (Sin cambios funcionales, usan el estado de carga) ---
 
   void _showGenerationChoice(BuildContext context, PlayerProfile profile) {
-    // ... (Tu implementación de showModalBottomSheet)
     showModalBottomSheet(
       context: context,
       builder: (context) {
@@ -116,9 +112,6 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
   // --- WIDGET BUILD ---
   @override
   Widget build(BuildContext context) {
-    // 1. [CORRECCIÓN] Lógica de Sincronización de Programa
-    // Se mantiene esta lógica para asegurar que siempre haya un programa seleccionado
-    // cuando la lista se actualiza, o que se limpie si la lista está vacía.
     ref.listen<AsyncValue<List<Program>>>(explorerProgramsProvider, (
       previous,
       next,

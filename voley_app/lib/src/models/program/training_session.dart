@@ -36,7 +36,6 @@ class TrainingSession {
   );
 
   // --- 6. AÑADE un método copyWith ---
-  // (Lo necesitarás para tu editor manual)
   TrainingSession copyWith({
     String? id,
     String? day,

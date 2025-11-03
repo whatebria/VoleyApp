@@ -1,8 +1,6 @@
-// lib/main.dart
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:voley_app/firebase_options.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:voley_app/src/auth/login_screen.dart';
 import 'package:voley_app/src/auth/register_screen.dart';
 import 'package:voley_app/src/auth/root_screen.dart';
@@ -14,13 +12,23 @@ import 'package:voley_app/src/screens/permissions/permission_management_screen.d
 import 'package:voley_app/src/screens/player_evaluation_screen.dart';
 import 'package:voley_app/src/screens/program_view_screen.dart';
 import 'package:voley_app/src/screens/user_management_screen.dart';
-import 'package:voley_app/theme/app_theme.dart';
+import 'package:voley_app/theme/app_theme.dart'; // Asegúrate de tener esta dependencia
 
 void main() async {
+  // 1. Asegura que el binding esté inicializado para llamar a métodos nativos
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  
+  // 2. [CORRECCIÓN CRÍTICA] Inicializa Firebase de forma asíncrona
+  try {
+    await Firebase.initializeApp(
+      // options: DefaultFirebaseOptions.currentPlatform, // Descomentar si usas FlutterFire CLI
+    );
+  } catch (e) {
+    // Manejo de errores de inicialización (ej: logs)
+    print("Error al inicializar Firebase: $e");
+  }
+  
+  // 3. Lanza la aplicación solo después de que Firebase esté listo
   runApp(const ProviderScope(child: MyApp()));
 }
 

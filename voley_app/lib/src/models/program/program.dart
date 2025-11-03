@@ -4,6 +4,7 @@ import 'package:voley_app/src/models/program/mesocycles.dart'; // Ajusta el path
 
 class Program {
   final String id;
+  final String title;
   final String source;
   final DateTime startDate;
   final DateTime endDate;
@@ -11,6 +12,7 @@ class Program {
 
   Program({
     required this.id,
+    required this.title,
     required this.source,
     required this.startDate,
     required this.endDate,
@@ -21,6 +23,7 @@ class Program {
   factory Program.fromJson(Map<String, dynamic> json) {
     return Program(
       id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
       source: json['source'] as String? ?? 'Automático',
       startDate: (json['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
       endDate: (json['endDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -34,6 +37,7 @@ class Program {
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    'title': title,
     'source': source,
     'startDate': Timestamp.fromDate(startDate),
     'endDate': Timestamp.fromDate(endDate),
@@ -43,13 +47,14 @@ class Program {
   // Constructor fromFirestore (para leer el ID del documento)
   factory Program.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    return Program.fromJson(data).copyWith(id: doc.id);
+    return Program.fromJson(data).copyWith(id: doc.id, mesocycles: []);
   }
 
   // Método auxiliar 'copyWith'
-  Program copyWith({String? id}) {
+  Program copyWith({String? id, required List<Mesocycle> mesocycles}) {
     return Program(
       id: id ?? this.id,
+      title: title,
       source: source,
       startDate: startDate,
       endDate: endDate,

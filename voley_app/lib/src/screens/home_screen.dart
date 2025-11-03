@@ -135,7 +135,6 @@ final isLoggingOut = ref.watch(isLoggingOutProvider);
   List<Widget> _buildCoachMenuCards(BuildContext context) {
     // Definimos las rutas para una navegación limpia
     const String routeEvaluation = '/evaluation';
-    const String routeProgram = '/program';
     const String routeUserManagement = '/user_management';
     const String routeUserCreate = '/user_create';
     const String routeLibrary = '/library';
@@ -148,13 +147,6 @@ final isLoggingOut = ref.watch(isLoggingOutProvider);
         title: 'Evaluaciones',
         subtitle: 'Crear o ver',
         route: routeEvaluation,
-      ),
-      _buildMenuCard(
-        context,
-        icon: Icons.list_alt,
-        title: 'Programas',
-        subtitle: 'Ver y generar',
-        route: routeProgram,
       ),
       _buildMenuCard(
         context,
