@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
 import 'package:intl/intl.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
+import 'package:voley_app/src/models/player_profile/player_event.dart';
+import 'package:voley_app/src/models/player_profile/form_peak.dart';
 
 class PlayerProfileScreen extends ConsumerWidget {
   const PlayerProfileScreen({super.key});
@@ -44,6 +46,19 @@ class PlayerProfileScreen extends ConsumerWidget {
   /// Muestra la vista detallada del perfil del jugador.
   Widget _buildProfileView(BuildContext context, ThemeData theme, PlayerProfile profile) {
     final keyStats = profile.evaluation.testScores;
+    final physicalMetrics = <MapEntry<String, String>>[];
+    if (profile.age != null) {
+      physicalMetrics.add(MapEntry('Edad', '${profile.age} años'));
+    }
+    if (profile.heightCm != null) {
+      physicalMetrics.add(MapEntry('Altura', '${_formatNumber(profile.heightCm!)} cm'));
+    }
+    if (profile.weightKg != null) {
+      physicalMetrics.add(MapEntry('Peso', '${_formatNumber(profile.weightKg!)} kg'));
+    }
+    if (profile.wingspanCm != null) {
+      physicalMetrics.add(MapEntry('Envergadura', '${_formatNumber(profile.wingspanCm!)} cm'));
+    }
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
@@ -102,34 +117,98 @@ class PlayerProfileScreen extends ConsumerWidget {
             style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           const Divider(height: 16),
-          if (keyStats.isEmpty)
+          if (physicalMetrics.isEmpty && keyStats.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24.0),
               child: Center(
                 child: Text(
-                  'Aún no tienes tests registrados.',
+                  'Aún no registras métricas o tests.',
                   style: theme.textTheme.bodyLarge?.copyWith(color: theme.textTheme.bodySmall?.color),
                 ),
               ),
             )
+          else ...[
+            if (physicalMetrics.isNotEmpty) ...[
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: physicalMetrics
+                    .map(
+                      (metric) => SizedBox(
+                        width: MediaQuery.of(context).size.width < 360 ? double.infinity : 160,
+                        child: _buildStatCard(
+                          theme,
+                          title: metric.key,
+                          value: metric.value,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 16),
+            ],
+            if (keyStats.isNotEmpty) ...[
+              Text(
+                'Tests físicos',
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.5,
+                children: keyStats.entries.map((test) {
+                  return _buildStatCard(
+                    theme,
+                    title: test.key,
+                    value: test.value.toStringAsFixed(1),
+                    unit: 'pts',
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+
+          const SizedBox(height: 24),
+
+          // --- Objetivos personales ---
+          Text(
+            'Objetivos',
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const Divider(height: 16),
+          if (profile.goals.isEmpty)
+            Text(
+              'Define objetivos desde tu evaluación para personalizar tu progreso.',
+              style: theme.textTheme.bodyLarge?.copyWith(color: theme.textTheme.bodySmall?.color),
+            )
           else
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.5,
-              children: keyStats.entries.map((test) {
-                return _buildStatCard(
-                  theme,
-                  title: test.key,
-                  value: test.value.toStringAsFixed(1), // Mejor formateo
-                  unit: 'pts', // Usar una unidad genérica si no se conoce
-                );
-              }).toList(),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: profile.goals
+                  .map(
+                    (goal) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle_outline, color: theme.colorScheme.secondary, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              goal,
+                              style: theme.textTheme.bodyLarge,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
-          
+
           const SizedBox(height: 24),
 
           // --- 3. Sección "Estado Actual" (Mi logística) ---
@@ -158,8 +237,49 @@ class PlayerProfileScreen extends ConsumerWidget {
             title: 'Duración de Sesión',
             value: '${profile.availability.sessionMinutes} minutos',
           ),
-          
+
           const SizedBox(height: 24),
+
+          if (profile.keyEvents.isNotEmpty) ...[
+            Text(
+              'Fechas Clave',
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const Divider(height: 16),
+            ...profile.keyEvents.map(
+              (PlayerEvent event) => ListTile(
+                leading: Icon(Icons.flag_outlined, color: theme.colorScheme.secondary),
+                title: Text(
+                  '${_eventLabel(event.type)} - ${DateFormat('dd/MM/yyyy').format(event.date)}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: event.description != null ? Text(event.description!) : null,
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          if (profile.formPeaks.isNotEmpty) ...[
+            Text(
+              'Picos de Forma Planificados',
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const Divider(height: 16),
+            Wrap(
+              spacing: 8.0,
+              runSpacing: 4.0,
+              children: profile.formPeaks
+                  .map(
+                    (FormPeak peak) => Chip(
+                      label: Text(
+                        '${DateFormat('dd/MM/yy').format(peak.date)}${peak.note != null ? ' • ${peak.note}' : ''}',
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 24),
+          ],
 
           // --- 4. Sección "Historial" (Mis logros) ---
           if (profile.tournaments.isNotEmpty) ...[
@@ -179,6 +299,27 @@ class PlayerProfileScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  String _eventLabel(String type) {
+    switch (type) {
+      case 'cup':
+        return 'Copa';
+      case 'playoff':
+        return 'Play-offs';
+      case 'national_team':
+        return 'Selección';
+      case 'travel':
+        return 'Viaje';
+      case 'league':
+      default:
+        return 'Liga';
+    }
+  }
+
+  String _formatNumber(double value) {
+    final isInt = value % 1 == 0;
+    return isInt ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
   }
 
   /// Muestra el estado vacío (jugador sin perfil). (Sin cambios)

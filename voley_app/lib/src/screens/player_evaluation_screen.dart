@@ -7,6 +7,8 @@ import 'package:voley_app/src/models/player_profile/availability.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
+import 'package:voley_app/src/models/player_profile/player_event.dart';
+import 'package:voley_app/src/models/player_profile/form_peak.dart';
 import 'package:voley_app/src/services/firestore_service.dart';
 import 'package:intl/intl.dart';
 
@@ -22,12 +24,19 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
   // --- Estado del Formulario y Controladores ---
   final _formKey = GlobalKey<FormState>();
   final nameCtrl = TextEditingController();
+  final ageCtrl = TextEditingController();
+  final heightCtrl = TextEditingController();
+  final weightCtrl = TextEditingController();
+  final wingspanCtrl = TextEditingController();
   String selectedPosition = 'Central';
   String selectedLevel = 'Competitivo';
   List<Tournament> _selectedTournaments = [];
   List<String> selectedInjuries = [];
   Map<String, double> _testScores = {};
   List<String> selectedDays = [];
+  List<String> _goals = [];
+  List<PlayerEvent> _keyEvents = [];
+  List<FormPeak> _formPeaks = [];
   final List<String> _allDays = [
     'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'
   ];
@@ -36,6 +45,22 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
     '75-90 minutos': 90, '90+ minutos': 120,
   };
   int _selectedDurationMinutes = 60;
+
+  String _eventTypeLabel(String type) {
+    switch (type) {
+      case 'cup':
+        return 'Copa';
+      case 'playoff':
+        return 'Play-offs';
+      case 'national_team':
+        return 'Selección';
+      case 'travel':
+        return 'Viaje';
+      case 'league':
+      default:
+        return 'Liga';
+    }
+  }
 
   // --- Estado de la Pantalla ---
   late final FirestoreService _firestoreService;
@@ -57,6 +82,10 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
       setState(() {
         _loadedProfile = null;
         nameCtrl.text = userName;
+        ageCtrl.clear();
+        heightCtrl.clear();
+        weightCtrl.clear();
+        wingspanCtrl.clear();
         selectedPosition = 'Central';
         selectedLevel = 'Competitivo';
         selectedDays = [];
@@ -64,6 +93,9 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
         selectedInjuries = ['Ninguna'];
         _selectedTournaments = [];
         _testScores = {};
+        _goals = [];
+        _keyEvents = [];
+        _formPeaks = [];
       });
       return;
     }
@@ -72,6 +104,10 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
     setState(() {
       _loadedProfile = p;
       nameCtrl.text = p.name;
+      ageCtrl.text = p.age?.toString() ?? '';
+      heightCtrl.text = p.heightCm?.toString() ?? '';
+      weightCtrl.text = p.weightKg?.toString() ?? '';
+      wingspanCtrl.text = p.wingspanCm?.toString() ?? '';
       selectedPosition = p.position;
       selectedLevel = p.level.isNotEmpty ? p.level[0].toUpperCase() + p.level.substring(1) : 'Competitivo';
       selectedDays = p.availability.trainingDays;
@@ -79,6 +115,9 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
       selectedInjuries = p.injuries.isEmpty ? ['Ninguna'] : p.injuries;
       _selectedTournaments = p.tournaments;
       _testScores = Map.from(p.evaluation.testScores); // Copia defensiva
+      _goals = List.from(p.goals);
+      _keyEvents = List.from(p.keyEvents);
+      _formPeaks = List.from(p.formPeaks);
     });
   }
 
@@ -86,6 +125,10 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
   @override
   void dispose() {
     nameCtrl.dispose();
+    ageCtrl.dispose();
+    heightCtrl.dispose();
+    weightCtrl.dispose();
+    wingspanCtrl.dispose();
     super.dispose();
   }
 
@@ -284,6 +327,217 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
     scoreCtrl.dispose();
   }
 
+  Future<void> _showAddGoalDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Agregar Objetivo'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'Objetivo',
+              helperText: 'Ej: Aumentar fuerza de saque',
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (controller.text.trim().isNotEmpty) {
+                  Navigator.pop(context, controller.text.trim());
+                }
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() => _goals.add(result));
+    }
+    controller.dispose();
+  }
+
+  Future<void> _showAddEventDialog() async {
+    const eventOptions = {
+      'league': 'Liga',
+      'cup': 'Copa',
+      'playoff': 'Play-offs',
+      'national_team': 'Selección',
+      'travel': 'Viaje',
+    };
+
+    String selectedType = 'league';
+    DateTime selectedDate = DateTime.now();
+    final descriptionCtrl = TextEditingController();
+
+    final result = await showDialog<PlayerEvent>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Agregar Fecha Clave'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: selectedType,
+                    decoration: const InputDecoration(labelText: 'Tipo de evento'),
+                    items: eventOptions.entries
+                        .map(
+                          (entry) => DropdownMenuItem<String>(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => selectedType = value);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_today),
+                    title: const Text('Fecha'),
+                    subtitle: Text(DateFormat('dd/MM/yyyy').format(selectedDate)),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                        lastDate: DateTime.now().add(const Duration(days: 730)),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => selectedDate = picked);
+                      }
+                    },
+                  ),
+                  TextField(
+                    controller: descriptionCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Descripción (opcional)',
+                      helperText: 'Ej: Liga Nacional',
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(
+                      context,
+                      PlayerEvent(
+                        type: selectedType,
+                        date: selectedDate,
+                        description: descriptionCtrl.text.trim().isEmpty
+                            ? null
+                            : descriptionCtrl.text.trim(),
+                      ),
+                    );
+                  },
+                  child: const Text('Agregar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() => _keyEvents.add(result));
+    }
+    descriptionCtrl.dispose();
+  }
+
+  Future<void> _showAddFormPeakDialog() async {
+    DateTime selectedDate = DateTime.now();
+    final noteCtrl = TextEditingController();
+
+    final result = await showDialog<FormPeak>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Registrar Pico de Forma'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_today),
+                    title: const Text('Fecha estimada'),
+                    subtitle: Text(DateFormat('dd/MM/yyyy').format(selectedDate)),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                        lastDate: DateTime.now().add(const Duration(days: 730)),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => selectedDate = picked);
+                      }
+                    },
+                  ),
+                  TextField(
+                    controller: noteCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Nota (opcional)',
+                      helperText: 'Ej: Preparar pico para finales',
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(
+                      context,
+                      FormPeak(
+                        date: selectedDate,
+                        note: noteCtrl.text.trim().isEmpty
+                            ? null
+                            : noteCtrl.text.trim(),
+                      ),
+                    );
+                  },
+                  child: const Text('Guardar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() => _formPeaks.add(result));
+    }
+    noteCtrl.dispose();
+  }
+
   void _showError(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -320,9 +574,21 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
       final evaluation = EvaluationResult(
         testScores: _testScores,
         // Conservamos fortalezas/debilidades si existen
-        strengths: _loadedProfile?.evaluation.strengths ?? [], 
+        strengths: _loadedProfile?.evaluation.strengths ?? [],
         weaknesses: _loadedProfile?.evaluation.weaknesses ?? [],
       );
+
+      int? parseAge(String value) {
+        final trimmed = value.trim();
+        if (trimmed.isEmpty) return null;
+        return int.tryParse(trimmed);
+      }
+
+      double? parseDouble(String value) {
+        final trimmed = value.trim();
+        if (trimmed.isEmpty) return null;
+        return double.tryParse(trimmed.replaceAll(',', '.'));
+      }
 
       if (_loadedProfile != null) {
         // --- ACTUALIZAR Perfil Existente ---
@@ -333,6 +599,13 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
           availability: availability,
           evaluation: evaluation,
           tournaments: _selectedTournaments,
+          goals: _goals,
+          age: parseAge(ageCtrl.text),
+          heightCm: parseDouble(heightCtrl.text),
+          weightKg: parseDouble(weightCtrl.text),
+          wingspanCm: parseDouble(wingspanCtrl.text),
+          keyEvents: _keyEvents,
+          formPeaks: _formPeaks,
         );
       } else {
         // --- CREAR Perfil Nuevo ---
@@ -343,11 +616,17 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
           name: nameCtrl.text.trim(),
           position: selectedPosition,
           level: selectedLevel.toLowerCase(),
-          goals: [], 
+          goals: _goals,
           injuries: selectedInjuries.contains('Ninguna') ? [] : selectedInjuries,
           availability: availability,
           evaluation: evaluation,
           tournaments: _selectedTournaments,
+          age: parseAge(ageCtrl.text),
+          heightCm: parseDouble(heightCtrl.text),
+          weightKg: parseDouble(weightCtrl.text),
+          wingspanCm: parseDouble(wingspanCtrl.text),
+          keyEvents: _keyEvents,
+          formPeaks: _formPeaks,
         );
       }
 
@@ -501,6 +780,112 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                   .map((String value) => DropdownMenuItem<String>(value: value, child: Text(value)))
                   .toList(),
               onChanged: (newValue) => setState(() => selectedLevel = newValue!),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: ageCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Edad',
+                prefixIcon: Icon(Icons.cake_outlined),
+              ),
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) return null;
+                final parsed = int.tryParse(value.trim());
+                if (parsed == null || parsed <= 0) {
+                  return 'Ingresa una edad válida';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: heightCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Altura (cm)',
+                      prefixIcon: Icon(Icons.height),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return null;
+                      return double.tryParse(value.replaceAll(',', '.')) == null
+                          ? 'Número inválido'
+                          : null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: weightCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Peso (kg)',
+                      prefixIcon: Icon(Icons.monitor_weight_outlined),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return null;
+                      return double.tryParse(value.replaceAll(',', '.')) == null
+                          ? 'Número inválido'
+                          : null;
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: wingspanCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Envergadura (cm)',
+                prefixIcon: Icon(Icons.swap_horiz_outlined),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) return null;
+                return double.tryParse(value.replaceAll(',', '.')) == null
+                    ? 'Número inválido'
+                    : null;
+              },
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Objetivos', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                IconButton(
+                  tooltip: 'Agregar objetivo',
+                  icon: const Icon(Icons.add_circle_outline),
+                  onPressed: _showAddGoalDialog,
+                ),
+              ],
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _goals.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.only(bottom: 8.0),
+                      child: Text(
+                        'Define objetivos específicos que guíen tu progreso.',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    )
+                  : Wrap(
+                      spacing: 8.0,
+                      runSpacing: 4.0,
+                      children: _goals
+                          .map(
+                            (goal) => Chip(
+                              label: Text(goal),
+                              deleteIcon: const Icon(Icons.cancel, size: 18),
+                              onDeleted: () => setState(() => _goals.remove(goal)),
+                            ),
+                          )
+                          .toList(),
+                    ),
             ),
           ],
         ),
@@ -682,6 +1067,82 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                     );
                   }).toList(),
                 ),
+              ),
+            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Fechas Clave', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                OutlinedButton.icon(
+                  onPressed: _showAddEventDialog,
+                  icon: const Icon(Icons.event_available_outlined, size: 18),
+                  label: const Text('Añadir'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.colorScheme.primary,
+                    side: BorderSide(color: theme.colorScheme.primary),
+                  ),
+                ),
+              ],
+            ),
+            if (_keyEvents.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12.0),
+                child: Text('Registra ligas, copas, selecciones o viajes próximos.',
+                    style: TextStyle(color: Colors.grey)),
+              )
+            else
+              ..._keyEvents.map(
+                (event) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.flag_outlined, color: theme.colorScheme.secondary),
+                  title: Text(
+                    '${_eventTypeLabel(event.type)} - ${DateFormat('dd/MM/yy').format(event.date)}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: event.description != null ? Text(event.description!) : null,
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () => setState(() => _keyEvents.remove(event)),
+                  ),
+                ),
+              ),
+            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Picos de Forma', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                OutlinedButton.icon(
+                  onPressed: _showAddFormPeakDialog,
+                  icon: const Icon(Icons.trending_up, size: 18),
+                  label: const Text('Añadir'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.colorScheme.primary,
+                    side: BorderSide(color: theme.colorScheme.primary),
+                  ),
+                ),
+              ],
+            ),
+            if (_formPeaks.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12.0),
+                child: Text('Planifica cuándo quieres alcanzar tu máximo rendimiento.',
+                    style: TextStyle(color: Colors.grey)),
+              )
+            else
+              Wrap(
+                spacing: 8.0,
+                runSpacing: 4.0,
+                children: _formPeaks
+                    .map(
+                      (peak) => Chip(
+                        label: Text(
+                          '${DateFormat('dd/MM/yy').format(peak.date)}${peak.note != null ? ' • ${peak.note}' : ''}',
+                        ),
+                        deleteIcon: const Icon(Icons.cancel, size: 18),
+                        onDeleted: () => setState(() => _formPeaks.remove(peak)),
+                      ),
+                    )
+                    .toList(),
               ),
           ],
         ),

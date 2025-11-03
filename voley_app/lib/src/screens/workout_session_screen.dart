@@ -285,118 +285,195 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
   }
 
   Widget _buildBottomNavBar(ThemeData theme, bool isSubmitting) {
-    bool isLastPage = _currentExerciseIndex == _exercises.length - 1;
-    String timerText = '${(_restTimeRemaining ~/ 60)}:${(_restTimeRemaining % 60).toString().padLeft(2, '0')}';
+    final bool isLastPage = _currentExerciseIndex == _exercises.length - 1;
+    final String timerText = '${(_restTimeRemaining ~/ 60)}:${(_restTimeRemaining % 60).toString().padLeft(2, '0')}';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0)
-          .copyWith(bottom: MediaQuery.of(context).padding.bottom + 12.0),
-      color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        child: _isResting
-            ? Column( // --- Vista de Temporizador (Actualizada) ---
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Icon(Icons.timer, color: theme.colorScheme.primary, size: 24),
-                      Text(
-                        _isLastSetRest ? 'EJERCICIO COMPLETO' : 'DESCANSANDO',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: _cancelRestTimer,
-                        child: const Text('Saltar'),
-                      )
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      // Botón -15s
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.remove, size: 20),
-                        label: const Text('30s'),
-                        onPressed: () => _adjustRestTime(-30),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: theme.colorScheme.secondary,
-                          side: BorderSide(
-                              color: theme.colorScheme.secondary.withOpacity(0.5)),
-                        ),
-                      ),
-                      // Display del tiempo
-                      Text(
-                        timerText,
-                        style: theme.textTheme.headlineLarge?.copyWith(
-                            color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
-                      ),
-                      // Botón +15s
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.add, size: 20),
-                        label: const Text('30s'),
-                        onPressed: () => _adjustRestTime(30),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: theme.colorScheme.secondary,
-                          side: BorderSide(
-                              color: theme.colorScheme.secondary.withOpacity(0.5)),
-                        ),
-                      ),
-                    ],
-                  )
-                ],
-              )
-            : Row( // --- Vista de Navegación ---
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton(
-                    onPressed: _currentExerciseIndex == 0 ? null : () {
-                      _pageController.previousPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeIn,
-                      );
-                    },
-                    child: const Text('Anterior'),
-                  ),
-                  Text(
-                    '${_currentExerciseIndex + 1} / ${_exercises.length}',
-                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  ElevatedButton(
-                    onPressed: isSubmitting ? null : () {
-                      if (isLastPage) {
-                        _finishWorkout();
-                      } else {
-                        _pageController.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeIn,
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isLastPage
-                          ? theme.colorScheme.secondary
-                          : theme.colorScheme.primary,
-                      foregroundColor: isLastPage
-                          ? theme.colorScheme.onSecondary
-                          : theme.colorScheme.onPrimary,
-                    ),
-                    child: isSubmitting && isLastPage
-                        ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onSecondary),
-                          )
-                        : Text(isLastPage ? 'Terminar' : 'Siguiente'),
-                  ),
-                ],
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isCompact = constraints.maxWidth < 420;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0)
+              .copyWith(bottom: MediaQuery.of(context).padding.bottom + 12.0),
+          color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            child: _isResting
+                ? _buildRestControls(theme, timerText, isCompact)
+                : _buildNavigationControls(theme, isSubmitting, isLastPage, isCompact),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildRestControls(ThemeData theme, String timerText, bool isCompact) {
+    final skipButton = TextButton(
+      onPressed: _cancelRestTimer,
+      child: const Text('Saltar'),
+    );
+
+    final decreaseButton = OutlinedButton.icon(
+      icon: const Icon(Icons.remove, size: 20),
+      label: const Text('30s'),
+      onPressed: () => _adjustRestTime(-30),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: theme.colorScheme.secondary,
+        side: BorderSide(color: theme.colorScheme.secondary.withOpacity(0.5)),
       ),
+    );
+
+    final increaseButton = OutlinedButton.icon(
+      icon: const Icon(Icons.add, size: 20),
+      label: const Text('30s'),
+      onPressed: () => _adjustRestTime(30),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: theme.colorScheme.secondary,
+        side: BorderSide(color: theme.colorScheme.secondary.withOpacity(0.5)),
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.timer, color: theme.colorScheme.primary, size: 24),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _isLastSetRest ? 'EJERCICIO COMPLETO' : 'DESCANSANDO',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            skipButton,
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (isCompact) ...[
+          Text(
+            timerText,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: decreaseButton),
+              const SizedBox(width: 12),
+              Expanded(child: increaseButton),
+            ],
+          ),
+        ] else ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              decreaseButton,
+              Text(
+                timerText,
+                style: theme.textTheme.headlineLarge?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              increaseButton,
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildNavigationControls(
+    ThemeData theme,
+    bool isSubmitting,
+    bool isLastPage,
+    bool isCompact,
+  ) {
+    final previousButton = TextButton(
+      onPressed: _currentExerciseIndex == 0
+          ? null
+          : () {
+              _pageController.previousPage(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeIn,
+              );
+            },
+      child: const Text('Anterior'),
+    );
+
+    final actionButton = _buildPrimaryActionButton(theme, isLastPage, isSubmitting);
+
+    if (isCompact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              previousButton,
+              Text(
+                '${_currentExerciseIndex + 1} / ${_exercises.length}',
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(width: double.infinity, child: actionButton),
+        ],
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        previousButton,
+        Text(
+          '${_currentExerciseIndex + 1} / ${_exercises.length}',
+          style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        actionButton,
+      ],
+    );
+  }
+
+  Widget _buildPrimaryActionButton(ThemeData theme, bool isLastPage, bool isSubmitting) {
+    return ElevatedButton(
+      onPressed: isSubmitting
+          ? null
+          : () {
+              if (isLastPage) {
+                _finishWorkout();
+              } else {
+                _pageController.nextPage(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeIn,
+                );
+              }
+            },
+      style: ElevatedButton.styleFrom(
+        backgroundColor:
+            isLastPage ? theme.colorScheme.secondary : theme.colorScheme.primary,
+        foregroundColor:
+            isLastPage ? theme.colorScheme.onSecondary : theme.colorScheme.onPrimary,
+      ),
+      child: isSubmitting && isLastPage
+          ? SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: theme.colorScheme.onSecondary,
+              ),
+            )
+          : Text(isLastPage ? 'Terminar' : 'Siguiente'),
     );
   }
 }
@@ -452,73 +529,86 @@ class _WorkoutExerciseCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            exercise.name,
-            style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Chip(
-            label: Text(
-              'OBJETIVO: ${exercise.sets} series x ${exercise.reps} @ ${exercise.intensity}',
-              style: TextStyle(color: theme.colorScheme.onSecondaryContainer),
-            ),
-            backgroundColor: theme.colorScheme.secondaryContainer.withOpacity(0.6),
-            side: BorderSide.none,
-          ),
-          const SizedBox(height: 8),
-          _buildLastTime(context, ref, theme),
-          const Divider(height: 24),
-          
-          // --- MEJORA DE UI: Cabecera de la tabla de logs ---
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isCompact = constraints.maxWidth < 420;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                flex: 1, // Columna angosta
-                child: Text('Set', style: theme.textTheme.bodySmall),
+              Text(
+                exercise.name,
+                style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
-              Expanded(
-                flex: 3, // Columna ancha
-                child: Center(
-                    child: Text('Peso (kg)', style: theme.textTheme.bodySmall)),
+              const SizedBox(height: 8),
+              Chip(
+                label: Text(
+                  'OBJETIVO: ${exercise.sets} series x ${exercise.reps} @ ${exercise.intensity}',
+                  style: TextStyle(color: theme.colorScheme.onSecondaryContainer),
+                ),
+                backgroundColor: theme.colorScheme.secondaryContainer.withOpacity(0.6),
+                side: BorderSide.none,
               ),
-              Expanded(
-                flex: 3, // Columna ancha
-                child: Center(
-                    child: Text('Reps', style: theme.textTheme.bodySmall)),
-              ),
-              Expanded(
-                flex: 1, // Columna angosta
-                child: Center(
-                    child: Icon(Icons.check,
-                        size: 16, color: theme.textTheme.bodySmall?.color)),
+              const SizedBox(height: 8),
+              _buildLastTime(context, ref, theme),
+              const Divider(height: 24),
+
+              if (!isCompact) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 1, // Columna angosta
+                      child: Text('Set', style: theme.textTheme.bodySmall),
+                    ),
+                    Expanded(
+                      flex: 3, // Columna ancha
+                      child: Center(
+                          child: Text('Peso (kg)', style: theme.textTheme.bodySmall)),
+                    ),
+                    Expanded(
+                      flex: 3, // Columna ancha
+                      child: Center(
+                          child: Text('Reps', style: theme.textTheme.bodySmall)),
+                    ),
+                    Expanded(
+                      flex: 1, // Columna angosta
+                      child: Center(
+                          child: Icon(Icons.check,
+                              size: 16, color: theme.textTheme.bodySmall?.color)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ] else ...[
+                Text(
+                  'Registra peso y repeticiones para cada set debajo.',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+              ],
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: exercise.sets,
+                itemBuilder: (context, setIndex) {
+                  return _SetRow(
+                    key: ValueKey('${exercise.exerciseId}_$setIndex'),
+                    setIndex: setIndex,
+                    targetReps: exercise.reps,
+                    targetIntensity: exercise.intensity,
+                    completedLog: loggedSets[setIndex],
+                    isCompact: isCompact,
+                    onSetLogged: (log) {
+                      onSetLogged(setIndex, log);
+                    },
+                  );
+                },
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: exercise.sets,
-            itemBuilder: (context, setIndex) {
-              return _SetRow(
-                key: ValueKey('${exercise.exerciseId}_$setIndex'),
-                setIndex: setIndex,
-                targetReps: exercise.reps,
-                targetIntensity: exercise.intensity,
-                completedLog: loggedSets[setIndex],
-                onSetLogged: (log) {
-                  onSetLogged(setIndex, log);
-                },
-              );
-            },
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -530,6 +620,7 @@ class _SetRow extends StatefulWidget {
   final String targetReps;
   final String targetIntensity;
   final SetLog? completedLog;
+  final bool isCompact;
   final Function(SetLog) onSetLogged;
 
   const _SetRow({
@@ -538,6 +629,7 @@ class _SetRow extends StatefulWidget {
     required this.targetReps,
     required this.targetIntensity,
     this.completedLog,
+    required this.isCompact,
     required this.onSetLogged,
   }) : super(key: key);
 
@@ -586,10 +678,11 @@ class __SetRowState extends State<_SetRow> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isCompact = widget.isCompact;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      height: 60, // --- MEJORA: Altura fija para consistencia ---
+      height: isCompact ? null : 60, // Altura adaptable en pantallas compactas
       decoration: BoxDecoration(
         color: _isCompleted
             ? theme.colorScheme.primary.withOpacity(0.1)
@@ -602,66 +695,142 @@ class __SetRowState extends State<_SetRow> {
           width: 1,
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // --- MEJORA DE UI/UX: Layout Responsivo con Expanded/Flex ---
-          Expanded(
-            flex: 1, // Columna angosta
-            child: Center(
-              child: Text(
-                '${widget.setIndex + 1}',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: _isCompleted
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.secondary,
+      padding: isCompact
+          ? const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12.0)
+          : null,
+      child: isCompact
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Set ${widget.setIndex + 1}',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: _isCompleted
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.secondary,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: Icon(
+                        _isCompleted
+                            ? Icons.check_circle
+                            : Icons.check_circle_outline,
+                        color: theme.colorScheme.primary,
+                        size: 24,
+                      ),
+                      onPressed: _isCompleted ? _unlogSet : _logSet,
+                    ),
+                  ],
                 ),
-              ),
-            ),
-          ),
-
-          Expanded(
-            flex: 3, // Columna ancha
-            child: _buildCompactStepper(
-              theme,
-              value: _currentWeight,
-              increment: _weightIncrement,
-              isEnabled: !_isCompleted,
-              onChanged: (newValue) => setState(() => _currentWeight = newValue),
-            ),
-          ),
-
-          Expanded(
-            flex: 3, // Columna ancha
-            child: _buildCompactStepper(
-              theme,
-              value: _currentReps,
-              increment: _repsIncrement,
-              isEnabled: !_isCompleted,
-              onChanged: (newValue) =>
-                  setState(() => _currentReps = newValue.toInt()),
-            ),
-          ),
-          
-          Expanded(
-            flex: 1, // Columna angosta
-            child: Center(
-              child: IconButton(
-                padding: EdgeInsets.zero,
-                icon: Icon(
-                  _isCompleted
-                      ? Icons.check_circle
-                      : Icons.check_circle_outline,
-                  color: theme.colorScheme.primary, // Volt
-                  size: 28,
+                const SizedBox(height: 12),
+                _buildLabeledStepper(
+                  theme,
+                  label: 'Peso (kg)',
+                  child: _buildCompactStepper(
+                    theme,
+                    value: _currentWeight,
+                    increment: _weightIncrement,
+                    isEnabled: !_isCompleted,
+                    onChanged: (newValue) =>
+                        setState(() => _currentWeight = newValue),
+                  ),
                 ),
-                onPressed: _isCompleted ? _unlogSet : _logSet,
-              ),
+                const SizedBox(height: 12),
+                _buildLabeledStepper(
+                  theme,
+                  label: 'Reps',
+                  child: _buildCompactStepper(
+                    theme,
+                    value: _currentReps,
+                    increment: _repsIncrement,
+                    isEnabled: !_isCompleted,
+                    onChanged: (newValue) =>
+                        setState(() => _currentReps = newValue.toInt()),
+                  ),
+                ),
+              ],
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // --- MEJORA DE UI/UX: Layout Responsivo con Expanded/Flex ---
+                Expanded(
+                  flex: 1, // Columna angosta
+                  child: Center(
+                    child: Text(
+                      '${widget.setIndex + 1}',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: _isCompleted
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.secondary,
+                      ),
+                    ),
+                  ),
+                ),
+
+                Expanded(
+                  flex: 3, // Columna ancha
+                  child: _buildCompactStepper(
+                    theme,
+                    value: _currentWeight,
+                    increment: _weightIncrement,
+                    isEnabled: !_isCompleted,
+                    onChanged: (newValue) =>
+                        setState(() => _currentWeight = newValue),
+                  ),
+                ),
+
+                Expanded(
+                  flex: 3, // Columna ancha
+                  child: _buildCompactStepper(
+                    theme,
+                    value: _currentReps,
+                    increment: _repsIncrement,
+                    isEnabled: !_isCompleted,
+                    onChanged: (newValue) =>
+                        setState(() => _currentReps = newValue.toInt()),
+                  ),
+                ),
+
+                Expanded(
+                  flex: 1, // Columna angosta
+                  child: Center(
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: Icon(
+                        _isCompleted
+                            ? Icons.check_circle
+                            : Icons.check_circle_outline,
+                        color: theme.colorScheme.primary, // Volt
+                        size: 28,
+                      ),
+                      onPressed: _isCompleted ? _unlogSet : _logSet,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
+    );
+  }
+
+  Widget _buildLabeledStepper(ThemeData theme,
+      {required String label, required Widget child}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 4),
+        child,
+      ],
     );
   }
 

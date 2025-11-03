@@ -1,5 +1,7 @@
 import 'package:voley_app/src/models/player_profile/availability.dart';
 import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
+import 'package:voley_app/src/models/player_profile/form_peak.dart';
+import 'package:voley_app/src/models/player_profile/player_event.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
 
 class PlayerProfile {
@@ -15,6 +17,12 @@ class PlayerProfile {
   final List<Tournament> tournaments;
   final String? assignedCoachId; // UID del entrenador asignado
   final List<String> equipment; // Equipamiento disponible
+  final int? age;
+  final double? heightCm;
+  final double? weightKg;
+  final double? wingspanCm;
+  final List<PlayerEvent> keyEvents;
+  final List<FormPeak> formPeaks;
 
   PlayerProfile({
     required this.id,
@@ -29,6 +37,12 @@ class PlayerProfile {
     required this.tournaments,
     this.assignedCoachId,
     this.equipment = const [],
+    this.age,
+    this.heightCm,
+    this.weightKg,
+    this.wingspanCm,
+    this.keyEvents = const [],
+    this.formPeaks = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -44,6 +58,12 @@ class PlayerProfile {
         'tournaments': tournaments.map((t) => t.toJson()).toList(),
         'assignedCoachId': assignedCoachId,
         'equipment': equipment,
+        'age': age,
+        'heightCm': heightCm,
+        'weightKg': weightKg,
+        'wingspanCm': wingspanCm,
+        'keyEvents': keyEvents.map((e) => e.toJson()).toList(),
+        'formPeaks': formPeaks.map((e) => e.toJson()).toList(),
       };
 
   static PlayerProfile fromJson(Map<String, dynamic> json) => PlayerProfile(
@@ -61,6 +81,16 @@ class PlayerProfile {
             .toList(),
         assignedCoachId: json['assignedCoachId'] as String?,
         equipment: List<String>.from(json['equipment'] ?? []),
+        age: json['age'] as int?,
+        heightCm: (json['heightCm'] as num?)?.toDouble(),
+        weightKg: (json['weightKg'] as num?)?.toDouble(),
+        wingspanCm: (json['wingspanCm'] as num?)?.toDouble(),
+        keyEvents: (json['keyEvents'] as List<dynamic>? ?? [])
+            .map((event) => PlayerEvent.fromJson(Map<String, dynamic>.from(event)))
+            .toList(),
+        formPeaks: (json['formPeaks'] as List<dynamic>? ?? [])
+            .map((peak) => FormPeak.fromJson(Map<String, dynamic>.from(peak)))
+            .toList(),
       );
 // --- AÑADE ESTE MÉTODO COMPLETO ---
   PlayerProfile copyWith({
@@ -75,6 +105,13 @@ class PlayerProfile {
     Availability? availability,
     EvaluationResult? evaluation,
     List<Tournament>? tournaments,
+    List<String>? equipment,
+    int? age,
+    double? heightCm,
+    double? weightKg,
+    double? wingspanCm,
+    List<PlayerEvent>? keyEvents,
+    List<FormPeak>? formPeaks,
   }) {
     return PlayerProfile(
       id: id ?? this.id,
@@ -88,6 +125,13 @@ class PlayerProfile {
       availability: availability ?? this.availability,
       evaluation: evaluation ?? this.evaluation,
       tournaments: tournaments ?? this.tournaments,
+      equipment: equipment ?? this.equipment,
+      age: age ?? this.age,
+      heightCm: heightCm ?? this.heightCm,
+      weightKg: weightKg ?? this.weightKg,
+      wingspanCm: wingspanCm ?? this.wingspanCm,
+      keyEvents: keyEvents ?? this.keyEvents,
+      formPeaks: formPeaks ?? this.formPeaks,
     );
   }
 }

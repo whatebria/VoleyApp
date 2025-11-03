@@ -6,6 +6,8 @@ import 'package:voley_app/src/models/player_profile/availability.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
+import 'package:voley_app/src/models/player_profile/player_event.dart';
+import 'package:voley_app/src/models/player_profile/form_peak.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 
@@ -32,6 +34,11 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
   final nameCtrl = TextEditingController();
   final emailCtrl = TextEditingController();
   final passwordCtrl = TextEditingController();
+  final ageCtrl = TextEditingController();
+  final heightCtrl = TextEditingController();
+  final weightCtrl = TextEditingController();
+  final wingspanCtrl = TextEditingController();
+  final goalCtrl = TextEditingController();
   final uuid = Uuid();
 
   // Estado del formulario (Efímero, se queda en la UI)
@@ -40,6 +47,10 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
   List<Tournament> _selectedTournaments = [];
   List<String> selectedInjuries = [];
   List<String> selectedDays = [];
+  List<String> _goals = [];
+  Map<String, double> _testScores = {};
+  List<PlayerEvent> _keyEvents = [];
+  List<FormPeak> _formPeaks = [];
   final List<String> _allDays = [
     'Lunes',
     'Martes',
@@ -58,11 +69,32 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
   };
   int _selectedDurationMinutes = 60;
 
+  String _eventTypeLabel(String type) {
+    switch (type) {
+      case 'cup':
+        return 'Copa';
+      case 'playoff':
+        return 'Play-offs';
+      case 'national_team':
+        return 'Selección';
+      case 'travel':
+        return 'Viaje';
+      case 'league':
+      default:
+        return 'Liga';
+    }
+  }
+
   @override
   void dispose() {
     nameCtrl.dispose();
     emailCtrl.dispose();
     passwordCtrl.dispose();
+    ageCtrl.dispose();
+    heightCtrl.dispose();
+    weightCtrl.dispose();
+    wingspanCtrl.dispose();
+    goalCtrl.dispose();
     super.dispose();
   }
 
@@ -106,6 +138,18 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
         sessionMinutes: _selectedDurationMinutes,
       );
 
+      int? parseAge(String value) {
+        final trimmed = value.trim();
+        if (trimmed.isEmpty) return null;
+        return int.tryParse(trimmed);
+      }
+
+      double? parseDouble(String value) {
+        final trimmed = value.trim();
+        if (trimmed.isEmpty) return null;
+        return double.tryParse(trimmed.replaceAll(',', '.'));
+      }
+
       final profileToSave = PlayerProfile(
         id: uuid.v4(),
         userId: userId,
@@ -113,15 +157,21 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
         name: nameCtrl.text.trim(),
         position: selectedPosition,
         level: selectedLevel.toLowerCase(),
-        goals: [], // Se definen después en la evaluación
+        goals: _goals,
         injuries: selectedInjuries.contains('Ninguna') ? [] : selectedInjuries,
         availability: availability,
         evaluation: EvaluationResult(
-          testScores: {}, // Se llena en la pantalla de Evaluación
+          testScores: _testScores,
           strengths: [],
           weaknesses: [],
         ),
         tournaments: _selectedTournaments,
+        age: parseAge(ageCtrl.text),
+        heightCm: parseDouble(heightCtrl.text),
+        weightKg: parseDouble(weightCtrl.text),
+        wingspanCm: parseDouble(wingspanCtrl.text),
+        keyEvents: _keyEvents,
+        formPeaks: _formPeaks,
       );
 
       // 3. Guardar el Perfil
@@ -243,6 +293,286 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
       setState(() => _selectedTournaments.add(result));
     }
     nameCtrl.dispose();
+  }
+
+  Future<void> _showAddGoalDialog() async {
+    goalCtrl.clear();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Agregar Objetivo'),
+          content: TextField(
+            controller: goalCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Objetivo',
+              helperText: 'Ej: Mejorar salto vertical',
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (goalCtrl.text.trim().isNotEmpty) {
+                  Navigator.pop(context, goalCtrl.text.trim());
+                }
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() => _goals.add(result));
+    }
+  }
+
+  Future<void> _showAddTestDialog() async {
+    final nameCtrl = TextEditingController();
+    final valueCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final result = await showDialog<MapEntry<String, double>>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Registrar Test Inicial'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre del Test *',
+                    helperText: 'Ej: Salto vertical',
+                  ),
+                  validator: (value) =>
+                      (value == null || value.trim().isEmpty) ? 'Ingresa un nombre' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: valueCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Resultado *',
+                    helperText: 'Ej: 45.5',
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Ingresa un resultado';
+                    }
+                    return double.tryParse(value.replaceAll(',', '.')) == null
+                        ? 'Ingresa un número válido'
+                        : null;
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (formKey.currentState?.validate() ?? false) {
+                  final value = double.parse(valueCtrl.text.replaceAll(',', '.'));
+                  Navigator.pop(context, MapEntry(nameCtrl.text.trim(), value));
+                }
+              },
+              child: const Text('Añadir'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() => _testScores[result.key] = result.value);
+    }
+    nameCtrl.dispose();
+    valueCtrl.dispose();
+  }
+
+  Future<void> _showAddEventDialog() async {
+    const eventOptions = {
+      'league': 'Liga',
+      'cup': 'Copa',
+      'playoff': 'Play-offs',
+      'national_team': 'Selección',
+      'travel': 'Viaje',
+    };
+
+    String selectedType = 'league';
+    DateTime selectedDate = DateTime.now();
+    final descriptionCtrl = TextEditingController();
+
+    final result = await showDialog<PlayerEvent>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Agregar Fecha Clave'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: selectedType,
+                    decoration: const InputDecoration(labelText: 'Tipo de evento'),
+                    items: eventOptions.entries
+                        .map(
+                          (entry) => DropdownMenuItem<String>(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => selectedType = value);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_today),
+                    title: const Text('Fecha'),
+                    subtitle: Text(DateFormat('dd/MM/yyyy').format(selectedDate)),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                        lastDate: DateTime.now().add(const Duration(days: 730)),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => selectedDate = picked);
+                      }
+                    },
+                  ),
+                  TextField(
+                    controller: descriptionCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Descripción (opcional)',
+                      helperText: 'Ej: Liga Metropolitana',
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(
+                      context,
+                      PlayerEvent(
+                        type: selectedType,
+                        date: selectedDate,
+                        description: descriptionCtrl.text.trim().isEmpty
+                            ? null
+                            : descriptionCtrl.text.trim(),
+                      ),
+                    );
+                  },
+                  child: const Text('Agregar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() => _keyEvents.add(result));
+    }
+    descriptionCtrl.dispose();
+  }
+
+  Future<void> _showAddFormPeakDialog() async {
+    DateTime selectedDate = DateTime.now();
+    final noteCtrl = TextEditingController();
+
+    final result = await showDialog<FormPeak>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Registrar Pico de Forma'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_today),
+                    title: const Text('Fecha estimada'),
+                    subtitle: Text(DateFormat('dd/MM/yyyy').format(selectedDate)),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                        lastDate: DateTime.now().add(const Duration(days: 730)),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => selectedDate = picked);
+                      }
+                    },
+                  ),
+                  TextField(
+                    controller: noteCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Nota (opcional)',
+                      helperText: 'Ej: Preparar pico para play-offs',
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(
+                      context,
+                      FormPeak(
+                        date: selectedDate,
+                        note: noteCtrl.text.trim().isEmpty
+                            ? null
+                            : noteCtrl.text.trim(),
+                      ),
+                    );
+                  },
+                  child: const Text('Guardar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() => _formPeaks.add(result));
+    }
+    noteCtrl.dispose();
   }
 
   @override
@@ -430,6 +760,161 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                 setState(() => selectedLevel = newValue!);
               },
             ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: ageCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Edad',
+                prefixIcon: Icon(Icons.cake_outlined),
+              ),
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) return null;
+                final parsed = int.tryParse(value.trim());
+                if (parsed == null || parsed <= 0) {
+                  return 'Ingresa una edad válida';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: heightCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Altura (cm)',
+                      prefixIcon: Icon(Icons.height),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return null;
+                      return double.tryParse(value.replaceAll(',', '.')) == null
+                          ? 'Número inválido'
+                          : null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: weightCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Peso (kg)',
+                      prefixIcon: Icon(Icons.monitor_weight_outlined),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return null;
+                      return double.tryParse(value.replaceAll(',', '.')) == null
+                          ? 'Número inválido'
+                          : null;
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: wingspanCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Envergadura (cm)',
+                prefixIcon: Icon(Icons.swap_horiz_outlined),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) return null;
+                return double.tryParse(value.replaceAll(',', '.')) == null
+                    ? 'Número inválido'
+                    : null;
+              },
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Objetivos',
+                  style: theme.textTheme.titleSmall,
+                ),
+                IconButton(
+                  tooltip: 'Agregar objetivo',
+                  onPressed: _showAddGoalDialog,
+                  icon: const Icon(Icons.add_circle_outline),
+                ),
+              ],
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _goals.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.only(bottom: 8.0),
+                      child: Text(
+                        'Define objetivos concretos para el jugador.',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    )
+                  : Wrap(
+                      spacing: 8.0,
+                      runSpacing: 4.0,
+                      children: _goals
+                          .map(
+                            (goal) => Chip(
+                              label: Text(goal),
+                              deleteIcon: const Icon(Icons.cancel, size: 18),
+                              onDeleted: () => setState(() => _goals.remove(goal)),
+                            ),
+                          )
+                          .toList(),
+                    ),
+            ),
+            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Evaluación Inicial',
+                  style: theme.textTheme.titleSmall,
+                ),
+                IconButton(
+                  tooltip: 'Agregar test',
+                  onPressed: _showAddTestDialog,
+                  icon: const Icon(Icons.add_chart),
+                ),
+              ],
+            ),
+            if (_testScores.isEmpty)
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 8.0),
+                  child: Text(
+                    'Añade resultados de tests físicos (opcional).',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              )
+            else
+              Column(
+                children: _testScores.entries
+                    .map(
+                      (entry) => ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(entry.key),
+                        trailing: Text(
+                          entry.value.toStringAsFixed(2),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        leading: IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => setState(() => _testScores.remove(entry.key)),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
             const SizedBox(height: 16),
             Align(
               alignment: Alignment.centerLeft,
@@ -585,6 +1070,86 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                       );
                     }).toList(),
                   ),
+            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Fechas Clave', style: theme.textTheme.titleSmall),
+                IconButton(
+                  icon: Icon(
+                    Icons.event_available_outlined,
+                    color: theme.colorScheme.primary,
+                  ),
+                  tooltip: 'Añadir evento',
+                  onPressed: _showAddEventDialog,
+                ),
+              ],
+            ),
+            if (_keyEvents.isEmpty)
+              const Text(
+                'Registra fechas importantes como ligas o viajes.',
+                style: TextStyle(color: Colors.grey),
+              )
+            else
+              Column(
+                children: _keyEvents
+                    .map(
+                      (event) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          '${_eventTypeLabel(event.type)} - ${DateFormat('dd/MM/yy').format(event.date)}',
+                        ),
+                        subtitle: event.description != null
+                            ? Text(event.description!)
+                            : null,
+                        leading: Icon(
+                          Icons.flag_outlined,
+                          color: theme.colorScheme.secondary,
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => setState(() => _keyEvents.remove(event)),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Picos de Forma', style: theme.textTheme.titleSmall),
+                IconButton(
+                  icon: Icon(
+                    Icons.trending_up,
+                    color: theme.colorScheme.primary,
+                  ),
+                  tooltip: 'Añadir pico',
+                  onPressed: _showAddFormPeakDialog,
+                ),
+              ],
+            ),
+            if (_formPeaks.isEmpty)
+              const Text(
+                'Planifica los momentos de máximo rendimiento.',
+                style: TextStyle(color: Colors.grey),
+              )
+            else
+              Wrap(
+                spacing: 8.0,
+                runSpacing: 4.0,
+                children: _formPeaks
+                    .map(
+                      (peak) => Chip(
+                        label: Text(
+                          '${DateFormat('dd/MM/yy').format(peak.date)}${peak.note != null ? ' • ${peak.note}' : ''}',
+                        ),
+                        deleteIcon: const Icon(Icons.cancel, size: 18),
+                        onDeleted: () => setState(() => _formPeaks.remove(peak)),
+                      ),
+                    )
+                    .toList(),
+              ),
           ],
         ),
       ),
