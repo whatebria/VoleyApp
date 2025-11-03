@@ -1,5 +1,7 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:voley_app/src/models/user.dart' as app_user;
 
 class AuthService {
@@ -22,6 +24,8 @@ class AuthService {
         password: password,
       );
 
+      final linkCode = await _generateUniqueLinkCode();
+
       // 2. Crear el objeto de usuario para Firestore
       final user = app_user.User(
         id: userCredential.user!.uid, // Usar el UID de Auth
@@ -30,6 +34,7 @@ class AuthService {
         role: role,
         createdAt: DateTime.now(),
         coachId: coachId,
+        linkCode: linkCode,
       );
 
       // 3. Guardar el usuario en la colección 'users' de Firestore
@@ -98,5 +103,36 @@ class AuthService {
   // --- Método de Logout (separado) ---
   Future<void> logout() async {
     await _auth.signOut();
+  }
+
+  Future<String> _generateUniqueLinkCode() async {
+    const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    final random = Random.secure();
+
+    String _generateCode() {
+      return List.generate(
+        6,
+        (_) => characters[random.nextInt(characters.length)],
+      ).join();
+    }
+
+    String code;
+    bool exists = true;
+
+    while (exists) {
+      code = _generateCode();
+      final snapshot = await _firestore
+          .collection('users')
+          .where('linkCode', isEqualTo: code)
+          .limit(1)
+          .get();
+      exists = snapshot.docs.isNotEmpty;
+      if (!exists) {
+        return code;
+      }
+    }
+
+    // No debería llegar aquí, pero Dart requiere inicialización
+    return _generateCode();
   }
 }

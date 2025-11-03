@@ -693,9 +693,12 @@ class __SetRowState extends State<_SetRow> {
         ),
 
         // --- Valor (Botón para entrada manual) ---
-        // Usamos Flexible para que el texto no cause overflow
-        Flexible(
+        ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 60),
           child: TextButton(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
             onPressed: !isEnabled
                 ? null
                 : () async {
@@ -704,15 +707,17 @@ class __SetRowState extends State<_SetRow> {
                       onChanged(newValue);
                     }
                   },
-            child: Text(
-              valueString,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: isEnabled
-                    ? theme.colorScheme.onSurface
-                    : theme.textTheme.bodySmall?.color,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                valueString,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: isEnabled
+                      ? theme.colorScheme.onSurface
+                      : theme.textTheme.bodySmall?.color,
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
         ),

@@ -1,16 +1,14 @@
 // lib/src/screens/permissions/permission_management_screen.dart
 
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
-
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import 'package:voley_app/src/models/user.dart' as app_user;
-
-import 'package:voley_app/src/models/coach_player_permission.dart';
-
-import 'package:voley_app/src/services/firestore_service.dart';
-
 import 'package:voley_app/providers/auth_provider.dart';
+import 'package:voley_app/src/models/coach_player_permission.dart';
+import 'package:voley_app/src/models/user.dart' as app_user;
+import 'package:voley_app/src/services/firestore_service.dart';
 
 
 
@@ -66,16 +64,24 @@ class _PermissionManagementScreenState
 
   List<app_user.User> _relatedUsers = [];
 
+  String? _linkCode;
+
+  bool _isLinking = false;
+
+  final TextEditingController _codeController = TextEditingController();
+
 
 
   @override
-
   void initState() {
-
     super.initState();
-
     _loadData();
+  }
 
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
   }
 
 
@@ -84,23 +90,15 @@ class _PermissionManagementScreenState
 
     setState(() => _isLoading = true);
 
-
-
     try {
-
       final currentFirebaseUser = ref.read(currentUserProvider);
-
       if (currentFirebaseUser == null) return;
 
-
-
       // Obtener datos del usuario actual
-
       _currentUser = await _firestoreService.getUser(currentFirebaseUser.uid);
-
       if (_currentUser == null) return;
 
-
+      _linkCode = await _firestoreService.ensureUserLinkCode(_currentUser!.id);
 
       if (_currentUser!.isCoach) {
 
@@ -148,6 +146,142 @@ class _PermissionManagementScreenState
 
     }
 
+  }
+
+  Future<void> _linkWithCode() async {
+    if (_currentUser == null) return;
+
+    final input = _codeController.text.trim().toUpperCase();
+    if (input.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ingresa un código para vincular.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (_linkCode != null && input == _linkCode) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No puedes usar tu propio código.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLinking = true);
+
+    try {
+      final targetUser = await _firestoreService.getUserByLinkCode(input);
+      if (targetUser == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Código no encontrado. Verifica e inténtalo de nuevo.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      if (targetUser.id == _currentUser!.id) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No puedes vincularte contigo mismo.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      if (_currentUser!.isCoach && !targetUser.isPlayer) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Este código no pertenece a un jugador.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      if (_currentUser!.isPlayer && !targetUser.isCoach) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Este código no pertenece a un entrenador.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      if (_currentUser!.isCoach) {
+        final alreadyLinked = await _firestoreService.hasPermission(
+          coachId: _currentUser!.id,
+          playerId: targetUser.id,
+        );
+        if (alreadyLinked) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Ya tienes acceso a este jugador.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          return;
+        }
+
+        await _firestoreService.linkCoachAndPlayer(
+          coachId: _currentUser!.id,
+          playerId: targetUser.id,
+        );
+      } else {
+        if (_currentUser!.coachId == targetUser.id) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Ya estás vinculado con este entrenador.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          return;
+        }
+
+        await _firestoreService.linkCoachAndPlayer(
+          coachId: targetUser.id,
+          playerId: _currentUser!.id,
+        );
+      }
+
+      _codeController.clear();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _currentUser!.isCoach
+                  ? '¡Jugador vinculado correctamente!'
+                  : '¡Entrenador vinculado correctamente!',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+      await _loadData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al vincular: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLinking = false);
+      }
+    }
   }
 
 
@@ -375,6 +509,9 @@ class _PermissionManagementScreenState
           padding: const EdgeInsets.all(16),
 
           children: [
+            if (_linkCode != null) _buildLinkCodeSection(),
+
+            if (_linkCode != null) const SizedBox(height: 24),
 
             // Sección de usuarios relacionados (jugadores o entrenadores)
 
@@ -429,6 +566,127 @@ class _PermissionManagementScreenState
   }
 
 
+
+  Widget _buildLinkCodeSection() {
+    final isCoach = _currentUser!.isCoach;
+    final theme = Theme.of(context);
+    final headline = isCoach
+        ? 'Comparte este código con tus jugadores'
+        : 'Comparte este código con tu entrenador';
+    final helper = isCoach
+        ? 'Ingresa el código de un jugador para agregarlo de inmediato.'
+        : 'Ingresa el código de tu entrenador para vincularte al equipo.';
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              headline,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text(
+                        _linkCode ?? '------',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                          letterSpacing: 2,
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                IconButton.filledTonal(
+                  onPressed: _linkCode == null
+                      ? null
+                      : () {
+                          Clipboard.setData(ClipboardData(text: _linkCode));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Código copiado al portapapeles'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        },
+                  icon: const Icon(Icons.copy),
+                  tooltip: 'Copiar código',
+                )
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(helper, style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _codeController,
+              textCapitalization: TextCapitalization.characters,
+              maxLength: 6,
+              onChanged: (value) {
+                final upper = value.toUpperCase();
+                if (value != upper) {
+                  _codeController.value = TextEditingValue(
+                    text: upper,
+                    selection: TextSelection.collapsed(offset: upper.length),
+                  );
+                  setState(() {});
+                } else {
+                  setState(() {});
+                }
+              },
+              decoration: InputDecoration(
+                labelText:
+                    isCoach ? 'Código del jugador' : 'Código del entrenador',
+                prefixIcon: const Icon(Icons.key_outlined),
+                counterText: '',
+                suffixIcon: _codeController.text.isEmpty
+                    ? null
+                    : IconButton(
+                        onPressed: _codeController.clear,
+                        icon: const Icon(Icons.clear),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isLinking ? null : _linkWithCode,
+                icon: _isLinking
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.colorScheme.onPrimary,
+                        ),
+                      )
+                    : const Icon(Icons.link),
+                label: Text(_isLinking ? 'Vinculando...' : 'Vincular'),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildRelatedUsersSection() {
 

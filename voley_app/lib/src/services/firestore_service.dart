@@ -1,4 +1,5 @@
 // lib/services/firestore_service.dart
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
@@ -32,6 +33,8 @@ class FirestoreService {
     required String name,
     required String coachId,
   }) async {
+    final linkCode = await _generateUniqueLinkCode();
+
     // Create user document
     final user = app_user.User(
       id: userId,
@@ -40,6 +43,7 @@ class FirestoreService {
       role: app_user.UserRole.player,
       createdAt: DateTime.now(),
       coachId: coachId,
+      linkCode: linkCode,
     );
 
     await _db.collection('users').doc(user.id).set(user.toJson());
@@ -243,6 +247,88 @@ class FirestoreService {
   /// Update user's coachId field
   Future<void> updateUserCoachId(String userId, String? coachId) async {
     await _db.collection('users').doc(userId).update({'coachId': coachId});
+  }
+
+  Future<String> ensureUserLinkCode(String userId) async {
+    final userDoc = await _db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      throw Exception('Usuario no encontrado');
+    }
+
+    final data = userDoc.data();
+    final currentCode = (data?['linkCode'] as String?)?.toUpperCase();
+    if (currentCode != null && currentCode.isNotEmpty) {
+      return currentCode;
+    }
+
+    final newCode = await _generateUniqueLinkCode();
+    await userDoc.reference.update({'linkCode': newCode});
+    return newCode;
+  }
+
+  Future<app_user.User?> getUserByLinkCode(String code) async {
+    final normalized = code.toUpperCase();
+    final snapshot = await _db
+        .collection('users')
+        .where('linkCode', isEqualTo: normalized)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) return null;
+
+    return app_user.User.fromJson(snapshot.docs.first.data());
+  }
+
+  Future<void> linkCoachAndPlayer({
+    required String coachId,
+    required String playerId,
+  }) async {
+    final permissionRef =
+        _db.collection('coach_player_permissions').doc('${coachId}_$playerId');
+
+    final now = Timestamp.fromDate(DateTime.now());
+    final permissionSnapshot = await permissionRef.get();
+    final data = <String, dynamic>{
+      'id': '${coachId}_$playerId',
+      'coachId': coachId,
+      'playerId': playerId,
+      'status': PermissionStatus.accepted.toJson(),
+      'updatedAt': now,
+    };
+
+    if (!permissionSnapshot.exists ||
+        permissionSnapshot.data()?['createdAt'] == null) {
+      data['createdAt'] = now;
+    }
+
+    await permissionRef.set(data, SetOptions(merge: true));
+    await updateUserCoachId(playerId, coachId);
+  }
+
+  Future<String> _generateUniqueLinkCode() async {
+    const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    final random = Random.secure();
+
+    String _generateCode() {
+      return List.generate(
+        6,
+        (_) => characters[random.nextInt(characters.length)],
+      ).join();
+    }
+
+    String code;
+
+    while (true) {
+      code = _generateCode();
+      final snapshot = await _db
+          .collection('users')
+          .where('linkCode', isEqualTo: code)
+          .limit(1)
+          .get();
+      if (snapshot.docs.isEmpty) {
+        return code;
+      }
+    }
   }
 
   // ========== Existing Player Profile Methods ==========
