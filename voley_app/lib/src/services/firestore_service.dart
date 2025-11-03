@@ -11,6 +11,9 @@ import 'package:voley_app/src/models/coach_player_permission.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  
+  // Expose the Firestore instance when needed by UI code
+  FirebaseFirestore get firestore => _db;
 
   // ========== User Methods ==========
 
