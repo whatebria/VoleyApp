@@ -47,18 +47,27 @@ class Program {
   // Constructor fromFirestore (para leer el ID del documento)
   factory Program.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    return Program.fromJson(data).copyWith(id: doc.id, mesocycles: []);
+    // Añade el ID del documento a los datos antes de parsear
+    data['id'] = doc.id;
+    return Program.fromJson(data);
   }
 
   // Método auxiliar 'copyWith'
-  Program copyWith({String? id, required List<Mesocycle> mesocycles}) {
+  Program copyWith({
+    String? id,
+    String? title,
+    String? source,
+    DateTime? startDate,
+    DateTime? endDate,
+    List<Mesocycle>? mesocycles,
+  }) {
     return Program(
       id: id ?? this.id,
-      title: title,
-      source: source,
-      startDate: startDate,
-      endDate: endDate,
-      mesocycles: mesocycles,
+      title: title ?? this.title,
+      source: source ?? this.source,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      mesocycles: mesocycles ?? this.mesocycles,
     );
   }
 }
