@@ -204,6 +204,7 @@ class _PlayerLinkCodeScreenState
     );
   }
   Widget _buildCodeCard(ThemeData theme) {
+     final linkCode = _linkCode;
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -235,7 +236,7 @@ class _PlayerLinkCodeScreenState
                     ),
                     child: Center(
                       child: Text(
-                        _linkCode ?? '------',
+                        linkCode ?? '------',
                         style: theme.textTheme.headlineMedium?.copyWith(
                           letterSpacing: 2,
                           fontWeight: FontWeight.w700,
@@ -247,11 +248,11 @@ class _PlayerLinkCodeScreenState
                 ),
                 const SizedBox(width: 12),
                 IconButton.filledTonal(
-                  onPressed: _linkCode == null
+                  onPressed: linkCode == null
                       ? null
                       : () {
                           Clipboard.setData(
-                            ClipboardData(text: _linkCode),
+                            ClipboardData(text: linkCode),
                           );
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(

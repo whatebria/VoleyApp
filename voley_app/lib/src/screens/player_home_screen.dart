@@ -20,7 +20,7 @@ class _PlayerHomeScreenState extends ConsumerState<PlayerHomeScreen> {
 
   // 1. Define las pantallas para tu navbar
   static const List<Widget> _widgetOptions = <Widget>[
-    PlayerCalendarScreen(),  // Pestaña 0
+    PlayerCalendarScreen(), // Pestaña 0
     ExerciseLibraryScreen(), // Pestaña 1
     PlayerProfileScreen(), // Pestaña 2
   ];
@@ -29,9 +29,8 @@ class _PlayerHomeScreenState extends ConsumerState<PlayerHomeScreen> {
   static const List<String> _widgetTitles = <String>[
     'Mi Programa',
     'Biblioteca de Ejercicios',
-    'Mi Perfil'
+    'Mi Perfil',
   ];
-
 
   void _onItemTapped(int index) {
     setState(() {
@@ -41,24 +40,23 @@ class _PlayerHomeScreenState extends ConsumerState<PlayerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 4. --- (Ya no hay '_isLoadingProfile') ---
+    final showOuterAppBar = _selectedIndex != 1;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_widgetTitles[_selectedIndex]),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Cerrar Sesión',
-            onPressed: () {
-              ref.read(authServiceProvider).logout();
-            },
-          )
-        ],
-      ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _widgetOptions,
-      ),
+      appBar: showOuterAppBar
+          ? AppBar(
+              title: Text(_widgetTitles[_selectedIndex]),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.logout),
+                  tooltip: 'Cerrar Sesión',
+                  onPressed: () {
+                    ref.read(authServiceProvider).logout();
+                  },
+                ),
+              ],
+            )
+          : null,
+      body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
@@ -69,10 +67,7 @@ class _PlayerHomeScreenState extends ConsumerState<PlayerHomeScreen> {
             icon: Icon(Icons.video_library),
             label: 'Biblioteca',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Perfil',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: Theme.of(context).colorScheme.primary,

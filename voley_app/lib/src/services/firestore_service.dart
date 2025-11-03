@@ -249,6 +249,17 @@ class FirestoreService {
     await _db.collection('users').doc(userId).update({'coachId': coachId});
   }
 
+  Future<void> updatePlayerProfileCoachId(String playerId, String coachId) async {
+    final query = await _db
+        .collection('players')
+        .where('userId', isEqualTo: playerId)
+        .get();
+
+    for (final doc in query.docs) {
+      await doc.reference.update({'assignedCoachId': coachId});
+    }
+  }
+
   Future<String> ensureUserLinkCode(String userId) async {
     final userDoc = await _db.collection('users').doc(userId).get();
     if (!userDoc.exists) {
@@ -303,6 +314,7 @@ class FirestoreService {
 
     await permissionRef.set(data, SetOptions(merge: true));
     await updateUserCoachId(playerId, coachId);
+    await updatePlayerProfileCoachId(playerId, coachId);
   }
 
   Future<String> _generateUniqueLinkCode() async {

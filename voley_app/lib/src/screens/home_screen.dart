@@ -117,7 +117,6 @@ final isLoggingOut = ref.watch(isLoggingOutProvider);
     try {
       await ref.read(authServiceProvider).logout();
     } catch (e) {
-      ref.read(isLoggingOutProvider.notifier).state = false;
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -125,7 +124,8 @@ final isLoggingOut = ref.watch(isLoggingOutProvider);
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
-      }
+      } } finally {
+      ref.read(isLoggingOutProvider.notifier).state = false;
     }
   }
 
