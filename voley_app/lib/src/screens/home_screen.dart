@@ -138,6 +138,7 @@ final isLoggingOut = ref.watch(isLoggingOutProvider);
     const String routeUserManagement = '/user_management';
     const String routeUserCreate = '/user_create';
     const String routeLibrary = '/library';
+    const String routePermissions = '/permiso';
 
     // --- VISTA PARA EL COACH ---
     return [
@@ -161,6 +162,13 @@ final isLoggingOut = ref.watch(isLoggingOutProvider);
         title: 'Jugadores',
         subtitle: 'Crear jugadores',
         route: routeUserCreate,
+      ),
+      _buildMenuCard(
+        context,
+        icon: Icons.shield,
+        title: 'Permisos',
+        subtitle: 'Gestionar accesos',
+        route: routePermissions,
       ),
       _buildMenuCard(
         context,

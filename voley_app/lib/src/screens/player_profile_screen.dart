@@ -57,6 +57,8 @@ class PlayerProfileScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 80.0),
         children: [
+          _buildLinkCoachPrompt(context, theme),
+          const SizedBox(height: 24),
           // --- 1. Tarjeta "Héroe" (Quién soy) ---
           Card(
             elevation: 2,
@@ -218,14 +220,66 @@ class PlayerProfileScreen extends ConsumerWidget {
                 onPressed: () {
                   Navigator.pushNamed(context, '/player_evaluation');
                 },
-              )
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.link),
+                label: const Text('Vincular con mi entrenador'),
+                onPressed: () {
+                  Navigator.pushNamed(context, '/player_link_code');
+                },
+              ),
             ],
           ),
         ),
       ),
     );
   }
-
+Widget _buildLinkCoachPrompt(BuildContext context, ThemeData theme) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: theme.colorScheme.surfaceVariant.withOpacity(0.7),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.link, color: theme.colorScheme.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Conecta con tu entrenador',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Comparte tu código o ingresa el de tu entrenador para sincronizar tus programas.',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/player_link_code');
+                },
+                icon: const Icon(Icons.qr_code_2),
+                label: const Text('Abrir códigos'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
   /// Tarjeta de Estadística para el Grid (Sin cambios)
   Widget _buildStatCard(ThemeData theme,
       {required String title, required String value, String? unit}) {

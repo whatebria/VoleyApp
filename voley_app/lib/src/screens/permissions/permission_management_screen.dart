@@ -539,7 +539,7 @@ class _PermissionManagementScreenState
 
               onPressed: () {
 
-                // TODO: Navegar a pantalla de búsqueda de jugadores
+                Navigator.pushNamed(context, '/user_management');
 
                 ScaffoldMessenger.of(context).showSnackBar(
 
@@ -619,7 +619,9 @@ class _PermissionManagementScreenState
                   onPressed: _linkCode == null
                       ? null
                       : () {
-                          Clipboard.setData(ClipboardData(text: _linkCode));
+                          final code = _linkCode;
+                          if (code == null) return;
+                          Clipboard.setData(ClipboardData(text: code));
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Código copiado al portapapeles'),

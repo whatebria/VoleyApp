@@ -10,6 +10,7 @@ import 'package:voley_app/src/screens/generate_program_screen.dart';
 import 'package:voley_app/src/screens/new_evaluation_screen.dart';
 import 'package:voley_app/src/screens/permissions/permission_management_screen.dart';
 import 'package:voley_app/src/screens/player_evaluation_screen.dart';
+import 'package:voley_app/src/screens/player_link_code_screen.dart';
 import 'package:voley_app/src/screens/program_view_screen.dart';
 import 'package:voley_app/src/screens/user_management_screen.dart';
 import 'package:voley_app/theme/app_theme.dart'; // Asegúrate de tener esta dependencia
@@ -53,6 +54,7 @@ class MyApp extends StatelessWidget {
         '/permiso': (c) => PermissionManagementScreen(),
         '/user_create': (c) => CreatePlayerScreen(),
         '/user_management': (c) => UserManagementScreen(),
+        '/player_link_code': (c) => const PlayerLinkCodeScreen(),
         '/library': (c) => const ExerciseLibraryScreen(),
       },
     );

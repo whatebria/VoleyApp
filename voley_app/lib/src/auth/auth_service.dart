@@ -105,20 +105,17 @@ class AuthService {
     await _auth.signOut();
   }
 
-  Future<String> _generateUniqueLinkCode() async {
+   Future<String> _generateUniqueLinkCode() async {
     const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     final random = Random.secure();
-
     String _generateCode() {
       return List.generate(
         6,
         (_) => characters[random.nextInt(characters.length)],
       ).join();
     }
-
     String code;
     bool exists = true;
-
     while (exists) {
       code = _generateCode();
       final snapshot = await _firestore
@@ -131,7 +128,6 @@ class AuthService {
         return code;
       }
     }
-
     // No debería llegar aquí, pero Dart requiere inicialización
     return _generateCode();
   }
