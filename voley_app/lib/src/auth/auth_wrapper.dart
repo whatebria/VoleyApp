@@ -1,62 +1,32 @@
-// lib/src/auth/auth_wrapper.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:voley_app/providers/auth_provider.dart';
+import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/auth/login_screen.dart';
 import 'package:voley_app/src/screens/home_screen.dart';
-import 'package:voley_app/src/screens/onboarding/evaluation_screen.dart';
+import 'package:voley_app/src/screens/player_home_screen.dart';
 
 class AuthWrapper extends ConsumerWidget {
-  const AuthWrapper({Key? key}) : super(key: key);
-
+  const AuthWrapper({super.key});
+  
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authStateProvider);
+    
+    // El resto de tu lógica no cambia: observa el perfil de Firestore
+    final appUserAsync = ref.watch(currentUserAppUserProvider);
 
-    return authState.when(
-      data: (user) {
-        // Si el usuario está autenticado, mostrar la pantalla principal
-
-        if (user != null) {
-          return const HomeScreen();
+    return appUserAsync.when(
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, s) => Scaffold(body: Center(child: Text('Error al cargar perfil de app: $e'))),
+      data: (appUser) {
+        if (appUser == null) {
+          return const LoginScreen(); 
         }
-
-        // Si no está autenticado, mostrar login
-
-        return const LoginScreen();
+        if (appUser.isCoach) {
+          return const HomeScreen();
+        } else {
+          return const PlayerHomeScreen();
+        }
       },
-
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-
-      error: (error, stack) => Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-
-              const SizedBox(height: 16),
-
-              Text('Error: $error'),
-
-              const SizedBox(height: 16),
-
-              ElevatedButton(
-                onPressed: () {
-                  // Intentar recargar
-
-                  ref.invalidate(authStateProvider);
-                },
-
-                child: const Text('Reintentar'),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

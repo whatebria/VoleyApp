@@ -1,18 +1,16 @@
 // lib/services/firestore_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/bd/exercise.dart';
 import 'package:voley_app/src/models/program/program.dart';
+import 'package:voley_app/src/models/program/session_log.dart';
 import 'package:voley_app/src/models/user.dart' as app_user;
-
 import 'package:voley_app/src/models/coach_player_permission.dart';
-
-import 'package:uuid/uuid.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-
-  final _uuid = const Uuid();
 
   // ========== User Methods ==========
 
@@ -38,12 +36,17 @@ class FirestoreService {
       name: name,
       role: app_user.UserRole.player,
       createdAt: DateTime.now(),
+      coachId: coachId,
     );
 
     await _db.collection('users').doc(user.id).set(user.toJson());
 
-    // Create permission link with coach
-    await createPermission(coachId: coachId, playerId: userId);
+    // Create permission link with coach (already accepted)
+    await createPermission(
+      coachId: coachId,
+      playerId: userId,
+      initialStatus: PermissionStatus.accepted,
+    );
 
     return user;
   }
@@ -74,17 +77,23 @@ class FirestoreService {
     required String coachId,
 
     required String playerId,
+
+    PermissionStatus initialStatus = PermissionStatus.pending,
   }) async {
     final permission = CoachPlayerPermission(
-      id: _uuid.v4(),
+      id: '${coachId}_$playerId',
 
       coachId: coachId,
 
       playerId: playerId,
 
-      status: PermissionStatus.pending,
+      status: initialStatus,
 
       createdAt: DateTime.now(),
+
+      updatedAt: initialStatus != PermissionStatus.pending
+          ? DateTime.now()
+          : null,
     );
 
     await _db
@@ -228,51 +237,42 @@ class FirestoreService {
     await _db.collection('coach_player_permissions').doc(permissionId).delete();
   }
 
-  Future<List<Program>> getProgramsByPlayer(String playerId) async {
-    final snap = await _db
-        .collection('players')
-        .doc(playerId)
-        .collection('programs')
-        .orderBy('startDate', descending: true)
-        .get();
+  /// Update user's coachId field
+  Future<void> updateUserCoachId(String userId, String? coachId) async {
+    await _db.collection('users').doc(userId).update({'coachId': coachId});
+  }
+
+  // ========== Existing Player Profile Methods ==========
 
     return snap.docs.map((d) => Program.fromJson(d.data())).toList();
   }
 
-  Stream<List<Program>> getAllProgramsStream(String profileId) {
-    // IMPORTANTE: Esta lógica asume que tu `profileId` es el ID del *documento*
-    // en la colección 'users' (el UUID que generas), NO el Auth UID.
-    // Esto coincide con la lógica que vimos en tu 'EvaluationScreen'.
-    
-    return _db
-        .collection('users')
+  Future<List<SessionLog>> getSessionLogHistory(String profileId) async {
+    final snap = await _db
+        .collection('players')
         .doc(profileId)
-        .collection('programs')
-        .orderBy('startDate', descending: true) // Muestra los más nuevos primero
-        .snapshots() // Esto devuelve un Stream<QuerySnapshot>
-        .map((snapshot) {
-          // Convierte el QuerySnapshot en un List<Program>
-          return snapshot.docs
-              .map((doc) => Program.fromFirestore(doc)) // Usa el constructor que creamos
-              .toList();
-        });
+        .collection('session_logs') // O 'session_logs', como lo hayas llamado
+        .orderBy('completedAt', descending: true)
+        .limit(50) // Limita a las últimas 50 sesiones para performance
+        .get();
+
+    return snap.docs.map((doc) => SessionLog.fromJson(doc.data())).toList();
   }
 
-  // (Asegúrate de que también tienes este)
   Stream<Program?> getLatestProgramStream(String profileId) {
     return _db
-        .collection('users')
+        .collection('players')
         .doc(profileId)
         .collection('programs')
         .orderBy('startDate', descending: true)
         .limit(1)
         .snapshots()
         .map((snapshot) {
-      if (snapshot.docs.isEmpty) {
-        return null;
-      }
-      return Program.fromFirestore(snapshot.docs.first);
-    });
+          if (snapshot.docs.isEmpty) {
+            return null;
+          }
+          return Program.fromFirestore(snapshot.docs.first);
+        });
   }
 
   Future<PlayerProfile?> getPlayerProfileByUserId(String userId) async {
@@ -309,6 +309,50 @@ class FirestoreService {
         .set(program.toJson());
   }
 
+  Future<List<Program>> getProgramsByPlayer(String playerId) async {
+    final snap = await _db
+        .collection('players')
+        .doc(playerId)
+        .collection('programs')
+        .orderBy('startDate', descending: true)
+        .get();
+
+    return snap.docs.map((d) => Program.fromJson(d.data())).toList();
+  }
+
+  Stream<List<Program>> getAllProgramsStream(String profileId) {
+    // Usamos 'players' porque tus otros métodos (saveProgram, getPlayerProfile)
+    // también usan la colección 'players'.
+    return _db
+        .collection('players')
+        .doc(profileId)
+        .collection('programs')
+        .orderBy('startDate', descending: true)
+        .snapshots() // .snapshots() devuelve un Stream
+        .map((snapshot) {
+          // Convierte el QuerySnapshot en un List<Program>
+          if (snapshot.docs.isEmpty) {
+            return []; // Devuelve una lista vacía si no hay programas
+          }
+          return snapshot.docs
+              .map(
+                (doc) => Program.fromFirestore(doc),
+              ) // Usa el constructor que creamos
+              .toList();
+        });
+  }
+
+  Future<PlayerProfile?> getPlayerProfileByUserId(String userId) async {
+    final snap = await _db
+        .collection('players')
+        .where('userId', isEqualTo: userId)
+        .limit(1)
+        .get();
+
+    if (snap.docs.isEmpty) return null;
+    return PlayerProfile.fromJson(snap.docs.first.data());
+  }
+
   Future<List<Exercise>> getAllExercises() async {
     final snap = await _db.collection('exercises').get();
     return snap.docs.map((d) => Exercise.fromJson(d.data())).toList();
@@ -326,4 +370,79 @@ class FirestoreService {
         .doc(sessionId)
         .set(feedback);
   }
+
+  Stream<List<app_user.User>> getPlayersByCoachStream(String coachId) {
+    return _db
+        .collection('coach_player_permissions')
+        .where('coachId', isEqualTo: coachId)
+        .where('status', isEqualTo: 'accepted')
+        .snapshots() // <-- 1. Usa .snapshots() para escuchar en tiempo real
+        .asyncMap((permissionsSnap) async {
+          // <-- 2. Mapea el stream
+
+          if (permissionsSnap.docs.isEmpty) return [];
+
+          // 3. Obtiene los IDs de los jugadores
+          final playerIds = permissionsSnap.docs
+              .map((doc) => doc.data()['playerId'] as String)
+              .toList();
+
+          if (playerIds.isEmpty) return [];
+
+          // 4. Busca todos los documentos de 'users' en paralelo (muy eficiente)
+          final playerFutures = playerIds.map((id) => getUser(id)).toList();
+          final players = await Future.wait(playerFutures);
+
+          // 5. Filtra los que no sean nulos y devuelve la lista
+          return players.whereType<app_user.User>().toList();
+        });
+  }
+
+  /// Observa el perfil del jugador y, si existe,
+  /// obtiene un [Stream] de su programa más reciente.
+  
+  Future<void> saveSessionLog(SessionLog log) {
+    return _db
+        .collection('players')
+        .doc(log.profileId)
+        .collection('session_logs') // O 'session_logs', como prefieras llamarla
+        .doc(log.id)
+        .set(log.toJson());
+  }
+
+  Stream<List<SessionLog>> getSessionHistoryStream(String profileId) {
+    return _db
+        .collection('players')
+        .doc(profileId)
+        .collection('session_logs') // La colección donde se guardan los SessionLog
+        .orderBy('completedAt', descending: true) 
+        .snapshots() // <-- USA .snapshots() EN LUGAR DE .get()
+        .map((snapshot) {
+      if (snapshot.docs.isEmpty) {
+        return []; 
+      }
+      return snapshot.docs
+          .map((doc) => SessionLog.fromJson(doc.data()))
+          .toList();
+    });
+  }
+final playerProgramProvider = StreamProvider<Program?>((ref) {
+  // 1. "Observa" (watch) el resultado del FutureProvider de perfil
+  final profileAsync = ref.watch(playerProfileProvider);
+
+  // 2. Mapea el resultado
+  return profileAsync.when(
+    data: (profile) {
+      if (profile == null) {
+        return Stream.value(null); // Sin perfil -> Sin programa
+      }
+      // 3. Si hay perfil, escucha el stream del programa
+      return ref.read(firestoreProvider).getLatestProgramStream(profile.id);
+    },
+    loading: () => Stream.value(null), // Cargando perfil -> Cargando programa
+    error: (e, s) => Stream.error(e, s), // Error de perfil -> Error de programa
+  );
+});
 }
+
+

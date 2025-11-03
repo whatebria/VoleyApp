@@ -1,35 +1,29 @@
+// lib/providers.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:voley_app/providers/auth_provider.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/bd/exercise.dart';
 import 'package:voley_app/src/models/program/program.dart';
+import 'package:voley_app/src/models/program/session_log.dart';
 import 'package:voley_app/src/models/user.dart' as app_user;
 import 'package:voley_app/src/services/firestore_service.dart';
 
 // --- SECCIÓN 1: SERVICIOS PRINCIPALES ---
+// (Sin cambios)
 
-/// Provee la instancia del servicio de Firestore.
 final firestoreProvider = Provider((ref) => FirestoreService());
+final functionsProvider = Provider((ref) => FirebaseFunctions.instance);
 
-/// Provee la instancia de Cloud Functions.
-final functionsProvider = Provider((ref) {
-  return FirebaseFunctions.instance;
-});
-
-// --- SECCIÓN 2: DATOS GLOBALES Y DE USUARIO ---
+// --- SECCIÓN 2: DATOS GLOBALES Y DE USUARIO LOGUEADO ---
+// (Sin cambios)
 
 /// Provee el usuario de Firestore (`app_user.User`) basado en el usuario de Auth.
 final currentUserAppUserProvider = FutureProvider<app_user.User?>((ref) async {
-  // Ahora observamos 'authStateProvider', que SÍ tiene .future
-  final authUser = await ref.watch(authStateProvide.future); 
-  
-  if (authUser == null) {
-    return null; // El usuario no está logueado
-  }
-  
-  // 'authUser' es ahora un 'User?' (de Auth) y .uid existe
+  final authUser = await ref.watch(authStateProvider.future);
+  if (authUser == null) return null;
   final firestore = ref.read(firestoreProvider);
-  return await firestore.getUser(authUser.uid); 
+  return await firestore.getUser(authUser.uid);
 });
 
 /// Provee la lista global de ejercicios.
@@ -38,84 +32,166 @@ final exercisesProvider = FutureProvider<List<Exercise>>((ref) async {
   return svc.getAllExercises();
 });
 
+/// Provee el perfil del **jugador actualmente logueado**.
+final playerProfileProvider = FutureProvider<PlayerProfile?>((ref) async {
+  final appUser = await ref.watch(currentUserAppUserProvider.future);
 
-// --- SECCIÓN 3: FLUJO DEL "GENERADOR" (EvaluationScreen -> GenerateProgramScreen) ---
+  if (appUser == null || appUser.isCoach) {
+    return null; // No es un jugador, no hay perfil
+  }
+  
+  final firestore = ref.read(firestoreProvider);
+  final profile = await firestore.getPlayerProfileByUserId(appUser.id);
+  return profile;
+});
 
-/// Almacena el perfil del jugador que se está creando o editando.
-/// La 'EvaluationScreen' escribe en este provider.
-final playerProfileProvider = StateProvider<PlayerProfile?>((ref) => null);
-
-/// Provee la ACCIÓN para llamar a la Cloud Function y generar un programa.
+/// Acción para llamar a la Cloud Function y generar un programa.
 final programGeneratorAction = Provider((ref) {
   final functions = ref.read(functionsProvider);
 
   return (PlayerProfile profile) async {
     final callable = functions.httpsCallable('generateMyProgram');
-    
-    // Pasa el ID del perfil del jugador (que es un UUID, no el Auth ID)
     final result = await callable.call(<String, dynamic>{
       'playerId': profile.id,
     });
-
     return result.data as Map<String, dynamic>;
   };
 });
 
-/// ESCUCHA el programa más RECIENTE del perfil que se acaba de generar.
-/// Usado por 'ProgramViewScreen' después de la generación.
+
+// --- SECCIÓN 3: DATOS DEL JUGADOR LOGUEADO ---
+
+/// Escucha el programa más RECIENTE del perfil del **jugador logueado**.
+/// (Usado por la pantalla de "Resultado Inmediato" o el Dashboard del jugador)
 final generatedProgramProvider = StreamProvider<Program?>((ref) {
-  // Observa el perfil que se guardó en el StateProvider
-  final selectedProfile = ref.watch(playerProfileProvider);
+  // 1. "Observa" (watch) el resultado del FutureProvider de perfil
+  final profileAsync = ref.watch(playerProfileProvider);
   final firestore = ref.read(firestoreProvider);
 
-  if (selectedProfile == null) {
-    return Stream.value(null);
-  }
-
-  // Escucha el último programa de ESE perfil
-  return firestore.getLatestProgramStream(selectedProfile.id);
+  // 2. Mapea el resultado
+  return profileAsync.when(
+    data: (profile) {
+      if (profile == null) {
+        return Stream.value(null); // Sin perfil -> Sin programa
+      }
+      // 3. Si hay perfil, escucha el stream
+      return firestore.getLatestProgramStream(profile.id);
+    },
+    loading: () => Stream.value(null), // Cargando perfil -> Cargando programa
+    error: (e, s) => Stream.error(e, s), // Error de perfil -> Error de programa
+  );
 });
 
-// --- 2. ERROR CORREGIDO: El bloque duplicado ha sido eliminado ---
-// (La lógica que estaba aquí abajo era un duplicado de la de arriba y fue borrada).
+/// Escucha el historial de sesiones del **jugador logueado**.
+final sessionLogHistoryProvider = StreamProvider<List<SessionLog>>((ref) {
+  final profileAsync = ref.watch(playerProfileProvider);
+
+  return profileAsync.when(
+    data: (profile) {
+      if (profile == null) {
+        return Stream.value([]); // Sin perfil -> Sin historial
+      }
+      return ref.read(firestoreProvider).getSessionHistoryStream(profile.id);
+    },
+    loading: () => Stream.value([]), 
+    error: (e, s) => Stream.error(e, s),
+  );
+});
 
 
-// --- SECCIÓN 4: FLUJO DEL "EXPLORADOR" (ProgramViewScreen como explorador) ---
+// --- SECCIÓN 4: FLUJO DEL "EXPLORADOR" (Para Coach) ---
+
+/// Clase auxiliar para agrupar un jugador con su perfil
+class PlayerWithProfile {
+  final app_user.User player;
+  final PlayerProfile? profile;
+  PlayerWithProfile(this.player, this.profile);
+  
+  // Es útil para los DropdownButton
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PlayerWithProfile &&
+          runtimeType == other.runtimeType &&
+          player.id == other.player.id;
+
+  @override
+  int get hashCode => player.id.hashCode;
+}
 
 /// Provee la lista de jugadores (app_user.User) asignados al coach logueado.
-final coachPlayersProvider = FutureProvider<List<app_user.User>>((ref) async {
-  // Observa el provider del usuario de Firestore
+final coachPlayersProvider = StreamProvider<List<app_user.User>>((ref) {
   final currentUser = ref.watch(currentUserAppUserProvider).value;
-  
-  // '.isCoach' ahora está disponible porque 'currentUser' es del tipo correcto
-  if (currentUser == null || !currentUser.isCoach) return [];
-  
+
+  if (currentUser == null || !currentUser.isCoach) {
+    return Stream.value([]);
+  }
+
   final firestore = ref.read(firestoreProvider);
-  return firestore.getPlayersByCoach(currentUser.id);
+  return firestore.getPlayersByCoachStream(currentUser.id);
 });
 
-/// Almacena el jugador (app_user.User) que el coach selecciona en el Dropdown.
-final explorerSelectedPlayerProvider = StateProvider<app_user.User?>((ref) => null);
-
-/// Escucha TODOS los programas del jugador seleccionado en el explorador.
-final explorerProgramsProvider = StreamProvider<List<Program>>((ref) async* {
+/// Provee la lista de jugadores Y sus perfiles asociados.
+/// [REFACTORIZADO] Convertido a StreamProvider para ser reactivo.
+final coachPlayersWithProfilesProvider =
+    StreamProvider<List<PlayerWithProfile>>((ref) async* {
   final firestore = ref.read(firestoreProvider);
-  // Observa al jugador seleccionado por el coach
-  final selectedPlayer = ref.watch(explorerSelectedPlayerProvider);
   
-  if (selectedPlayer == null) {
-    yield [];
-  } else {
-    // Busca el *perfil* de ese jugador (basado en el Auth UID de 'selectedPlayer.id')
-    final profile = await firestore.getPlayerProfileByUserId(selectedPlayer.id);
-    if (profile == null) {
+  // 1. Escucha el stream de jugadores
+  final playersStream = ref.watch(coachPlayersProvider.stream);
+
+  // 2. Por cada nueva lista de jugadores emitida...
+  await for (final players in playersStream) {
+    if (players.isEmpty) {
       yield [];
-    } else {
-      // Escucha todos los programas de ESE perfil
-      yield* firestore.getAllProgramsStream(profile.id);
+      continue;
     }
+
+    // 3. Busca todos sus perfiles en paralelo
+    final futures = players.map((player) async {
+      final profile = await firestore.getPlayerProfileByUserId(player.id);
+      return PlayerWithProfile(player, profile);
+    }).toList();
+
+    // 4. Espera a que todos se completen y emite la lista combinada
+    yield await Future.wait(futures);
+  }
+});
+
+/// Almacena el combo (Jugador + Perfil) que el coach selecciona en el Dropdown.
+/// [REFACTORIZADO] Ahora almacena `PlayerWithProfile` en lugar de `app_user.User`.
+final explorerSelectedPlayerProvider = StateProvider<PlayerWithProfile?>(
+  (ref) => null,
+);
+
+final selectedPlayerProfileProvider = Provider<PlayerProfile?>((ref) {
+  final selected = ref.watch(explorerSelectedPlayerProvider);
+  return selected?.profile;
+});
+
+final explorerProgramsProvider = StreamProvider<List<Program>>((ref) {
+  final firestore = ref.read(firestoreProvider);
+  
+  // 1. Observa el perfil del jugador seleccionado (que ya está cargado)
+  final selectedProfile = ref.watch(selectedPlayerProfileProvider);
+
+  if (selectedProfile == null) {
+    // Si no hay perfil (o no hay jugador seleccionado), emite lista vacía.
+    return Stream.value([]);
+  } else {
+    // 2. Escucha los programas de ESE perfil
+    return firestore.getAllProgramsStream(selectedProfile.id);
   }
 });
 
 /// Almacena el programa (Program) que el coach selecciona en el 2do Dropdown.
+/// (Sin cambios)
 final explorerSelectedProgramProvider = StateProvider<Program?>((ref) => null);
+
+
+// --- SECCIÓN 5: ESTADOS GLOBALES DE UI ---
+// (Agrupados para claridad, sin cambios)
+
+final isGeneratingProgramProvider = StateProvider<bool>((ref) => false);
+final isLoggingOutProvider = StateProvider<bool>((ref) => false);
+final isCreatingPlayerProvider = StateProvider<bool>((ref) => false);

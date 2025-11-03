@@ -1,406 +1,204 @@
+// lib/src/screens/user_management_screen.dart (CORREGIDO)
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:voley_app/src/models/user.dart';
-import 'package:voley_app/src/models/player_profile/player_profile.dart';
-import 'package:voley_app/src/services/firestore_service.dart';
-import 'package:voley_app/providers/auth_provider.dart';
-import 'package:intl/intl.dart';
+import 'package:voley_app/src/models/user.dart' as app_user;
+import 'package:voley_app/providers/providers.dart'; 
+import 'package:voley_app/src/models/player_profile/player_profile.dart'; // Importar PlayerProfile (necesario para PlayerWithProfile)
+import 'package:voley_app/src/screens/create_player_screen.dart';
 
-class UserManagementScreen extends ConsumerStatefulWidget {
-  const UserManagementScreen({Key? key}) : super(key: key);
 
-  @override
-  ConsumerState<UserManagementScreen> createState() =>
-      _UserManagementScreenState();
-}
+class UserManagementScreen extends ConsumerWidget {
+  const UserManagementScreen({super.key});
 
-class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
-  final _firestoreService = FirestoreService();
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  
-  bool _isLoading = false;
-  User? _currentUser;
-  List<User> _linkedPlayers = [];
-  Map<String, PlayerProfile?> _playerProfiles = {};
+  /// --- MEJORA DE UX: Muestra las opciones del jugador ---
+  // [CORRECCIÓN]: Ahora acepta PlayerWithProfile
+  void _showPlayerOptions(
+      BuildContext context, WidgetRef ref, PlayerWithProfile playerCombo) {
+    final theme = Theme.of(context);
+    
+    // [CORRECCIÓN CRÍTICA]: Asigna el objeto PlayerWithProfile completo.
+    ref.read(explorerSelectedPlayerProvider.notifier).state = playerCombo;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
+    // 2. MUESTRA EL MENÚ
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              // --- Opción 1: Ir a Evaluación/Perfil ---
+              ListTile(
+                leading:
+                    Icon(Icons.assessment, color: theme.colorScheme.primary), // Volt
+                title: const Text('Ver/Editar Evaluación'),
+                subtitle: Text(playerCombo.profile == null 
+                  ? 'Perfil, posición, tests, lesiones (Perfil NO CREADO)'
+                  : 'Perfil, posición, tests, lesiones...'),
+                onTap: () {
+                  Navigator.pop(ctx); // Cierra el menú
+                  Navigator.pushNamed(context, '/evaluation');
+                },
+              ),
+              // --- Opción 2: Ir a Programas ---
+              ListTile(
+                leading:
+                    Icon(Icons.list_alt, color: theme.colorScheme.secondary), // Azul Pro
+                title: const Text('Ver/Gestionar Programas'),
+                subtitle: const Text('Calendario, mesociclos, sesiones...'),
+                onTap: () {
+                  Navigator.pop(ctx); // Cierra el menú
+                  Navigator.pushNamed(context, '/program');
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final currentFirebaseUser = ref.read(currentUserProvider);
-      if (currentFirebaseUser == null) return;
-
-      _currentUser = await _firestoreService.getUser(currentFirebaseUser.uid);
-      
-      if (_currentUser != null && _currentUser!.isCoach) {
-        _linkedPlayers = await _firestoreService.getPlayersByCoach(_currentUser!.id);
-        
-        // Fetch player profiles for each linked player
-        for (final player in _linkedPlayers) {
-          final profile = await _firestoreService.getPlayerProfileByUserId(player.id);
-          _playerProfiles[player.id] = profile;
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al cargar datos: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  Future<void> _createPlayer() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_currentUser == null || !_currentUser!.isCoach) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Solo los coaches pueden crear jugadores'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      final authService = ref.read(authServiceProvider);
-      
-      // Crear el jugador con vinculación automática al coach
-      final result = await authService.register(
-        _emailController.text.trim(),
-        _passwordController.text,
-        _nameController.text.trim(),
-        UserRole.player,
-        coachId: _currentUser!.id,
-      );
-
-      if (!mounted) return;
-
-      if (result == "success") {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('¡Jugador creado y vinculado exitosamente!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        // Limpiar formulario
-        _nameController.clear();
-        _emailController.clear();
-        _passwordController.clear();
-        
-        // Recargar lista de jugadores
-        await _loadData();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result ?? 'Error al crear jugador'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_currentUser == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Gestión de Usuarios')),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (!_currentUser!.isCoach) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Gestión de Usuarios')),
-        body: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
-              'Esta funcionalidad solo está disponible para coaches.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16),
-            ),
-          ),
-        ),
-      );
-    }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final coachUserAsync = ref.watch(currentUserAppUserProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gestión de Jugadores'),
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16.0),
+      body: coachUserAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, s) => Center(child: Text('Error al cargar usuario: $e')),
+        data: (coachUser) {
+          // Manejo de permisos
+          if (coachUser == null || !coachUser.isCoach) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  'Esta funcionalidad solo está disponible para coaches.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16),
+                ),
+              ),
+            );
+          }
+
+          // El body es SOLO la lista de jugadores
+          return _buildPlayerList(theme, ref);
+        },
+      ),
+      // --- MEJORA DE UX: FAB para la acción de "Crear" ---
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // Navega a la nueva pantalla de formulario
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CreatePlayerScreen()),
+          );
+        },
+        child: const Icon(Icons.person_add),
+        tooltip: 'Crear Jugador',
+      ),
+    );
+  }
+
+  /// Widget separado para la lista de jugadores
+  Widget _buildPlayerList(ThemeData theme, WidgetRef ref) {
+    // Observa el nuevo provider que tiene jugadores + perfiles
+    final playersWithProfilesAsync = ref.watch(coachPlayersWithProfilesProvider);
+
+    return playersWithProfilesAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, s) => Center(child: Text('Error al cargar jugadores: $e')),
+      data: (playersWithProfiles) {
+        
+        // --- MEJORA DE UX: RefreshIndicator en la lista ---
+        return RefreshIndicator(
+          // Invalida el StreamProvider principal para forzar una nueva lectura
+          onRefresh: () async {
+            ref.invalidate(coachPlayersProvider); 
+          },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Formulario para crear jugador
-              Card(
-                elevation: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Crear Nuevo Jugador',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: InputDecoration(
-                            labelText: 'Nombre completo',
-                            prefixIcon: const Icon(Icons.person_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Por favor ingresa el nombre';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            labelText: 'Correo electrónico',
-                            prefixIcon: const Icon(Icons.email_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Por favor ingresa el correo';
-                            }
-                            if (!value.contains('@')) {
-                              return 'Ingresa un correo válido';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            labelText: 'Contraseña inicial',
-                            prefixIcon: const Icon(Icons.lock_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            helperText: 'El jugador podrá cambiarla después',
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Por favor ingresa una contraseña';
-                            }
-                            if (value.length < 6) {
-                              return 'Mínimo 6 caracteres';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: _isLoading ? null : _createPlayer,
-                            icon: _isLoading
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                : const Icon(Icons.person_add),
-                            label: const Text('Crear Jugador'),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+                child: Text(
+                  'Jugadores Vinculados (${playersWithProfiles.length})',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              
-              // Lista de jugadores vinculados
-              Text(
-                'Jugadores Vinculados (${_linkedPlayers.length})',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              
-              if (_linkedPlayers.isEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'No tienes jugadores vinculados aún. Crea uno usando el formulario de arriba.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey[600]),
+              if (playersWithProfiles.isEmpty)
+                Expanded( // Para que el texto se centre en el espacio restante
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Text(
+                        'No tienes jugadores vinculados. Presiona el botón "+" para crear uno.',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyLarge
+                            ?.copyWith(color: theme.textTheme.bodySmall?.color),
+                      ),
                     ),
                   ),
                 )
               else
-                ..._linkedPlayers.map((player) {
-                  final profile = _playerProfiles[player.id];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    elevation: 2,
-                    child: ExpansionTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.blue,
-                        child: Text(
-                          player.name[0].toUpperCase(),
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ),
-                      title: Text(
-                        player.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text(player.email),
-                      trailing: const Icon(Icons.expand_more),
-                      children: [
-                        if (profile == null)
-                          const Padding(
-                            padding: EdgeInsets.all(16.0),
+                // --- MEJORA DE RENDIMIENTO: ListView.builder ---
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 80.0), // Espacio para el FAB
+                    itemCount: playersWithProfiles.length,
+                    itemBuilder: (context, index) {
+                      // [CORRECCIÓN]: El item es PlayerWithProfile
+                      final playerCombo = playersWithProfiles[index];
+                      final player = playerCombo.player;
+                      final profile = playerCombo.profile;
+
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16.0, vertical: 6.0),
+                        elevation: 0,
+                        color:
+                            theme.colorScheme.surfaceVariant.withOpacity(0.6),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: theme.colorScheme.primary, // Volt
                             child: Text(
-                              'No hay perfil de jugador disponible. Realiza una evaluación primero.',
-                              style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
-                            ),
-                          )
-                        else
-                          Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildInfoRow(Icons.sports_volleyball, 'Posición', profile.position),
-                                const SizedBox(height: 8),
-                                _buildInfoRow(Icons.bar_chart, 'Nivel', profile.level),
-                                const SizedBox(height: 8),
-                                _buildInfoRow(
-                                  Icons.healing,
-                                  'Lesiones',
-                                  profile.injuries.isEmpty
-                                      ? 'Ninguna'
-                                      : profile.injuries.join(', '),
-                                ),
-                                const SizedBox(height: 8),
-                                _buildInfoRow(
-                                  Icons.calendar_today,
-                                  'Días de Entrenamiento',
-                                  profile.availability.trainingDays.isEmpty
-                                      ? 'No especificado'
-                                      : profile.availability.trainingDays.join(', '),
-                                ),
-                                const SizedBox(height: 8),
-                                _buildInfoRow(
-                                  Icons.timer,
-                                  'Duración de Sesión',
-                                  '${profile.availability.sessionMinutes} minutos',
-                                ),
-                                const SizedBox(height: 8),
-                                if (profile.tournaments.isNotEmpty) ...[
-                                  const Divider(),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: const [
-                                      Icon(Icons.emoji_events, size: 20, color: Colors.orange),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Torneos:',
-                                        style: TextStyle(fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  ...profile.tournaments.map((tournament) => Padding(
-                                        padding: const EdgeInsets.only(left: 28, bottom: 4),
-                                        child: Text(
-                                          '• ${tournament.name} - ${DateFormat('dd/MM/yyyy').format(tournament.date)}',
-                                          style: const TextStyle(fontSize: 14),
-                                        ),
-                                      )),
-                                ],
-                              ],
+                              player.name[0].toUpperCase(),
+                              style: TextStyle(
+                                  color: theme.colorScheme.onPrimary), // Texto oscuro
                             ),
                           ),
-                      ],
-                    ),
-                  );
-                }),
+                          title: Text(
+                            player.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            // Muestra info clave: Posición (si existe) o email
+                            profile?.position ?? player.email,
+                            style: TextStyle(
+                                color: theme.textTheme.bodySmall?.color),
+                          ),
+                          trailing:
+                              const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () {
+                            // [CORRECCIÓN CRÍTICA]: Pasamos el PlayerWithProfile completo
+                            _showPlayerOptions(context, ref, playerCombo);
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
