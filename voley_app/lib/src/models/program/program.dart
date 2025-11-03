@@ -1,63 +1,73 @@
-// En tu archivo program.dart
+// lib/src/models/program/program.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:voley_app/src/models/program/mesocycles.dart';
+import 'package:voley_app/src/models/program/mesocycles.dart'; // Ajusta el path si es necesario
 
 class Program {
   final String id;
+  final String title;
   final String source;
   final DateTime startDate;
   final DateTime endDate;
   final List<Mesocycle> mesocycles;
 
-  // (Tu constructor existente)
   Program({
     required this.id,
+    required this.title,
     required this.source,
     required this.startDate,
     required this.endDate,
     required this.mesocycles,
   });
 
-  // --- AÑADE ESTE CONSTRUCTOR ---
+  // --- CONSTRUCTOR fromJson CORREGIDO Y SEGURO ---
   factory Program.fromJson(Map<String, dynamic> json) {
     return Program(
-      // 'id' vendrá del documento, pero lo mantenemos por si lo guardas
-      id: json['id'] ?? '',
-      source: json['source'] ?? 'Desconocido',
-      // Convertir Timestamp de Firestore a DateTime de Dart
-      startDate: (json['startDate'] as Timestamp).toDate(),
-      endDate: (json['endDate'] as Timestamp).toDate(),
-      // Convertir la lista de mapas anidada a una List<Mesocycle>
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      source: json['source'] as String? ?? 'Automático',
+      startDate: (json['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      endDate: (json['endDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
       mesocycles: (json['mesocycles'] as List<dynamic>? ?? [])
-          .map((mesoJson) => Mesocycle.fromJson(mesoJson as Map<String, dynamic>))
+          .map(
+            (mesoJson) => Mesocycle.fromJson(mesoJson as Map<String, dynamic>),
+          )
           .toList(),
     );
   }
-  
-  // (Tu método toJson existente)
+
   Map<String, dynamic> toJson() => {
     'id': id,
+    'title': title,
     'source': source,
-    'startDate': startDate,
-    'endDate': endDate,
+    'startDate': Timestamp.fromDate(startDate),
+    'endDate': Timestamp.fromDate(endDate),
     'mesocycles': mesocycles.map((m) => m.toJson()).toList(),
   };
 
-  // (Opcional, pero recomendado): Añade este para llamar desde el snapshot
+  // Constructor fromFirestore (para leer el ID del documento)
   factory Program.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    // Usa el ID del documento real
-    return Program.fromJson(data).copyWith(id: doc.id); 
+    // Añade el ID del documento a los datos antes de parsear
+    data['id'] = doc.id;
+    return Program.fromJson(data);
   }
 
-  // (Opcional): Añade esto para que 'fromFirestore' funcione
-  Program copyWith({String? id}) {
+  // Método auxiliar 'copyWith'
+  Program copyWith({
+    String? id,
+    String? title,
+    String? source,
+    DateTime? startDate,
+    DateTime? endDate,
+    List<Mesocycle>? mesocycles,
+  }) {
     return Program(
       id: id ?? this.id,
-      source: this.source,
-      startDate: this.startDate,
-      endDate: this.endDate,
-      mesocycles: this.mesocycles,
+      title: title ?? this.title,
+      source: source ?? this.source,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      mesocycles: mesocycles ?? this.mesocycles,
     );
   }
 }

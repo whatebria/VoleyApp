@@ -10,14 +10,30 @@ class EvaluationResult {
   });
 
   Map<String, dynamic> toJson() => {
-        'testScores': testScores,
-        'strengths': strengths,
-        'weaknesses': weaknesses,
-      };
+    'testScores': testScores,
+    'strengths': strengths,
+    'weaknesses': weaknesses,
+  };
 
-  static EvaluationResult fromJson(Map<String, dynamic> json) => EvaluationResult(
-        testScores: Map<String, double>.from((json['testScores'] ?? {}).map((k, v) => MapEntry(k, (v as num).toDouble()))),
+  static EvaluationResult fromJson(Map<String, dynamic> json) =>
+      EvaluationResult(
+        testScores: Map<String, double>.from(
+          (json['testScores'] ?? {}).map(
+            (k, v) => MapEntry(k, (v as num).toDouble()),
+          ),
+        ),
         strengths: List<String>.from(json['strengths'] ?? []),
         weaknesses: List<String>.from(json['weaknesses'] ?? []),
       );
+  EvaluationResult copyWith({
+    Map<String, double>? testScores,
+    List<String>? strengths,
+    List<String>? weaknesses,
+  }) {
+    return EvaluationResult(
+      testScores: testScores ?? this.testScores,
+      strengths: strengths ?? this.strengths,
+      weaknesses: weaknesses ?? this.weaknesses,
+    );
+  }
 }

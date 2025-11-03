@@ -34,14 +34,14 @@ class Exercise {
       };
 
   static Exercise fromJson(Map<String, dynamic> json) => Exercise(
-        id: json['id'],
-        name: json['name'],
+        id: json['id'] as String? ?? '',
+        name: json['name'] as String? ?? 'Ejercicio',
         tags: List<String>.from(json['tags'] ?? []),
-        level: json['level'],
-        category: json['category'],
-        videoUrl: json['videoUrl'] ?? '',
+        level: json['level'] as String? ?? 'principiante',
+        category: json['category'] as String? ?? 'general',
+        videoUrl: json['videoUrl'] as String? ?? '',
         equipment: List<String>.from(json['equipment'] ?? []),
         contraindicatedFor: List<String>.from(json['contraindicatedFor'] ?? []),
-        description: json['description'] ?? '',
+        description: json['description'] as String? ?? '',
       );
 }

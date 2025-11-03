@@ -61,15 +61,19 @@ class CoachPlayerPermission {
 
   static CoachPlayerPermission fromJson(Map<String, dynamic> json) {
     return CoachPlayerPermission(
-      id: json['id'] as String,
+      id: json['id'] as String? ?? '',
 
-      coachId: json['coachId'] as String,
+      coachId: json['coachId'] as String? ?? '',
 
-      playerId: json['playerId'] as String,
+      playerId: json['playerId'] as String? ?? '',
 
-      status: PermissionStatus.fromJson(json['status'] as String),
+      status: json['status'] != null
+          ? PermissionStatus.fromJson(json['status'] as String)
+          : PermissionStatus.pending,
 
-      createdAt: (json['createdAt'] as Timestamp).toDate(),
+      createdAt: json['createdAt'] != null
+          ? (json['createdAt'] as Timestamp).toDate()
+          : DateTime.now(),
 
       updatedAt: json['updatedAt'] != null
           ? (json['updatedAt'] as Timestamp).toDate()

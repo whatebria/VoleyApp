@@ -12,7 +12,11 @@ class Tournament {
       };
 
   static Tournament fromJson(Map<String, dynamic> json) => Tournament(
-        date: (json['date'] is Timestamp) ? (json['date'] as Timestamp).toDate() : DateTime.parse(json['date']),
-        name: json['name'] ?? '',
+        date: json['date'] != null
+            ? (json['date'] is Timestamp 
+                ? (json['date'] as Timestamp).toDate() 
+                : DateTime.parse(json['date'] as String))
+            : DateTime.now(),
+        name: json['name'] as String? ?? '',
       );
 }

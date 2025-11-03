@@ -1,6 +1,5 @@
 import * as admin from "firebase-admin";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
-import * as functions from "firebase-functions";
+import {onCall, HttpsError} from "firebase-functions/v2/https";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -92,8 +91,8 @@ function clamp(value: number, min: number, max: number): number {
 
 function _normalizeLevel(level: string): number {
   const s = level.toLowerCase();
-  if (s.includes('principiante') || s.includes('recreativo')) return 1;
-  if (s.includes('intermedio') || s.includes('competitivo')) return 2;
+  if (s.includes("principiante") || s.includes("recreativo")) return 1;
+  if (s.includes("intermedio") || s.includes("competitivo")) return 2;
   return 3; // avanzado
 }
 
@@ -114,9 +113,9 @@ function _createMesocycles(totalWeeks: number): Mesocycle[] {
   let powerWeeks = totalWeeks - baseWeeks - strengthWeeks;
   powerWeeks = clamp(powerWeeks, 2, 6);
   return [
-    { name: "Base", weeks: baseWeeks, focus: "Base", progressionType: "lineal", microcycles: [] },
-    { name: "Fuerza", weeks: strengthWeeks, focus: "Fuerza", progressionType: "progresiva", microcycles: [] },
-    { name: "Potencia", weeks: powerWeeks, focus: "Potencia", progressionType: "ondulante", microcycles: [] },
+    {name: "Base", weeks: baseWeeks, focus: "Base", progressionType: "lineal", microcycles: []},
+    {name: "Fuerza", weeks: strengthWeeks, focus: "Fuerza", progressionType: "progresiva", microcycles: []},
+    {name: "Potencia", weeks: powerWeeks, focus: "Potencia", progressionType: "ondulante", microcycles: []},
   ];
 }
 
@@ -208,9 +207,9 @@ function generateProgram(profile: PlayerProfile, allExercises: Exercise[]): Prog
           exercises: sessionExercises,
         };
       });
-      microcycles.push({ weekNumber: w, sessions: sessions });
+      microcycles.push({weekNumber: w, sessions: sessions});
     }
-    finalMesocycles.push({ ...meso, microcycles: microcycles });
+    finalMesocycles.push({...meso, microcycles: microcycles});
   }
   const endDateMillis = now.toMillis() + weeksToTournament * 7 * 24 * 60 * 60 * 1000;
   const endDate = admin.firestore.Timestamp.fromMillis(endDateMillis);
@@ -223,6 +222,66 @@ function generateProgram(profile: PlayerProfile, allExercises: Exercise[]): Prog
   };
 }
 
+
+export const createPlayerAccount = onCall(async (request) => {
+  // 1. Obtener datos de la app
+  const {email, password, name, coachId} = request.data;
+  const callerId = request.auth?.uid;
+
+  // 2. Validar (el que llama debe ser el coach)
+  if (callerId !== coachId) {
+    throw new HttpsError(
+      "permission-denied",
+      "No tienes permiso para crear usuarios para otro coach."
+    );
+  }
+  if (!email || !password || !name) {
+    throw new HttpsError(
+      "invalid-argument",
+      "Faltan email, password o nombre."
+    );
+  }
+
+  try {
+    // 3. Crear el usuario en Firebase Authentication
+    const userRecord = await admin.auth().createUser({
+      email: email,
+      password: password,
+      displayName: name,
+    });
+
+    const newUserId = userRecord.uid;
+
+    // 4. Crear el documento del usuario en Firestore (colección 'users')
+    const userDoc = {
+      id: newUserId,
+      email: email,
+      name: name,
+      role: "player", // Asignar rol de jugador
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      coachId: coachId, // Enlazar al coach
+    };
+    await db.collection("users").doc(newUserId).set(userDoc);
+
+    // 5. Crear el enlace de permiso (como en tu FirestoreService)
+    const permission = {
+      id: `${coachId}_${newUserId}`,
+      coachId: coachId,
+      playerId: newUserId,
+      status: "accepted", // Aceptado automáticamente
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    await db.collection("coach_player_permissions").doc(permission.id).set(permission);
+
+    // 6. Devolver el ID del nuevo usuario a la app
+    return {userId: newUserId};
+  } catch (error: any) {
+    // Manejar errores (ej. "email-already-exists")
+    console.error("Error al crear cuenta de jugador:", error);
+    throw new HttpsError("internal", error.message || "No se pudo crear el usuario.");
+  }
+});
 
 // --- 3. FUNCIÓN "Callable" (Punto de Entrada MODIFICADO) ---
 
@@ -244,7 +303,7 @@ export const generateMyProgram = onCall(async (request) => {
     );
 
     // 2. Recolección de Datos
-    const userDoc = await db.collection("users").doc(targetPlayerId).get();
+    const userDoc = await db.collection("players").doc(targetPlayerId).get();
     if (!userDoc.exists) {
       throw new HttpsError("not-found", "Perfil de jugador no encontrado.");
     }
@@ -275,21 +334,17 @@ export const generateMyProgram = onCall(async (request) => {
     const newProgram = generateProgram(profile, allExercises);
     console.log("Programa generado.");
 
-    // 4. Guardado en Firestore
-    const programData = JSON.parse(JSON.stringify(newProgram));
-
     // Guardar el programa en la subcolección del JUGADOR OBJETIVO
     const programRef = await db
-      .collection("users")
-      .doc(targetPlayerId) // <-- Guardar en el perfil del jugador
+      .collection("players")
+      .doc(targetPlayerId)
       .collection("programs")
-      .add(programData);
+      .add(newProgram);
 
     console.log(`Programa guardado con ID: ${programRef.id}`);
 
     // 5. Devolver éxito a la app de Flutter
-    return { success: true, programId: programRef.id };
-
+    return {success: true, programId: programRef.id};
   } catch (error) {
     console.error("Error al generar el programa:", error);
     if (error instanceof HttpsError) {
