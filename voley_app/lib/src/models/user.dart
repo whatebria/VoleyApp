@@ -63,15 +63,19 @@ class User {
 
   static User fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'] as String,
+      id: json['id'] as String? ?? '',
 
-      email: json['email'] as String,
+      email: json['email'] as String? ?? '',
 
-      name: json['name'] as String,
+      name: json['name'] as String? ?? 'Usuario',
 
-      role: UserRole.fromJson(json['role'] as String),
+      role: json['role'] != null 
+          ? UserRole.fromJson(json['role'] as String)
+          : UserRole.player,
 
-      createdAt: (json['createdAt'] as Timestamp).toDate(),
+      createdAt: json['createdAt'] != null 
+          ? (json['createdAt'] as Timestamp).toDate()
+          : DateTime.now(),
       testScores: List<int>.from(json['testScores'] ?? []),
       coachId: json['coachId'] as String?,
     );

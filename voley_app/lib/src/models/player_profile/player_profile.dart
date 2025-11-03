@@ -47,11 +47,11 @@ class PlayerProfile {
       };
 
   static PlayerProfile fromJson(Map<String, dynamic> json) => PlayerProfile(
-        id: json['id'],
-        userId: json['userId'],
-        name: json['name'],
-        position: json['position'],
-        level: json['level'],
+        id: json['id'] as String? ?? '',
+        userId: json['userId'] as String?,
+        name: json['name'] as String? ?? 'Jugador',
+        position: json['position'] as String? ?? 'Sin posición',
+        level: json['level'] as String? ?? 'recreativo',
         goals: List<String>.from(json['goals'] ?? []),
         injuries: List<String>.from(json['injuries'] ?? []),
         availability: Availability.fromJson(Map<String, dynamic>.from(json['availability'] ?? {})),
@@ -59,7 +59,7 @@ class PlayerProfile {
         tournaments: (json['tournaments'] as List<dynamic>? ?? [])
             .map((t) => Tournament.fromJson(Map<String, dynamic>.from(t)))
             .toList(),
-        assignedCoachId: json['assignedCoachId'],
+        assignedCoachId: json['assignedCoachId'] as String?,
         equipment: List<String>.from(json['equipment'] ?? []),
       );
 // --- AÑADE ESTE MÉTODO COMPLETO ---
