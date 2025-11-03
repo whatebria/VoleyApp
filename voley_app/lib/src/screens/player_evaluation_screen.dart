@@ -89,9 +89,200 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
     super.dispose();
   }
 
-  // --- Diálogos (Omitidos por brevedad, asumiendo que están completos) ---
-  Future<void> _showAddTournamentDialog() async { /* ... tu código ... */ }
-  Future<void> _showAddTestDialog() async { /* ... tu código ... */ }
+  // --- Diálogos ---
+  Future<void> _showAddTournamentDialog() async {
+    final nameCtrl = TextEditingController();
+    DateTime selectedDate = DateTime.now();
+    final formKey = GlobalKey<FormState>();
+
+    final result = await showDialog<Tournament>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Añadir Torneo'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Nombre del Torneo *',
+                        prefixIcon: Icon(Icons.emoji_events),
+                        helperText: 'Ej: Copa Nacional 2024',
+                      ),
+                      validator: (v) =>
+                          (v?.isEmpty ?? true) ? 'El nombre es requerido' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.calendar_today),
+                      title: const Text('Fecha del Torneo'),
+                      subtitle: Text(
+                        DateFormat('dd/MM/yyyy').format(selectedDate),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      trailing: const Icon(Icons.edit),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (picked != null) {
+                          setDialogState(() => selectedDate = picked);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (formKey.currentState?.validate() ?? false) {
+                      final tournament = Tournament(
+                        name: nameCtrl.text.trim(),
+                        date: selectedDate,
+                      );
+                      Navigator.pop(context, tournament);
+                    }
+                  },
+                  child: const Text('Añadir'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() => _selectedTournaments.add(result));
+    }
+    nameCtrl.dispose();
+  }
+
+  Future<void> _showAddTestDialog() async {
+    final scoreCtrl = TextEditingController();
+    String? selectedTestId;
+    String selectedTestName = '';
+    String selectedTestMeasure = '';
+    final formKey = GlobalKey<FormState>();
+
+    // Fetch available tests from Firestore
+    final testsSnapshot = await ref.read(firestoreProvider).firestore
+        .collection('tests')
+        .get();
+    
+    final availableTests = testsSnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              'name': doc.data()['name'] as String? ?? 'Sin nombre',
+              'measure': doc.data()['measure'] as String? ?? '',
+            })
+        .toList();
+
+    if (availableTests.isEmpty) {
+      _showError('No hay tests disponibles en la base de datos.');
+      return;
+    }
+
+    final result = await showDialog<MapEntry<String, double>>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Añadir Test Físico'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: selectedTestId,
+                      decoration: const InputDecoration(
+                        labelText: 'Seleccionar Test *',
+                        prefixIcon: Icon(Icons.assessment),
+                      ),
+                      items: availableTests.map((test) {
+                        return DropdownMenuItem<String>(
+                          value: test['id'] as String,
+                          child: Text(test['name'] as String),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          selectedTestId = value;
+                          final test = availableTests.firstWhere(
+                            (t) => t['id'] == value,
+                          );
+                          selectedTestName = test['name'] as String;
+                          selectedTestMeasure = test['measure'] as String;
+                        });
+                      },
+                      validator: (v) => v == null ? 'Selecciona un test' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: scoreCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Puntuación *',
+                        prefixIcon: const Icon(Icons.score),
+                        suffixText: selectedTestMeasure.isNotEmpty
+                            ? selectedTestMeasure
+                            : '',
+                        helperText: 'Ingresa el resultado del test',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (v) {
+                        if (v?.isEmpty ?? true) return 'La puntuación es requerida';
+                        if (double.tryParse(v!) == null) return 'Ingresa un número válido';
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (formKey.currentState?.validate() ?? false) {
+                      final score = double.parse(scoreCtrl.text.trim());
+                      Navigator.pop(
+                        context,
+                        MapEntry(selectedTestName, score),
+                      );
+                    }
+                  },
+                  child: const Text('Añadir'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() => _testScores[result.key] = result.value);
+    }
+    scoreCtrl.dispose();
+  }
 
   void _showError(String message) {
     if (mounted) {

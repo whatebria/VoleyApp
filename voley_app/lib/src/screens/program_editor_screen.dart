@@ -193,9 +193,13 @@ class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen> {
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
-        return SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
-          child: _buildMesoForm(context, theme), // Llama al formulario
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+              child: _buildMesoForm(context, theme, setModalState), // Llama al formulario con setModalState
+            );
+          },
         );
       },
     ).then((_) {
@@ -207,7 +211,7 @@ class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen> {
   // --- WIDGETS DE CONSTRUCCIÓN ---
 
   /// [NUEVO] Construye el formulario como un widget
-  Widget _buildMesoForm(BuildContext context, ThemeData theme) {
+  Widget _buildMesoForm(BuildContext context, ThemeData theme, StateSetter setModalState) {
     return Form(
       key: _mesoFormKey,
       child: Column(
@@ -250,7 +254,7 @@ class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen> {
             theme: theme,
             title: 'Duración (Semanas):',
             value: _mesoWeeks,
-            onChanged: (newValue) => setState(() => _mesoWeeks = newValue),
+            onChanged: (newValue) => setModalState(() => _mesoWeeks = newValue),
             max: 12,
           ),
           
@@ -258,7 +262,7 @@ class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen> {
             theme: theme,
             title: 'Sesiones por Semana:',
             value: _mesoSessions,
-            onChanged: (newValue) => setState(() => _mesoSessions = newValue),
+            onChanged: (newValue) => setModalState(() => _mesoSessions = newValue),
             min: 1,
             max: 7,
           ),
@@ -274,7 +278,7 @@ class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen> {
               ButtonSegment(value: 'ondulante', label: Text('Ondulante')),
             ],
             selected: {_mesoProgressionType},
-            onSelectionChanged: (Set<String> newSelection) => setState(() => _mesoProgressionType = newSelection.first),
+            onSelectionChanged: (Set<String> newSelection) => setModalState(() => _mesoProgressionType = newSelection.first),
             style: SegmentedButton.styleFrom(
               selectedBackgroundColor: theme.colorScheme.secondary,
               selectedForegroundColor: theme.colorScheme.onSecondary,

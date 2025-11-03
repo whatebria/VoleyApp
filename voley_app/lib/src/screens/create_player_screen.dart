@@ -163,9 +163,86 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
     }
   }
 
-  // ... (Tu diálogo _showAddTournamentDialog se queda igual) ...
   Future<void> _showAddTournamentDialog() async {
-    /* ... tu código ... */
+    final nameCtrl = TextEditingController();
+    DateTime selectedDate = DateTime.now();
+    final formKey = GlobalKey<FormState>();
+
+    final result = await showDialog<Tournament>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Añadir Torneo'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Nombre del Torneo *',
+                        prefixIcon: Icon(Icons.emoji_events),
+                        helperText: 'Ej: Copa Nacional 2024',
+                      ),
+                      validator: (v) =>
+                          (v?.isEmpty ?? true) ? 'El nombre es requerido' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.calendar_today),
+                      title: const Text('Fecha del Torneo'),
+                      subtitle: Text(
+                        DateFormat('dd/MM/yyyy').format(selectedDate),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      trailing: const Icon(Icons.edit),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (picked != null) {
+                          setDialogState(() => selectedDate = picked);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (formKey.currentState?.validate() ?? false) {
+                      final tournament = Tournament(
+                        name: nameCtrl.text.trim(),
+                        date: selectedDate,
+                      );
+                      Navigator.pop(context, tournament);
+                    }
+                  },
+                  child: const Text('Añadir'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() => _selectedTournaments.add(result));
+    }
+    nameCtrl.dispose();
   }
 
   @override
