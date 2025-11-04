@@ -4,8 +4,8 @@ import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/mesocycles.dart';
 import 'package:voley_app/src/models/program/program.dart';
-import 'package:voley_app/src/screens/bloack_detail_screen.dart';
-import 'package:voley_app/src/screens/create_block_screen.dart';
+import 'package:voley_app/src/screens/program_view/bloack_detail_screen.dart';
+import 'package:voley_app/src/screens/program_view/create_block_screen.dart';
 
 /// Muestra los Mesociclos (Bloques) de un Programa
 // --- CAMBIO: Convertido a ConsumerWidget ---

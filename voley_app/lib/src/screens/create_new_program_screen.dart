@@ -8,8 +8,8 @@ import 'package:voley_app/src/models/program/microcicle.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart'; // Necesario para la UI
 // --- CAMBIO: Imports ---
-import 'package:voley_app/src/screens/create_block_screen.dart'; 
-import 'package:voley_app/src/screens/edit_session_screen.dart'; // <-- AÑADIDO
+import 'package:voley_app/src/screens/program_view/create_block_screen.dart'; 
+import 'package:voley_app/src/screens/program_view/edit_session_screen.dart'; // <-- AÑADIDO
 import 'package:uuid/uuid.dart';
 
 // --- CAMBIO: Nombre de la clase ---

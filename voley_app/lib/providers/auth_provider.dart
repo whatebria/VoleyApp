@@ -1,5 +1,3 @@
-// lib/providers/auth_provider.dart
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/src/auth/auth_service.dart';
 import 'package:voley_app/src/models/user.dart' as app_user; // <-- 1. AÑADE EL ALIAS
@@ -40,18 +38,20 @@ class LoginController extends AutoDisposeAsyncNotifier<void> {
   FutureOr<void> build() {}
 
   Future<void> login(String email, String password) async {
-    state = const AsyncLoading();
     final authService = ref.read(authServiceProvider);
-    try {
+    
+    // --- CORRECCIÓN ---
+    // state = const AsyncLoading(); // <-- ESTO CAUSA EL ERROR
+    
+    // Usa AsyncValue.guard para manejar automáticamente 
+    // los estados de loading, data y error.
+    // Esto permite que el notifier se vuelva a ejecutar sin fallar.
+    state = await AsyncValue.guard(() async {
       final result = await authService.login(email, password);
-      if (result == "success") {
-        state = const AsyncData(null);
-      } else {
+      if (result != "success") {
         throw Exception(result ?? "Error al iniciar sesión");
       }
-    } catch (e, s) {
-      state = AsyncError(e, s);
-    }
+    });
   }
 }
 
@@ -72,23 +72,23 @@ class RegisterController extends AutoDisposeAsyncNotifier<void> {
     required String name,
     required app_user.UserRole role, 
   }) async {
-    state = const AsyncLoading();
     final authService = ref.read(authServiceProvider);
 
-    try {
+    // --- CORRECCIÓN ---
+    // state = const AsyncLoading(); // <-- ESTO CAUSA EL ERROR
+    
+    // Usa AsyncValue.guard aquí también
+    state = await AsyncValue.guard(() async {
       final result = await authService.register(
         email,
         password,
         name,
         role, // Pasa el UserRole con alias
       );
-      if (result == "success") {
-        state = const AsyncData(null);
-      } else {
+      if (result != "success") {
         throw Exception(result ?? "Error al registrarse");
       }
-    } catch (e, s) {
-      state = AsyncError(e, s);
-    }
+    });
   }
 }
+

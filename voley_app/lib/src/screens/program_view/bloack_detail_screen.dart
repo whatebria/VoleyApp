@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart'; // Importado para Consu
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/mesocycles.dart';
 import 'package:voley_app/src/models/program/microcicle.dart';
-import 'package:voley_app/src/screens/week_detail_screen.dart'; // Importa la siguiente pantalla
-import 'package:voley_app/src/screens/create_block_screen.dart'; // Importa la pantalla de edición
+import 'package:voley_app/src/screens/program_view/week_detail_screen.dart'; // Importa la siguiente pantalla
+import 'package:voley_app/src/screens/program_view/create_block_screen.dart'; // Importa la pantalla de edición
 
 /// Muestra los Microciclos (Semanas) de un Mesociclo (Bloque)
 /// AÑADIDO: Convertido a ConsumerStatefulWidget para manejar la edición

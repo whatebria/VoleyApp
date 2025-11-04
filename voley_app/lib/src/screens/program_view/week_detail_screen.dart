@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/microcicle.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
-import 'package:voley_app/src/screens/edit_session_screen.dart'; // Importa la pantalla de edición
+import 'package:voley_app/src/screens/program_view/edit_session_screen.dart'; // Importa la pantalla de edición
 
 /// Muestra las Sesiones (Cards) de un Microciclo (Semana)
 class WeekDetailScreen extends StatelessWidget {

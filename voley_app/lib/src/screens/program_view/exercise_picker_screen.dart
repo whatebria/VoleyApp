@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
-import 'package:voley_app/src/screens/searchable_excersice_list_screen.dart';
+import 'package:voley_app/src/screens/program_view/searchable_excersice_list_screen.dart';
 
 class ExercisePickerScreen extends ConsumerStatefulWidget {
   final TrainingSession session;

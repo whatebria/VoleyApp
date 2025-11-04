@@ -6,7 +6,7 @@ import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:intl/intl.dart';
 import 'package:voley_app/src/screens/create_new_program_screen.dart';
 // --- AÑADIDO: Import de la nueva pantalla de detalle ---
-import 'package:voley_app/src/screens/program_detail_screen.dart';
+import 'package:voley_app/src/screens/program_view/program_detail_screen.dart';
 
 // --- CAMBIO: Nombre de la clase ---
 class ProgramExplorerScreen extends ConsumerStatefulWidget {
