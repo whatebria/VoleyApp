@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:voley_app/providers/program_generator.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/mesocycles.dart';
 import 'package:voley_app/src/models/program/microcicle.dart';
@@ -7,13 +8,21 @@ import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
 import 'package:voley_app/src/screens/exercise_picker_screen.dart';
 import 'package:uuid/uuid.dart';
+import 'package:voley_app/providers/providers.dart'; 
 
-/// Pantalla dedicada a crear un nuevo Mesociclo (Bloque).
+/// Pantalla dedicada a crear o EDITAR un nuevo Mesociclo (Bloque).
 /// Recibe el [profile] para mostrar contexto (días disponibles)
 /// y devuelve un [Mesocycle] completo si se guarda.
 class CreateBlockScreen extends ConsumerStatefulWidget {
   final PlayerProfile profile;
-  const CreateBlockScreen({super.key, required this.profile});
+  // --- AÑADIDO: Parámetro opcional para editar ---
+  final Mesocycle? mesoToEdit;
+
+  const CreateBlockScreen({
+    super.key, 
+    required this.profile, 
+    this.mesoToEdit, // <-- AÑADIDO
+  });
 
   @override
   _CreateBlockScreenState createState() => _CreateBlockScreenState();
@@ -34,8 +43,24 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
   @override
   void initState() {
     super.initState();
-    // Genera la plantilla inicial al cargar la pantalla
-    _generateTemplateMicro(_mesoSessions);
+    
+    // --- AÑADIDO: Lógica de Edición ---
+    if (widget.mesoToEdit != null) {
+      // Estamos en modo EDICIÓN
+      final meso = widget.mesoToEdit!;
+      _mesoNameCtrl.text = meso.name;
+      _mesoObjectiveCtrl.text = meso.objective;
+      _mesoWeeks = meso.weeks;
+      // Usamos la primera semana como la "plantilla"
+      // Asumimos que todas las sesiones tienen la misma longitud
+      _mesoSessions = meso.microcycles.first.sessions.length;
+      _templateMicro = meso.microcycles.first.copyWith(id: _uuid.v4());
+
+    } else {
+      // Estamos en modo CREACIÓN
+      // Genera la plantilla inicial al cargar la pantalla
+      _generateTemplateMicro(_mesoSessions);
+    }
   }
 
 
@@ -46,16 +71,16 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
     super.dispose();
   }
 
-  /// Lógica de carga para la progresión de semanas
-  double _suggestedLoadFor(int weekIndex, int totalWeeks) {
-    final normalizedIndex = totalWeeks <= 1 ? 0 : weekIndex / (totalWeeks - 1);
-    // Progresión lineal simple de 0.6 a 0.85
-    return double.parse((0.6 + 0.25 * normalizedIndex).toStringAsFixed(2));
-  }
+  // --- CAMBIO: Lógica movida a program_generator.dart ---
+  // double _suggestedLoadFor(int weekIndex, int totalWeeks) { ... }
+
   
   // --- AÑADIDO: Generador de Semana Plantilla ---
   /// Crea o actualiza la semana plantilla (Microcycle)
   void _generateTemplateMicro(int sessionsPerWeek) {
+    // --- CAMBIO: Llama al provider para la lógica ---
+    final generator = ref.read(programGeneratorProvider);
+    
     final sessions = List.generate(sessionsPerWeek, (sIndex) {
       // Si ya existe una plantilla, intenta mantener las sesiones existentes
       if (_templateMicro != null && sIndex < _templateMicro!.sessions.length) {
@@ -65,7 +90,8 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
       return TrainingSession(
         id: _uuid.v4(),
         day: 'Sesión ${sIndex + 1}',
-        load: _suggestedLoadFor(0, _mesoWeeks), // Carga base para la plantilla
+        // --- CAMBIO: Usa el generator ---
+        load: generator.suggestedLoadFor(0, _mesoWeeks), // Carga base
         exercises: [],
       );
     });
@@ -107,48 +133,36 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
 
   /// Guarda el nuevo mesociclo y lo devuelve a la pantalla anterior
   void _saveNewMesocycle() {
+    // --- CAMBIO: Lógica movida a ProgramGenerator ---
     if (_mesoFormKey.currentState!.validate() && _templateMicro != null) {
-      final weeks = _mesoWeeks;
       
-      // --- CAMBIO: Usa la plantilla para generar todas las semanas ---
-      final templateSessions = _templateMicro!.sessions;
+      // 1. Leer el servicio/provider
+      final generator = ref.read(programGeneratorProvider);
 
-      final microcycles = List.generate(weeks, (i) {
-        final newSessions = templateSessions.map((templateSession) {
-          
-          // Copia profunda de ejercicios
-          final newExercises = templateSession.exercises
-              .map((e) => e.copyWith(exerciseId: _uuid.v4()))
-              .toList();
+      final Mesocycle resultingMeso;
 
-          // Copia la sesión, pero actualiza ID y Carga
-          return templateSession.copyWith(
-            id: _uuid.v4(),
-            load: _suggestedLoadFor(i, weeks), // Recalcula la carga
-            exercises: newExercises,
-          );
-        }).toList();
-
-        return Microcycle(
-          weekNumber: i + 1,
-          sessions: newSessions,
-          id: _uuid.v4(),
+      // 2. Decidir si crear o actualizar
+      if (widget.mesoToEdit != null) {
+        // --- MODO EDICIÓN ---
+        resultingMeso = generator.updateMesocycle(
+          mesoToEdit: widget.mesoToEdit!,
+          name: _mesoNameCtrl.text,
+          objective: _mesoObjectiveCtrl.text,
+          weeks: _mesoWeeks,
+          templateMicro: _templateMicro!,
         );
-      });
+      } else {
+        // --- MODO CREACIÓN ---
+        resultingMeso = generator.createNewMesocycle(
+          name: _mesoNameCtrl.text,
+          objective: _mesoObjectiveCtrl.text,
+          weeks: _mesoWeeks,
+          templateMicro: _templateMicro!,
+        );
+      }
 
-      final newMeso = Mesocycle(
-        id: _uuid.v4(),
-        name: _mesoNameCtrl.text,
-        objective: _mesoObjectiveCtrl.text,
-        weeks: weeks,
-        focus: "Personalizado",
-        progressionType: 'lineal', 
-        matchDayIndex: 5, // Sábado (valor por defecto)
-        microcycles: microcycles,
-      );
-
-      // Devuelve el nuevo mesociclo a la pantalla anterior
-      Navigator.pop(context, newMeso);
+      // 3. Devolver el resultado
+      Navigator.pop(context, resultingMeso);
     }
   }
 
@@ -168,7 +182,43 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
     );
   }
 
-  // --- CAMBIO: Eliminado _buildAvailabilityReminder ---
+  Widget _buildAvailabilityReminder(ThemeData theme) {
+    final availability = widget.profile.availability;
+    
+    // Asumiendo que el modelo tiene 'trainingDays' como en tu query
+    final trainingDays = availability.trainingDays; // O usa availability.trainingDays si existe
+
+    if (trainingDays.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Días disponibles del atleta:", 
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.7)
+            )
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8.0,
+            runSpacing: 4.0,
+            children: trainingDays.map((day) => Chip(
+              label: Text(day),
+              backgroundColor: theme.colorScheme.secondary.withOpacity(0.2), // azulPro
+              labelStyle: TextStyle(color: theme.colorScheme.onSurface),
+              side: BorderSide.none,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            )).toList(),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildNumberStepper({
     required ThemeData theme,
@@ -231,7 +281,13 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildSectionHeader(theme, 'Define tu Semana Tipo', Icons.edit_calendar_outlined),
-            const Divider(height: 14),
+            Text(
+              'Edita las sesiones de esta semana. Se copiarán a las ${_mesoWeeks} semanas del bloque.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.7)
+              )
+            ),
+            const Divider(height: 24),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -274,10 +330,13 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // --- AÑADIDO: Determina el modo ---
+    final isEditing = widget.mesoToEdit != null;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Crear Bloque'),
+        // --- CAMBIO: Título dinámico ---
+        title: Text(isEditing ? 'Editar Bloque' : 'Crear Bloque'),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -289,7 +348,8 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Detalles del Bloque',
+                  // --- CAMBIO: Título dinámico ---
+                  isEditing ? 'Detalles del Bloque' : 'Crear Bloque de Entrenamiento',
                   style: theme.textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.primary, // voltNeon
@@ -346,7 +406,7 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildSectionHeader(theme, 'Configuración Semanal', Icons.calendar_today_outlined),
-                        // --- CAMBIO: _buildAvailabilityReminder eliminado ---
+                        _buildAvailabilityReminder(theme), 
                         _buildNumberStepper(
                           theme: theme,
                           title: 'Duración (Semanas):',
@@ -379,8 +439,9 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
                 const SizedBox(height: 24),
           
                 ElevatedButton.icon(
-                  icon: const Icon(Icons.add),
-                  label: const Text('Crear Bloque'),
+                  icon: Icon(isEditing ? Icons.save_as : Icons.add),
+                  // --- CAMBIO: Texto de botón dinámico ---
+                  label: Text(isEditing ? 'Guardar Cambios' : 'Crear Bloque'),
                   onPressed: _saveNewMesocycle,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),

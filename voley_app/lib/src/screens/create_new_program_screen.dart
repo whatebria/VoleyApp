@@ -7,10 +7,10 @@ import 'package:voley_app/src/models/program/mesocycles.dart';
 import 'package:voley_app/src/models/program/microcicle.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart'; // Necesario para la UI
-import 'package:voley_app/src/screens/exercise_picker_screen.dart';
-import 'package:uuid/uuid.dart';
-// --- AÑADIDO: Import de la nueva pantalla ---
+// --- CAMBIO: Imports ---
 import 'package:voley_app/src/screens/create_block_screen.dart'; 
+import 'package:voley_app/src/screens/edit_session_screen.dart'; // <-- AÑADIDO
+import 'package:uuid/uuid.dart';
 
 // --- CAMBIO: Nombre de la clase ---
 class CreateNewProgramScreen extends ConsumerStatefulWidget {
@@ -102,39 +102,8 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
   }
 
   // --- CAMBIO: _saveNewMesocycle eliminado, lógica movida a _navigateToAddBlock ---
-
-  void _navigateToExercisePicker(TrainingSession session) async {
-    final updatedSession = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            ExercisePickerScreen(session: session, profile: widget.profile),
-      ),
-    );
-
-    if (updatedSession is TrainingSession) {
-      setState(() {
-        final newMesocycles = _program.mesocycles.map((meso) {
-          final microIndex = meso.microcycles.indexWhere(
-            (micro) => micro.sessions.any((s) => s.id == updatedSession.id),
-          );
-          if (microIndex == -1) return meso;
-
-          final newMicrocycles = meso.microcycles.map((micro) {
-            if (micro.weekNumber == meso.microcycles[microIndex].weekNumber) {
-              final newSessions = micro.sessions
-                  .map((s) => s.id == updatedSession.id ? updatedSession : s)
-                  .toList();
-              return micro.copyWith(sessions: newSessions);
-            }
-            return micro;
-          }).toList();
-          return meso.copyWith(microcycles: newMicrocycles);
-        }).toList();
-        _program = _program.copyWith(mesocycles: newMesocycles);
-      });
-    }
-  }
+  
+  // --- CAMBIO: _navigateToExercisePicker movido a EditSessionScreen ---
 
   // --- HELPER METHODS ---
 
@@ -190,14 +159,56 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
       });
     }
   }
+  
+  // --- AÑADIDO: Lógica de navegación para Editar ---
+  void _navigateToEditBlock(Mesocycle mesoToEdit) async {
+    final updatedMeso = await Navigator.push<Mesocycle>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateBlockScreen(
+          profile: widget.profile,
+          mesoToEdit: mesoToEdit, // <-- Pasa el bloque a editar
+        ),
+      ),
+    );
+
+    if (updatedMeso != null && mounted) {
+      // Reemplaza el bloque antiguo por el actualizado
+      setState(() {
+        final updatedMesocycles = _program.mesocycles.map((meso) {
+          if (meso.id == updatedMeso.id) {
+            return updatedMeso; // Reemplaza el bloque editado
+          }
+          return meso; // Mantiene los demás
+        }).toList();
+
+        _program = _program.copyWith(mesocycles: updatedMesocycles);
+        _currentEditingMeso = updatedMeso; // Re-enfoca el bloque editado
+      });
+    }
+  }
+  
+  // --- AÑADIDO: Navegación a la pantalla de edición de sesión ---
+  void _navigateToEditSession(Mesocycle meso, Microcycle micro, TrainingSession session) async {
+    final updatedSession = await Navigator.push<TrainingSession>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditSessionScreen(
+          session: session,
+          profile: widget.profile,
+        ),
+      ),
+    );
+    
+    if (updatedSession != null && mounted) {
+      _updateSessionInState(meso, micro, updatedSession);
+    }
+  }
 
 
   // --- WIDGETS DE CONSTRUCCIÓN ---
 
   // --- CAMBIO: Formularios y helpers de modal eliminados ---
-  // _buildMesoForm, _buildSectionHeader, _buildAvailabilityReminder, 
-  // _buildNumberStepper han sido movidos a create_block_screen.dart
-
   
   // --- CAMBIO: Lista de programas rediseñada ---
   List<Widget> _buildProgramListItems() {
@@ -238,10 +249,20 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
                       ),
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(Icons.delete_outline, color: theme.colorScheme.error), // errorRed
-                    tooltip: 'Eliminar Bloque',
-                    onPressed: () => _deleteMesocycle(meso),
+                  Row(
+                    children: [
+                      // --- AÑADIDO: Botón de Editar ---
+                      IconButton(
+                        icon: Icon(Icons.edit, color: theme.colorScheme.secondary), // azulPro
+                        tooltip: 'Editar Bloque',
+                        onPressed: () => _navigateToEditBlock(meso),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.delete_outline, color: theme.colorScheme.error), // errorRed
+                        tooltip: 'Eliminar Bloque',
+                        onPressed: () => _deleteMesocycle(meso),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -275,6 +296,37 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
               
               const Divider(height: 24),
 
+              // --- CAMBIO: ExpansionTile de Semanas (anidado) ---
+              ...meso.microcycles.map((micro) {
+              return ExpansionTile(
+                key: ValueKey('${meso.id}_${micro.weekNumber}'),
+                // Fondo transparente para que se integre al Card
+                backgroundColor: Colors.transparent, 
+                collapsedBackgroundColor: Colors.transparent,
+                tilePadding: EdgeInsets.zero,
+                leading: Icon(
+                  Icons.date_range,
+                  color: theme.colorScheme.secondary.withOpacity(0.7),
+                ),
+                title: Text(
+                  'Semana ${micro.weekNumber}',
+                  style: theme.textTheme.titleMedium,
+                ),
+                subtitle: Text('${micro.sessions.length} sesiones'),
+                trailing: IconButton(
+                  icon: Icon(Icons.sync, color: theme.colorScheme.primary),
+                  tooltip: 'Usar esta semana como plantilla para todo el bloque',
+                  onPressed: () => _showApplyTemplateDialog(meso, micro),
+                ),
+                childrenPadding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 4.0,
+                ),
+                children: micro.sessions.map((session) {
+                  return _buildSessionTile(session, meso, micro);
+                }).toList(),
+              );
+            })
             ],
           ),
         ),
@@ -282,7 +334,64 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
     }).toList();
   }
   
+  // --- AÑADIDO: Lógica para aplicar plantilla de semana ---
+  
+  /// Muestra un diálogo de confirmación antes de aplicar la plantilla
+  Future<void> _showApplyTemplateDialog(Mesocycle meso, Microcycle templateMicro) async {
+    final theme = Theme.of(context);
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: theme.colorScheme.surface,
+          title: Text('Aplicar Plantilla de Semana', style: TextStyle(color: theme.colorScheme.primary)),
+          content: Text(
+            '¿Estás seguro de que quieres usar la "Semana ${templateMicro.weekNumber}" '
+            'como plantilla?\n\nEsto sobrescribirá todas las demás semanas de este bloque.'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Aplicar'),
+            ),
+          ],
+        );
+      }
+    );
 
+    if (result == true) {
+      _applyWeekTemplate(meso, templateMicro);
+    }
+  }
+
+  /// Lógica inmutable para copiar las sesiones de una semana a todas las demás
+  void _applyWeekTemplate(Mesocycle meso, Microcycle templateMicro) {
+    // --- CAMBIO: Llama al provider para la lógica ---
+    final generator = ref.read(programGeneratorProvider);
+    
+    setState(() {
+      final newMesocycles = _program.mesocycles.map((m) {
+        if (m.id != meso.id) return m;
+
+        // --- CAMBIO: Delega la generación al provider ---
+        final newMicrocycles = generator.generateMicrocyclesFromTemplate(
+          weeks: m.weeks,
+          templateMicro: templateMicro,
+        );
+        
+        return m.copyWith(microcycles: newMicrocycles);
+
+      }).toList();
+
+      _program = _program.copyWith(mesocycles: newMesocycles);
+    });
+    
+    _showSuccess('Plantilla de semana aplicada a todo el bloque.');
+  }
 
   // --- CAMBIO: Diseño de la Tarjeta de Sesión ---
   Widget _buildSessionTile(TrainingSession session, Mesocycle meso, Microcycle micro) {
@@ -320,8 +429,8 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
             ),
             // --- CAMBIO: El trailing ahora es solo el chevron ---
             trailing: const Icon(Icons.chevron_right),
-            // --- CAMBIO: El onTap abre el nuevo modal ---
-            onTap: () => _showEditSessionModal(meso, micro, session),
+            // --- CAMBIO: El onTap abre la nueva pantalla ---
+            onTap: () => _navigateToEditSession(meso, micro, session),
           ),
           // --- CAMBIO: El ActionChip y los botones se han movido al modal ---
         ],
@@ -329,309 +438,9 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
     );
   }
 
-  // --- CAMBIO: _showEditSessionDialog eliminado y reemplazado ---
-
-  // --- AÑADIDO: Nuevo modal para editar sesión y ejercicios ---
-  Future<void> _showEditSessionModal(
-    Mesocycle meso,
-    Microcycle micro,
-    TrainingSession session,
-  ) async {
-    final theme = Theme.of(context);
-    final sessionNameCtrl = TextEditingController(text: session.day);
-    // Mantenemos una copia local de los ejercicios para el modal
-    List<WorkoutExercise> modalExercises = List.from(session.exercises);
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: theme.colorScheme.surface, // grisPro
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (modalContext) {
-        // StatefulBuilder para que el modal maneje su propio estado
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return DraggableScrollableSheet(
-              initialChildSize: 0.7,
-              minChildSize: 0.5,
-              maxChildSize: 0.9,
-              expand: false,
-              builder: (context, scrollController) {
-                return Column(
-                  children: [
-                    // Header del Modal
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.background,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              // --- CAMBIO DE COLOR ---
-                              Icon(Icons.edit, color: theme.colorScheme.secondary), // azulPro
-                              const SizedBox(width: 12),
-                              Text(
-                                'Editar Sesión',
-                                style: theme.textTheme.headlineSmall,
-                              ),
-                            ],
-                          ),
-                          // Botón de Eliminar Sesión
-                          IconButton(
-                            icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
-                            tooltip: 'Eliminar Sesión',
-                            onPressed: () {
-                              Navigator.pop(modalContext); // Cierra el modal
-                              _deleteSession(meso, micro, session); // Llama a la lógica de borrado
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView(
-                        controller: scrollController,
-                        padding: const EdgeInsets.all(16),
-                        children: [
-                          // 1. Campo para nombrar la sesión
-                          TextField(
-                            controller: sessionNameCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Nombre de la Sesión',
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          
-                          // 2. Título de la lista de ejercicios
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Ejercicios de la Sesión',
-                                style: theme.textTheme.titleLarge
-                              ),
-                              IconButton(
-                                icon: Icon(Icons.add_circle, color: theme.colorScheme.primary), // voltNeon
-                                tooltip: 'Añadir Ejercicio',
-                                onPressed: () async {
-                                  // 3. Botón para añadir ejercicios
-                                  // --- CAMBIO: Llamada a _navigateToExercisePicker ---
-                                  // Creamos una sesión temporal para el picker
-                                  final tempSession = session.copyWith(exercises: modalExercises);
-                                  
-                                  final updatedSession = await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ExercisePickerScreen(
-                                        session: tempSession, 
-                                        profile: widget.profile
-                                      ),
-                                    ),
-                                  );
-
-                                  if (updatedSession is TrainingSession) {
-                                    setModalState(() {
-                                      modalExercises = updatedSession.exercises;
-                                    });
-                                  }
-                                },
-                              )
-                            ],
-                          ),
-                          const Divider(),
-                          
-                          // 4. Lista de ejercicios
-                          if (modalExercises.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.all(16.0),
-                              child: Center(
-                                child: Text('No hay ejercicios. Presiona "+" para añadir.'),
-                              ),
-                            )
-                          else
-                            ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: modalExercises.length,
-                              itemBuilder: (context, index) {
-                                final ex = modalExercises[index];
-                                return ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: theme.colorScheme.secondary,
-                                    child: Text('${index + 1}'),
-                                  ),
-                                  title: Text(ex.name),
-                                  subtitle: Text('${ex.sets}x${ex.reps} @ ${ex.intensity}'),
-                                  // --- CAMBIO: Botones de Editar y Eliminar ---
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: Icon(Icons.edit, color: theme.colorScheme.secondary),
-                                        tooltip: 'Editar series/reps',
-                                        onPressed: () {
-                                          _showEditExerciseDialog(
-                                            modalContext, 
-                                            setModalState, 
-                                            ex,
-                                            (updatedExercise) {
-                                              // Callback para actualizar la lista en el modal
-                                              setModalState(() {
-                                                modalExercises[index] = updatedExercise;
-                                              });
-                                            }
-                                          );
-                                        },
-                                      ),
-                                      IconButton(
-                                        icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
-                                        tooltip: 'Eliminar ejercicio',
-                                        onPressed: () {
-                                          setModalState(() {
-                                            modalExercises.removeAt(index);
-                                          });
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                        ],
-                      ),
-                    ),
-                    // 5. Botón de Guardar
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          // Crear la sesión actualizada
-                          final updatedSession = session.copyWith(
-                            day: sessionNameCtrl.text,
-                            exercises: modalExercises,
-                          );
-                          
-                          // Actualizar el estado principal (fuera del modal)
-                          _updateSessionInState(meso, micro, updatedSession);
-                          
-                          Navigator.pop(modalContext); // Cerrar el modal
-                        },
-                        child: const Text('Guardar Sesión'),
-                      ),
-                    )
-                  ],
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-
-    sessionNameCtrl.dispose();
-  }
-  
-  // --- AÑADIDO: Diálogo para editar Reps/Sets/Intensidad ---
-  Future<void> _showEditExerciseDialog(
-    BuildContext modalContext, // El context del showModalBottomSheet
-    StateSetter setModalState, // El setState del StatefulBuilder del modal
-    WorkoutExercise exercise,
-    Function(WorkoutExercise) onUpdate, // Callback para actualizar la lista
-  ) async {
-    final theme = Theme.of(context);
-    final setsCtrl = TextEditingController(text: exercise.sets.toString());
-    final repsCtrl = TextEditingController(text: exercise.reps);
-    final intensityCtrl = TextEditingController(text: exercise.intensity);
-
-    final updatedExercise = await showDialog<WorkoutExercise>(
-      context: modalContext, // Usa el context del modal
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: theme.colorScheme.surface,
-          title: Text('Editar ${exercise.name}', style: TextStyle(color: theme.colorScheme.primary)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: setsCtrl,
-                decoration: const InputDecoration(labelText: 'Series'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: repsCtrl,
-                decoration: const InputDecoration(labelText: 'Repeticiones'),
-                keyboardType: TextInputType.text,
-              ),
-              TextField(
-                controller: intensityCtrl,
-                decoration: const InputDecoration(labelText: 'Intensidad (RPE)'),
-                keyboardType: TextInputType.text,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext, rootNavigator: true).maybePop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final updated = exercise.copyWith(
-                  sets: int.tryParse(setsCtrl.text) ?? exercise.sets,
-                  reps: repsCtrl.text,
-                  intensity: intensityCtrl.text,
-                );
-                // --- CORRECCIÓN: Navigator.pop ---
-                Navigator.of(dialogContext, rootNavigator: true).pop(updated);
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (updatedExercise != null) {
-      // Llama al callback para que el StatefulBuilder del modal
-      // actualice su lista interna de ejercicios.
-      onUpdate(updatedExercise);
-    }
-    
-    // Dispose de los controllers
-    setsCtrl.dispose();
-    repsCtrl.dispose();
-    intensityCtrl.dispose();
-  }
-  
-  // --- AÑADIDO: Helper para borrar sesión ---
-  void _deleteSession(Mesocycle meso, Microcycle micro, TrainingSession session) {
-    setState(() {
-      final newMesocycles = _program.mesocycles.map((m) {
-        if (m.id != meso.id) return m; // No es el meso correcto
-
-        final newMicrocycles = m.microcycles.map((mic) {
-          if (mic.id != micro.id) return mic; // No es el micro correcto
-
-          // Filtramos la sesión
-          final newSessions = mic.sessions
-              .where((s) => s.id != session.id)
-              .toList();
-          return mic.copyWith(sessions: newSessions);
-        }).toList();
-
-        return m.copyWith(microcycles: newMicrocycles);
-      }).toList();
-      _program = _program.copyWith(mesocycles: newMesocycles);
-    });
-    _showSuccess('Sesión eliminada');
-  }
+  // --- CAMBIO: _showEditSessionModal eliminado ---
+  // --- CAMBIO: _showEditExerciseDialog eliminado ---
+  // --- CAMBIO: _deleteSession eliminado ---
 
   // --- AÑADIDO: Helper para actualizar estado desde el modal ---
   void _updateSessionInState(Mesocycle meso, Microcycle micro, TrainingSession updatedSession) {
