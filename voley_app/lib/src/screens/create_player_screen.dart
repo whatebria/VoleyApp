@@ -182,7 +182,7 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
 
         // --- MEJORA DE UX: Refresca la lista y vuelve atrás ---
         ref.invalidate(coachPlayersProvider);
-        Navigator.of(context, rootNavigator: true).maybePop(); // Vuelve a la lista de jugadores
+        Navigator.pop(context); // Vuelve a la lista de jugadores
       }
     } catch (e) {
       _showError('Error al guardar: $e');

@@ -1,12 +1,11 @@
-// lib/src/screens/player_calendar_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:voley_app/providers/calendar_provider.dart';
 import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/program/program.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/session_log.dart';
-import 'dart:collection';
 import 'package:voley_app/src/screens/player/workout_session_screen.dart';
 import 'package:collection/collection.dart';
 
@@ -19,9 +18,9 @@ class PlayerCalendarScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
+  // El estado local ahora solo se ocupa de la UI del calendario (días y formato)
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  LinkedHashMap<DateTime, List<TrainingSession>> _events = LinkedHashMap();
   CalendarFormat _calendarFormat = CalendarFormat.week;
 
   @override
@@ -29,150 +28,100 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
     super.initState();
     _selectedDay = _focusedDay;
   }
-  
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
-  String _mapWeekdayToString(int weekday) {
-    switch (weekday) {
-      case 1:
-        return 'lunes';
-      case 2:
-        return 'martes';
-      case 3:
-        return 'miércoles';
-      case 4:
-        return 'jueves';
-      case 5:
-        return 'viernes';
-      case 6:
-        return 'sábado';
-      case 7:
-        return 'domingo';
-      default:
-        return '';
-    }
-  }
-
-  LinkedHashMap<DateTime, List<TrainingSession>> _buildEventMap(
-    Program program,
-  ) {
-    final newEvents = LinkedHashMap<DateTime, List<TrainingSession>>(
-      equals: isSameDay,
-      hashCode: (key) => key.day * 1000000 + key.month * 10000 + key.year,
-    );
-    final allMicrocycles = program.mesocycles
-        .expand((m) => m.microcycles)
-        .toList();
-    DateTime currentDate = program.startDate;
-
-    for (int weekIndex = 0; weekIndex < allMicrocycles.length; weekIndex++) {
-      final micro = allMicrocycles[weekIndex];
-      for (int dayIndex = 0; dayIndex < 7; dayIndex++) {
-        final dateForDay = currentDate.add(Duration(days: dayIndex));
-        final dayString = _mapWeekdayToString(dateForDay.weekday);
-        final normalizedDate = DateTime(
-          dateForDay.year,
-          dateForDay.month,
-          dateForDay.day,
-        );
-        final session = micro.sessions.firstWhere(
-          (s) => s.day.toLowerCase() == dayString,
-          orElse: () => TrainingSession(
-            day: '',
-            load: 0,
-            exercises: [], id: '',
-          ),
-        );
-      }
-      currentDate = currentDate.add(const Duration(days: 7));
-    }
-    return newEvents;
-  }
-
-  List<TrainingSession> _getEventsForDay(DateTime day) {
-    final normalizedDay = DateTime(day.year, day.month, day.day);
-    return _events[normalizedDay] ?? [];
-  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // --- Observa los providers ---
     
-    // Observa el provider del programa (que depende del perfil)
-    final programAsync = ref.watch(generatedProgramProvider); 
+    // ¡CAMBIO CLAVE! Ahora observa el provider del JUGADOR, no el del EXPLORADOR.
+    final allProgramsAsync = ref.watch(playerProgramsProvider); 
+    
+    final selectedProgram = ref.watch(selectedProgramProvider);
+    final events = ref.watch(calendarEventsProvider);
 
-    ref.listen<AsyncValue<Program?>>(generatedProgramProvider, (previous, next) {
-      final program = next.value;
-      if (program != null) {
-        setState(() {
-          _events = _buildEventMap(program);
-          _selectedDay =
-              DateTime(_focusedDay.year, _focusedDay.month, _focusedDay.day);
-        });
-      } else {
-        setState(() => _events.clear());
-      }
-    });
-
-    // --- MEJORA: Se eliminó el Scaffold y el AppBar ---
-    return programAsync.when(
+    return allProgramsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, s) => Center(child: Text('Error al cargar programa: $e')),
-      data: (program) {
-        if (program == null) {
-          // --- MEJORA DE UX: Empty State con tu tema ---
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.calendar_today_outlined,
-                    size: 80,
-                    color: theme.colorScheme.secondary, // Azul Pro
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'No tienes un programa activo',
-                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Habla con tu entrenador para que te asigne un plan de entrenamiento.',
-                    style: theme.textTheme.bodyLarge,
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          );
+      data: (programs) {
+        // --- LÓGICA DE SINCRONIZACIÓN DE PROVIDERS ---
+
+        // CASO 1: No hay programas.
+        if (programs.isEmpty) {
+          // Si el provider de selección aún cree que hay uno, límpialo.
+          if (selectedProgram != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                ref.read(selectedProgramProvider.notifier).state = null;
+              }
+            });
+          }
+          // Muestra la pantalla de "Sin programa"
+          return _buildNoProgramWidget(theme);
         }
 
-        // El programa existe, construye la UI
+        // CASO 2: Hay programas, pero ninguno está seleccionado
+        // (p.ej. al cargar la app por primera vez).
+        if (programs.isNotEmpty && selectedProgram == null) {
+          // Actualiza el provider para que seleccione el primer programa.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              ref.read(selectedProgramProvider.notifier).state = programs.first;
+            }
+          });
+          // Muestra un loader mientras el provider se actualiza.
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        // CASO 3: El programa seleccionado fue borrado o ya no existe.
+        // Sincroniza el provider para que seleccione el primero de la lista.
+        if (selectedProgram != null && !programs.contains(selectedProgram)) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              ref.read(selectedProgramProvider.notifier).state = programs.first;
+            }
+          });
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        // CASO 4: El estado está "cargando" brevemente
+        // (p.ej. justo después del CASO 1 o 2, antes de que el build se rehaga).
+        if (selectedProgram == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        // --- ESTADO PRINCIPAL (READY) ---
+        // Si llegamos aquí, 'programs' no está vacío y 'selectedProgram' es válido.
+
         return Column(
           children: [
-            TableCalendar<TrainingSession>(
-              firstDay: program.startDate.subtract(const Duration(days: 30)),
-              lastDay: program.endDate.add(const Duration(days: 30)),
-              focusedDay: _focusedDay,
+            // El selector ahora lee y escribe en el provider
+            _buildProgramSelector(theme, programs, selectedProgram),
 
-              calendarFormat: _calendarFormat, // Usa la variable de estado
+            TableCalendar<TrainingSession>(
+              firstDay:
+                  selectedProgram.startDate.subtract(const Duration(days: 30)),
+              lastDay: selectedProgram.endDate.add(const Duration(days: 30)),
+              focusedDay: _focusedDay,
+              calendarFormat: _calendarFormat,
               onFormatChanged: (format) {
                 setState(() {
-                  _calendarFormat = format; // Actualiza el estado al tocar el botón
+                  _calendarFormat = format;
                 });
-              },// Inicia en formato semana
+              },
               availableCalendarFormats: const {
                 CalendarFormat.month: 'Mes',
                 CalendarFormat.week: 'Semana',
               },
               selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-              eventLoader: _getEventsForDay,
+              
+              // El eventLoader ahora consume el provider 'events'
+              eventLoader: (day) {
+                final normalizedDay = DateTime(day.year, day.month, day.day);
+                return events[normalizedDay] ?? [];
+              },
+              
               onDaySelected: (selectedDay, focusedDay) {
                 setState(() {
                   _selectedDay = selectedDay;
@@ -218,13 +167,26 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
               ),
             ),
             const Divider(height: 1, thickness: 1),
-            
             Expanded(
               child: ref.watch(sessionLogHistoryProvider).when(
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (e, s) => Center(child: Text('Error al cargar historial: $e')),
-                    data: (historyList) => _buildEventList(context, theme, historyList),
-                  ),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, s) =>
+                    Center(child: Text('Error al cargar historial: $e')),
+                data: (historyList) {
+                  // Obtenemos los eventos para el día seleccionado desde el provider 'events'
+                  final normalizedDay = _selectedDay != null
+                      ? DateTime(
+                          _selectedDay!.year, _selectedDay!.month, _selectedDay!.day)
+                      : null;
+                  final selectedEvents = (normalizedDay != null &&
+                          events.containsKey(normalizedDay))
+                      ? events[normalizedDay]!
+                      : <TrainingSession>[];
+
+                  return _buildEventList(
+                      context, theme, historyList, selectedEvents);
+                },
+              ),
             ),
           ],
         );
@@ -232,22 +194,102 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
     );
   }
 
-  /// --- MEJORA DE UX: Lista de eventos rediseñada ---
-Widget _buildEventList(BuildContext context, ThemeData theme, List<SessionLog> historyList) {
+  /// Widget para mostrar cuando no hay programas
+  Widget _buildNoProgramWidget(ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.calendar_today_outlined,
+              size: 80,
+              color: theme.colorScheme.secondary, // Azul Pro
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'No tienes un programa activo',
+              style: theme.textTheme.headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Habla con tu entrenador para que te asigne un plan de entrenamiento.',
+              style: theme.textTheme.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// El selector ahora lee y escribe en el [selectedProgramProvider]
+  Widget _buildProgramSelector(
+      ThemeData theme, List<Program> programs, Program currentSelectedProgram) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+      color: theme.colorScheme.surface.withOpacity(0.5), // grisPro transparente
+      child: DropdownButtonFormField<Program>(
+        value: currentSelectedProgram,
+        items: programs.map((program) {
+          return DropdownMenuItem<Program>(
+            value: program,
+            child: Text(
+              program.title,
+              overflow: TextOverflow.ellipsis,
+            ),
+          );
+        }).toList(),
+        onChanged: (Program? newProgram) {
+          if (newProgram != null) {
+            // 1. Actualiza el provider con la nueva selección
+            ref.read(selectedProgramProvider.notifier).state = newProgram;
+
+            // 2. Resetea el estado local de la UI del calendario
+            setState(() {
+              _focusedDay = DateTime.now(); // Resetea el foco
+              _selectedDay =
+                  DateTime(_focusedDay.year, _focusedDay.month, _focusedDay.day);
+            });
+          }
+        },
+        decoration: InputDecoration(
+            labelText: 'Programa Seleccionado',
+            filled: true,
+            fillColor: theme.colorScheme.background,
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none),
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0)),
+      ),
+    );
+  }
+
+  /// La lista de eventos ahora recibe los eventos como parámetro.
+  Widget _buildEventList(
+    BuildContext context,
+    ThemeData theme,
+    List<SessionLog> historyList,
+    List<TrainingSession> selectedEvents,
+  ) {
     if (_selectedDay == null) return const SizedBox.shrink();
-    
-    final selectedEvents = _getEventsForDay(_selectedDay!);
 
     if (selectedEvents.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.coffee_outlined, size: 60, color: theme.textTheme.bodySmall?.color),
+            Icon(Icons.coffee_outlined,
+                size: 60, color: theme.textTheme.bodySmall?.color),
             const SizedBox(height: 16),
             Text(
               'Día de Descanso',
-              style: theme.textTheme.titleLarge?.copyWith(color: theme.textTheme.bodySmall?.color),
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(color: theme.textTheme.bodySmall?.color),
             ),
           ],
         ),
@@ -259,7 +301,7 @@ Widget _buildEventList(BuildContext context, ThemeData theme, List<SessionLog> h
       itemCount: selectedEvents.length,
       itemBuilder: (context, index) {
         final session = selectedEvents[index];
-        
+
         final SessionLog? completedLog = historyList.firstWhereOrNull(
           (log) => log.sessionId == session.id,
         );
@@ -268,31 +310,33 @@ Widget _buildEventList(BuildContext context, ThemeData theme, List<SessionLog> h
         return Card(
           elevation: 0,
           margin: const EdgeInsets.only(bottom: 12),
-          clipBehavior: Clip.antiAlias, 
+          clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(
               color: isCompleted
                   ? theme.colorScheme.primary // Borde Volt
-                  : theme.colorScheme.secondary.withOpacity(0.5), // Borde Azul Pro
+                  : theme.colorScheme.secondary
+                      .withOpacity(0.5), // Borde Azul Pro
               width: 1.5,
             ),
           ),
           color: isCompleted
               ? theme.colorScheme.primary.withOpacity(0.1) // Fondo Volt
-              : theme.colorScheme.surfaceVariant.withOpacity(0.6), // Fondo oscuro
-          
-          // --- MEJORA: La tarjeta "Completada" ahora es un ExpansionTile ---
-          // La tarjeta "Pendiente" sigue siendo un InkWell
+              : theme.colorScheme.surfaceVariant
+                  .withOpacity(0.6), // Fondo oscuro
+
           child: isCompleted
-              ? _buildLogSummary(theme, session, completedLog) // Tarjeta de Resumen EXPANDIBLE
-              : _buildPlannedSession(context, theme, session), // Tarjeta de Acción
+              ? _buildLogSummary(theme, session, completedLog)
+              : _buildPlannedSession(context, theme, session),
         );
       },
     );
   }
-  /// --- MEJORA DE UX: Widget para "Pendiente" (más amigable y accionable) ---
-  Widget _buildPlannedSession(BuildContext context, ThemeData theme, TrainingSession session) {
+
+  /// Sin cambios
+  Widget _buildPlannedSession(
+      BuildContext context, ThemeData theme, TrainingSession session) {
     return InkWell(
       onTap: () {
         Navigator.push(
@@ -314,39 +358,38 @@ Widget _buildEventList(BuildContext context, ThemeData theme, List<SessionLog> h
                   Text(
                     session.day,
                     style: theme.textTheme.titleSmall?.copyWith(
-                      color: theme.colorScheme.secondary,
-                      fontWeight: FontWeight.bold
-                    ),
+                        color: theme.colorScheme.secondary,
+                        fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 6,
                     runSpacing: 4,
-                    children: session.exercises.map((e) => Chip(
-                      label: Text(e.name),
-                      backgroundColor: theme.colorScheme.surface,
-                      labelStyle: theme.textTheme.bodySmall,
-                      padding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                    )).toList(),
+                    children: session.exercises
+                        .map((e) => Chip(
+                              label: Text(e.name),
+                              backgroundColor: theme.colorScheme.surface,
+                              labelStyle: theme.textTheme.bodySmall,
+                              padding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                            ))
+                        .toList(),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 16),
-            // --- El "Llamado a la Acción" (CTA) ---
             Container(
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary, // Volt
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: theme.colorScheme.primary.withOpacity(0.3),
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                  )
-                ]
-              ),
+                  color: theme.colorScheme.primary, // Volt
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.colorScheme.primary.withOpacity(0.3),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    )
+                  ]),
               child: Icon(
                 Icons.play_arrow_rounded,
                 size: 60,
@@ -359,7 +402,9 @@ Widget _buildEventList(BuildContext context, ThemeData theme, List<SessionLog> h
     );
   }
 
-  Widget _buildLogSummary(ThemeData theme, TrainingSession session, SessionLog log) {
+  /// Sin cambios
+  Widget _buildLogSummary(
+      ThemeData theme, TrainingSession session, SessionLog log) {
     String bestLift = "N/A";
     if (log.exercises.isNotEmpty) {
       final allSets = log.exercises.values.expand((sets) => sets).toList();
@@ -369,9 +414,7 @@ Widget _buildEventList(BuildContext context, ThemeData theme, List<SessionLog> h
       }
     }
 
-    // --- MEJORA: Convertido en ExpansionTile ---
     return ExpansionTile(
-      // --- Encabezado Plegado (lo que ves primero) ---
       title: Text(
         '${session.day} - COMPLETADO',
         style: theme.textTheme.titleLarge?.copyWith(
@@ -381,10 +424,9 @@ Widget _buildEventList(BuildContext context, ThemeData theme, List<SessionLog> h
       ),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 8.0),
-        // --- SOLUCIÓN AL OVERFLOW: Row -> Wrap ---
         child: Wrap(
-          spacing: 8.0, // Espacio horizontal
-          runSpacing: 4.0, // Espacio vertical si se envuelve
+          spacing: 8.0,
+          runSpacing: 4.0,
           children: [
             _buildSummaryChip(
               theme,
@@ -403,47 +445,45 @@ Widget _buildEventList(BuildContext context, ThemeData theme, List<SessionLog> h
         Icons.expand_more,
         color: theme.colorScheme.primary.withOpacity(0.7),
       ),
-      // --- Contenido Expandido (El desglose) ---
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- Notas ---
               if (log.notes.isNotEmpty) ...[
                 const Divider(height: 16),
                 Text('Notas de la Sesión:', style: theme.textTheme.bodySmall),
                 Text(
                   log.notes,
-                  style: theme.textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(fontStyle: FontStyle.italic),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const Divider(height: 16),
-              ] else ... [
+              ] else ...[
                 const Divider(height: 16),
               ],
-              
-              // --- Título del Desglose ---
               Text(
                 'Desglose de Series',
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-
-              // --- Lógica del Desglose ---
               if (log.exercises.isEmpty)
-                const Text('No se registraron series.', style: TextStyle(fontStyle: FontStyle.italic))
+                const Text('No se registraron series.',
+                    style: TextStyle(fontStyle: FontStyle.italic))
               else
                 ...log.exercises.entries.map((entry) {
                   final String exerciseId = entry.key;
                   final List<SetLog> sets = entry.value;
 
                   final exerciseName = session.exercises
-                      .firstWhereOrNull((ex) => ex.exerciseId == exerciseId)
-                      ?.name ?? 'Ejercicio Borrado';
-                  
+                          .firstWhereOrNull((ex) => ex.exerciseId == exerciseId)
+                          ?.name ??
+                      'Ejercicio Borrado';
+
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8.0),
                     child: Column(
@@ -451,11 +491,13 @@ Widget _buildEventList(BuildContext context, ThemeData theme, List<SessionLog> h
                       children: [
                         Text(
                           exerciseName,
-                          style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                          style: theme.textTheme.bodyLarge
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         ...sets.map((set) {
                           return Padding(
-                            padding: const EdgeInsets.only(left: 16.0, top: 2.0),
+                            padding:
+                                const EdgeInsets.only(left: 16.0, top: 2.0),
                             child: Text(
                               '• Set ${set.setNumber}: ${set.weight}kg x ${set.reps} reps',
                               style: theme.textTheme.bodyMedium,
@@ -473,17 +515,17 @@ Widget _buildEventList(BuildContext context, ThemeData theme, List<SessionLog> h
     );
   }
 
-  /// Helper para los chips de resumen (sin cambios)
-  Widget _buildSummaryChip(ThemeData theme, {required IconData icon, required String label}) {
+  /// Sin cambios
+  Widget _buildSummaryChip(ThemeData theme,
+      {required IconData icon, required String label}) {
     return Chip(
       avatar: Icon(icon, size: 16, color: theme.colorScheme.secondary),
       label: Text(label),
       labelStyle: TextStyle(
-        color: theme.colorScheme.onSurface,
-        fontWeight: FontWeight.w600
-      ),
+          color: theme.colorScheme.onSurface, fontWeight: FontWeight.w600),
       backgroundColor: theme.colorScheme.surface,
       side: BorderSide(color: theme.colorScheme.surfaceVariant),
     );
   }
 }
+

@@ -41,7 +41,7 @@ final playerProfileProvider = FutureProvider<PlayerProfile?>((ref) async {
   if (appUser == null || appUser.isCoach) {
     return null; // No es un jugador, no hay perfil
   }
-  
+
   final firestore = ref.read(firestoreProvider);
   final profile = await firestore.getPlayerProfileByUserId(appUser.id);
   return profile;
@@ -59,7 +59,6 @@ final programGeneratorAction = Provider((ref) {
     return result.data as Map<String, dynamic>;
   };
 });
-
 
 // --- SECCIÓN 3: DATOS DEL JUGADOR LOGUEADO ---
 
@@ -95,11 +94,30 @@ final sessionLogHistoryProvider = StreamProvider<List<SessionLog>>((ref) {
       }
       return ref.read(firestoreProvider).getSessionHistoryStream(profile.id);
     },
-    loading: () => Stream.value([]), 
+    loading: () => Stream.value([]),
     error: (e, s) => Stream.error(e, s),
   );
 });
 
+final playerProgramsProvider = StreamProvider<List<Program>>((ref) {
+  final firestore = ref.read(firestoreProvider);
+
+  // 1. Observa el perfil del JUGADOR LOGUEADO
+  final profileAsync = ref.watch(playerProfileProvider);
+
+  // 2. Mapea el resultado
+  return profileAsync.when(
+    data: (profile) {
+      if (profile == null) {
+        return Stream.value([]); // Sin perfil -> Sin programas
+      }
+      // 3. Si hay perfil, escucha el stream de TODOS sus programas
+      return firestore.getAllProgramsStream(profile.id);
+    },
+    loading: () => Stream.value([]), // Cargando perfil -> Cargando programas
+    error: (e, s) => Stream.error(e, s),
+  );
+});
 
 // --- SECCIÓN 4: FLUJO DEL "EXPLORADOR" (Para Coach) ---
 
@@ -108,7 +126,7 @@ class PlayerWithProfile {
   final app_user.User player;
   final PlayerProfile? profile;
   PlayerWithProfile(this.player, this.profile);
-  
+
   // Es útil para los DropdownButton
   @override
   bool operator ==(Object other) =>
@@ -137,28 +155,28 @@ final coachPlayersProvider = StreamProvider<List<app_user.User>>((ref) {
 /// [REFACTORIZADO] Convertido a StreamProvider para ser reactivo.
 final coachPlayersWithProfilesProvider =
     StreamProvider<List<PlayerWithProfile>>((ref) async* {
-  final firestore = ref.read(firestoreProvider);
-  
-  // 1. Escucha el stream de jugadores
-  final playersStream = ref.watch(coachPlayersProvider.stream);
+      final firestore = ref.read(firestoreProvider);
 
-  // 2. Por cada nueva lista de jugadores emitida...
-  await for (final players in playersStream) {
-    if (players.isEmpty) {
-      yield [];
-      continue;
-    }
+      // 1. Escucha el stream de jugadores
+      final playersStream = ref.watch(coachPlayersProvider.stream);
 
-    // 3. Busca todos sus perfiles en paralelo
-    final futures = players.map((player) async {
-      final profile = await firestore.getPlayerProfileByUserId(player.id);
-      return PlayerWithProfile(player, profile);
-    }).toList();
+      // 2. Por cada nueva lista de jugadores emitida...
+      await for (final players in playersStream) {
+        if (players.isEmpty) {
+          yield [];
+          continue;
+        }
 
-    // 4. Espera a que todos se completen y emite la lista combinada
-    yield await Future.wait(futures);
-  }
-});
+        // 3. Busca todos sus perfiles en paralelo
+        final futures = players.map((player) async {
+          final profile = await firestore.getPlayerProfileByUserId(player.id);
+          return PlayerWithProfile(player, profile);
+        }).toList();
+
+        // 4. Espera a que todos se completen y emite la lista combinada
+        yield await Future.wait(futures);
+      }
+    });
 
 /// Almacena el combo (Jugador + Perfil) que el coach selecciona en el Dropdown.
 /// [REFACTORIZADO] Ahora almacena `PlayerWithProfile` en lugar de `app_user.User`.
@@ -173,7 +191,7 @@ final selectedPlayerProfileProvider = Provider<PlayerProfile?>((ref) {
 
 final explorerProgramsProvider = StreamProvider<List<Program>>((ref) {
   final firestore = ref.read(firestoreProvider);
-  
+
   // 1. Observa el perfil del jugador seleccionado (que ya está cargado)
   final selectedProfile = ref.watch(selectedPlayerProfileProvider);
 
@@ -190,18 +208,19 @@ final explorerProgramsProvider = StreamProvider<List<Program>>((ref) {
 /// (Sin cambios)
 final explorerSelectedProgramProvider = StateProvider<Program?>((ref) => null);
 
-
 // --- SECCIÓN 5: ESTADOS GLOBALES DE UI ---
 // (Agrupados para claridad, sin cambios)
 
 final isGeneratingProgramProvider = StateProvider<bool>((ref) => false);
 final isLoggingOutProvider = StateProvider<bool>((ref) => false);
 final isCreatingPlayerProvider = StateProvider<bool>((ref) => false);
+
 /// Provider que expone la lógica de negocio para crear programas.
 final programGeneratorProvider = Provider<ProgramGenerator>((ref) {
   return ProgramGenerator();
 });
 
-final programEditorProvider = StateNotifierProvider<ProgramEditorNotifier, Program?>((ref) {
-  return ProgramEditorNotifier(ref);
-});
+final programEditorProvider =
+    StateNotifierProvider<ProgramEditorNotifier, Program?>((ref) {
+      return ProgramEditorNotifier(ref);
+    });
