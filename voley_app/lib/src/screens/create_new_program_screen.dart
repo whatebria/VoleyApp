@@ -9,29 +9,28 @@ import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart'; // Necesario para la UI
 import 'package:voley_app/src/screens/exercise_picker_screen.dart';
 import 'package:uuid/uuid.dart';
+// --- AÑADIDO: Import de la nueva pantalla ---
+import 'package:voley_app/src/screens/create_block_screen.dart'; 
 
-// --- CAMBIO: _SessionTemplate eliminado ---
-
-class ManualProgramCreateScreen extends ConsumerStatefulWidget {
+// --- CAMBIO: Nombre de la clase ---
+class CreateNewProgramScreen extends ConsumerStatefulWidget {
   final PlayerProfile profile;
-  const ManualProgramCreateScreen({super.key, required this.profile});
+  const CreateNewProgramScreen({super.key, required this.profile});
 
   @override
-  _ManualProgramCreateScreenState createState() => _ManualProgramCreateScreenState();
+  _CreateNewProgramScreenState createState() => _CreateNewProgramScreenState();
 }
 
-class _ManualProgramCreateScreenState extends ConsumerState<ManualProgramCreateScreen> {
+class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen> {
   Mesocycle? _currentEditingMeso;
   late Program _program;
   bool _isSaving = false;
   final Uuid _uuid = const Uuid();
 
-  final _mesoFormKey = GlobalKey<FormState>();
-  final _mesoNameCtrl = TextEditingController();
-  final _mesoObjectiveCtrl = TextEditingController(); // --- AÑADIDO ---
-  int _mesoWeeks = 4;
-  int _mesoSessions = 3;
-  // --- CAMBIO: 'progressionType' ya no se controla desde la UI ---
+  // --- AÑADIDO: Controlador para el título del programa ---
+  late TextEditingController _programNameCtrl;
+
+  // --- CAMBIO: State del formulario movido a CreateBlockScreen ---
 
 
   @override
@@ -39,42 +38,23 @@ class _ManualProgramCreateScreenState extends ConsumerState<ManualProgramCreateS
     super.initState();
     _program = Program(
       id: _uuid.v4(),
-      title: 'Nuevo Programa para ${widget.profile.name}',
+      // --- CAMBIO: Título inicial en blanco ---
+      title: '', 
       source: 'Manual',
       startDate: DateTime.now(),
       endDate: DateTime.now(), 
       mesocycles: [],
     );
+    // --- AÑADIDO: Inicializar controlador de título ---
+    _programNameCtrl = TextEditingController(text: _program.title);
   }
   
-  // --- CAMBIO: _generateSessionTemplates eliminado ---
-
-  // --- CAMBIO: Lógica de carga simplificada ---
-  double _suggestedLoadFor(int weekIndex, int totalWeeks) {
-    final normalizedIndex = totalWeeks <= 1 ? 0 : weekIndex / (totalWeeks - 1);
-    // Progresión lineal simple de 0.6 a 0.85
-    return double.parse((0.6 + 0.25 * normalizedIndex).toStringAsFixed(2));
-  }
-
-  // --- CAMBIO: Esta función ya no se usa para crear por defecto ---
-  // Se mantiene por si se usa en otro lado, o se puede eliminar.
-  List<WorkoutExercise> _buildDefaultSegmentExercises(String focus) {
-    return [
-      WorkoutExercise(
-        exerciseId: _uuid.v4(),
-        name: 'Calentamiento y movilidad',
-        sets: 1,
-        reps: '10-15 minutos',
-        intensity: 'Suave',
-      ),
-      // ...
-    ];
-  }
+  // --- CAMBIO: _generateSessionTemplates, _suggestedLoadFor movidos ---
+  // --- CAMBIO: _buildDefaultSegmentExercises movido ---
 
   @override
   void dispose() {
-    _mesoNameCtrl.dispose();
-    _mesoObjectiveCtrl.dispose(); // --- AÑADIDO ---
+    _programNameCtrl.dispose(); // --- AÑADIDO ---
     super.dispose();
   }
 
@@ -90,7 +70,13 @@ class _ManualProgramCreateScreenState extends ConsumerState<ManualProgramCreateS
     setState(() => _isSaving = true);
     
     final totalWeeks = _program.mesocycles.fold<int>(0, (sum, meso) => sum + meso.weeks);
+    
+    // --- CAMBIO: Actualizar título y fecha de fin ---
     _program = _program.copyWith(
+      // --- CAMBIO: Guardar el título del programa ---
+      title: _programNameCtrl.text.isEmpty 
+          ? 'Programa sin título' 
+          : _programNameCtrl.text,
       endDate: _program.startDate.add(Duration(days: totalWeeks * 7)),
     );
 
@@ -115,54 +101,7 @@ class _ManualProgramCreateScreenState extends ConsumerState<ManualProgramCreateS
     }
   }
 
-  // --- CAMBIO: Lógica de guardado de Mesociclo ---
-  void _saveNewMesocycle() {
-    if (_mesoFormKey.currentState!.validate()) {
-      final weeks = _mesoWeeks;
-      final sessionsPerWeek = _mesoSessions;
-
-      // --- CAMBIO: Ya no se usan plantillas ---
-      final microcycles = List.generate(weeks, (i) {
-        
-        // --- CAMBIO: Genera sesiones 'vacías' ---
-        final sessions = List.generate(sessionsPerWeek, (sIndex) {
-          return TrainingSession(
-            id: _uuid.v4(),
-            day: 'Sesión ${sIndex + 1}',
-            // --- CAMBIO: 'objective' eliminado ---
-            load: _suggestedLoadFor(i, weeks), 
-            exercises: [], objective: '', // --- CAMBIO: Inicia con 0 ejercicios ---
-          );
-        });
-
-        return Microcycle(
-          weekNumber: i + 1,
-          sessions: sessions,
-          id: _uuid.v4(),
-        );
-      });
-
-      final newMeso = Mesocycle(
-        id: _uuid.v4(),
-        name: _mesoNameCtrl.text,
-        objective: _mesoObjectiveCtrl.text, // --- AÑADIDO ---
-        weeks: weeks,
-        focus: "Personalizado", // 'focus' de Mesocycle (ya no es del form)
-        // --- CAMBIO: 'progressionType' y 'matchDayIndex' con valor por defecto ---
-        progressionType: 'lineal', 
-        matchDayIndex: 5, // 5 = Sábado (valor por defecto)
-        microcycles: microcycles,
-      );
-
-      setState(() {
-        final updatedMesocycles = List<Mesocycle>.from(_program.mesocycles);
-        updatedMesocycles.insert(0, newMeso);
-        _program = _program.copyWith(mesocycles: updatedMesocycles);
-        _clearMesoForm();
-        _currentEditingMeso = newMeso;
-      });
-    }
-  }
+  // --- CAMBIO: _saveNewMesocycle eliminado, lógica movida a _navigateToAddBlock ---
 
   void _navigateToExercisePicker(TrainingSession session) async {
     final updatedSession = await Navigator.push(
@@ -229,285 +168,49 @@ class _ManualProgramCreateScreenState extends ConsumerState<ManualProgramCreateS
     });
   }
 
-  // --- CAMBIO: Limpieza de formulario ---
-  void _clearMesoForm() {
-    _mesoFormKey.currentState?.reset();
-    _mesoNameCtrl.clear();
-    _mesoObjectiveCtrl.clear(); // --- AÑADIDO ---
-    _mesoWeeks = 4;
-    _mesoSessions = 3;
-    // --- CAMBIO: 'progressionType' eliminado ---
-  }
-
-  // --- MEJORA DE UX: Diálogo de Creación (Modal) ---
-  void _showCreateMesoModal(BuildContext context, ThemeData theme) {
-    _clearMesoForm();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: theme.colorScheme.surface, // grisPro
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  // --- CAMBIO: _clearMesoForm eliminado ---
+  // --- CAMBIO: _showCreateMesoModal eliminado ---
+  
+  // --- AÑADIDO: Navegación a la nueva pantalla ---
+  void _navigateToAddBlock() async {
+    // Navega a la new screen y espera por un Mesocycle
+    final newMeso = await Navigator.push<Mesocycle>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateBlockScreen(profile: widget.profile),
       ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                MediaQuery.of(context).viewInsets.bottom + 16,
-              ),
-              child: _buildMesoForm(
-                context,
-                theme,
-                setModalState,
-              ), 
-            );
-          },
-        );
-      },
     );
+
+    if (newMeso != null && mounted) {
+      setState(() {
+        final updatedMesocycles = List<Mesocycle>.from(_program.mesocycles);
+        updatedMesocycles.insert(0, newMeso); // Add to top
+        _program = _program.copyWith(mesocycles: updatedMesocycles);
+        _currentEditingMeso = newMeso; // Focus the new one
+      });
+    }
   }
+
 
   // --- WIDGETS DE CONSTRUCCIÓN ---
 
-  // --- AÑADIDO: Helper para Títulos de Sección en el Modal ---
-  Widget _buildSectionHeader(ThemeData theme, String title, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: Row(
-        children: [
-          Icon(icon, color: theme.colorScheme.secondary, size: 20), // azulPro
-          const SizedBox(width: 8),
-          Text(title, style: theme.textTheme.titleMedium),
-        ],
-      ),
-    );
-  }
+  // --- CAMBIO: Formularios y helpers de modal eliminados ---
+  // _buildMesoForm, _buildSectionHeader, _buildAvailabilityReminder, 
+  // _buildNumberStepper han sido movidos a create_block_screen.dart
 
-  // --- AÑADIDO: Helper para Recordatorio de Disponibilidad ---
-  Widget _buildAvailabilityReminder(ThemeData theme) {
-    // Leemos la disponibilidad del perfil del jugador
-    final availability = widget.profile.availability;
-    
-    // Si no definió días, no mostramos nada.
-    if (availability.trainingDays.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Días disponibles del atleta:", 
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.7)
-            )
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8.0,
-            runSpacing: 4.0,
-            children: availability.trainingDays.map((day) => Chip(
-              label: Text(day),
-              backgroundColor: theme.colorScheme.secondary.withOpacity(0.2), // azulPro
-              labelStyle: TextStyle(color: theme.colorScheme.onSurface),
-              side: BorderSide.none,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-            )).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-  // --- CAMBIO: Formulario de Mesociclo rediseñado con Cards ---
-  Widget _buildMesoForm(
-    BuildContext context,
-    ThemeData theme,
-    StateSetter setModalState,
-  ) {
-    return Form(
-      key: _mesoFormKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Crear Bloque de Entrenamiento',
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.primary, // voltNeon
-            ),
-          ),
-          const Divider(height: 24),
-
-          // --- AÑADIDO: Card 1 - Detalles ---
-          Card(
-            elevation: 0,
-            color: theme.colorScheme.background, // negroEnfocado
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            clipBehavior: Clip.antiAlias,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionHeader(theme, 'Detalles del Bloque', Icons.description_outlined),
-                  TextFormField(
-                    controller: _mesoNameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre del Bloque',
-                      helperText: 'Ej: Bloque de Fuerza, Base',
-                      prefixIcon: Icon(Icons.label_outline),
-                    ),
-                    validator: (val) => val!.isEmpty ? 'Requerido' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _mesoObjectiveCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Objetivo SMART del Bloque',
-                      helperText: 'Ej: Aumentar salto vertical en 5cm...',
-                      prefixIcon: Icon(Icons.check_circle_outline),
-                    ),
-                    maxLines: 3,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // --- AÑADIDO: Card 2 - Configuración ---
-          Card(
-            elevation: 0,
-            color: theme.colorScheme.background, // negroEnfocado
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            clipBehavior: Clip.antiAlias,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionHeader(theme, 'Configuración Semanal', Icons.calendar_today_outlined),
-                  // --- AÑADIDO: Recordatorio de Disponibilidad ---
-                  _buildAvailabilityReminder(theme), 
-                  _buildNumberStepper(
-                    theme: theme,
-                    title: 'Duración (Semanas):',
-                    value: _mesoWeeks,
-                    onChanged: (newValue) => setModalState(() => _mesoWeeks = newValue),
-                    max: 12,
-                  ),
-                  _buildNumberStepper(
-                    theme: theme,
-                    title: 'Sesiones por Semana:',
-                    value: _mesoSessions,
-                    onChanged: (newValue) =>
-                        setModalState(() => _mesoSessions = newValue),
-                    min: 1,
-                    max: 7,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          ElevatedButton.icon(
-            icon: const Icon(Icons.add),
-            label: const Text('Crear Bloque'),
-            onPressed: () {
-              if (_mesoFormKey.currentState!.validate()) {
-                _saveNewMesocycle();
-                Navigator.pop(context); 
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNumberStepper({
-    required ThemeData theme,
-    required String title,
-    required int value,
-    required ValueChanged<int> onChanged,
-    int min = 1,
-    int max = 12,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(title, style: theme.textTheme.titleMedium),
-          Row(
-            children: [
-              IconButton(
-                icon: Icon(
-                  Icons.remove_circle_outline,
-                  color: theme.colorScheme.secondary,
-                ),
-                onPressed: value > min ? () => onChanged(value - 1) : null,
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                child: Text(
-                  value.toString(),
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.add_circle_outline,
-                  color: theme.colorScheme.secondary,
-                ),
-                onPressed: value < max ? () => onChanged(value + 1) : null,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
   
   // --- CAMBIO: Lista de programas rediseñada ---
   List<Widget> _buildProgramListItems() {
     final theme = Theme.of(context);
 
-    if (_program.mesocycles.isEmpty) {
-      return [
-        Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Center(
-            child: Text(
-              'Añade tu primer Bloque de Entrenamiento para empezar.',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7)
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      ];
-    }
+    // No necesitamos el mensaje de "vacío" aquí, 
+    // ya que se maneja en el build() principal.
 
-    return _program.mesocycles.map((meso) {
+    // --- CAMBIO: Usar asMap().entries.map() para obtener el índice ---
+    return _program.mesocycles.asMap().entries.map((entry) {
+      final int index = entry.key;
+      final Mesocycle meso = entry.value;
+
       return Card(
         margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
         elevation: 0,
@@ -516,46 +219,50 @@ class _ManualProgramCreateScreenState extends ConsumerState<ManualProgramCreateS
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: theme.colorScheme.surface) // Borde grisPro
         ),
-        child: ExpansionTile(
-          key: ValueKey(meso.id),
-          initiallyExpanded: meso == _currentEditingMeso,
-          onExpansionChanged: (isExpanded) {
-            setState(() {
-              _currentEditingMeso = isExpanded ? meso : null;
-            });
-          },
-          backgroundColor: theme.colorScheme.surface, // grisPro
-          collapsedBackgroundColor: theme.colorScheme.background, // negroEnfocado
-          // --- CAMBIO DE COLOR ---
-          leading: Icon(Icons.timeline, color: theme.colorScheme.secondary), // azulPro
-          title: Text(
-            meso.name,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          // --- CAMBIO: Subtítulo simplificado ---
-          subtitle: Text(
-            '${meso.weeks} Semanas • Foco: ${meso.focus}',
-          ),
-          trailing: IconButton(
-            icon: Icon(Icons.delete_outline, color: theme.colorScheme.error), // errorRed
-            tooltip: 'Eliminar Bloque',
-            onPressed: () => _deleteMesocycle(meso),
-          ),
-          children: [
-            // --- AÑADIDO: Mostrar Objetivo SMART ---
-            if (meso.objective.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Column(
+        // --- CAMBIO: El Card ya no es un ExpansionTile ---
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // --- CAMBIO: Nuevo Header de la Card ---
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(
+                    child: Text(
+                      'Bloque ${index + 1}: ${meso.name}',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary // voltNeon
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.delete_outline, color: theme.colorScheme.error), // errorRed
+                    tooltip: 'Eliminar Bloque',
+                    onPressed: () => _deleteMesocycle(meso),
+                  ),
+                ],
+              ),
+              Text(
+                '${meso.weeks} Semanas',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withOpacity(0.7)
+                ),
+              ),
+              const SizedBox(height: 12),
+              
+              // --- CAMBIO: Objetivo del Bloque ---
+              if (meso.objective.isNotEmpty)
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'OBJETIVO DEL BLOQUE:',
+                      'OBJETIVO:',
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary.withOpacity(0.8) // voltNeon
+                        color: theme.colorScheme.secondary // azulPro
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -565,130 +272,17 @@ class _ManualProgramCreateScreenState extends ConsumerState<ManualProgramCreateS
                     ),
                   ],
                 ),
-              ),
-            const Divider(height: 1, indent: 16, endIndent: 16),
+              
+              const Divider(height: 24),
 
-            // Lista de Semanas (Microciclos)
-            ...meso.microcycles.map((micro) {
-            return ExpansionTile(
-              key: ValueKey('${meso.id}_${micro.weekNumber}'),
-              leading: Icon(
-                Icons.date_range,
-                color: theme.colorScheme.secondary.withOpacity(0.7),
-              ),
-              title: Text(
-                'Semana ${micro.weekNumber}',
-                style: theme.textTheme.titleMedium,
-              ),
-              subtitle: Text('${micro.sessions.length} sesiones'),
-              // --- AÑADIDO: Botón "Aplicar a todas" ---
-              trailing: IconButton(
-                icon: Icon(Icons.sync, color: theme.colorScheme.primary),
-                tooltip: 'Usar esta semana como plantilla para todo el bloque',
-                onPressed: () => _showApplyTemplateDialog(meso, micro),
-              ),
-              childrenPadding: const EdgeInsets.symmetric(
-                horizontal: 8.0,
-                vertical: 4.0,
-              ),
-              children: micro.sessions.map((session) {
-                // --- CAMBIO: _buildSessionTile modificado ---
-                return _buildSessionTile(session, meso, micro);
-              }).toList(),
-            );
-          })],
+            ],
+          ),
         ),
       );
     }).toList();
   }
   
-  // --- AÑADIDO: Lógica para aplicar plantilla de semana ---
-  
-  /// Muestra un diálogo de confirmación antes de aplicar la plantilla
-  Future<void> _showApplyTemplateDialog(Mesocycle meso, Microcycle templateMicro) async {
-    final theme = Theme.of(context);
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: theme.colorScheme.surface,
-          title: Text('Aplicar Plantilla de Semana', style: TextStyle(color: theme.colorScheme.primary)),
-          content: Text(
-            '¿Estás seguro de que quieres usar la "Semana ${templateMicro.weekNumber}" '
-            'como plantilla?\n\nEsto sobrescribirá todas las demás semanas de este bloque.'
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Aplicar'),
-            ),
-          ],
-        );
-      }
-    );
 
-    if (result == true) {
-      _applyWeekTemplate(meso, templateMicro);
-    }
-  }
-
-  /// Lógica inmutable para copiar las sesiones de una semana a todas las demás
-  void _applyWeekTemplate(Mesocycle meso, Microcycle templateMicro) {
-    setState(() {
-      final newMesocycles = _program.mesocycles.map((m) {
-        // Ignorar otros mesociclos
-        if (m.id != meso.id) return m;
-
-        // Estas son las sesiones que queremos copiar
-        final templateSessions = templateMicro.sessions;
-        final totalWeeks = m.weeks;
-
-        // Mapeamos todos los microciclos
-        final newMicrocycles = List.generate(m.microcycles.length, (i) {
-          final currentMicro = m.microcycles[i];
-
-          // Si es la semana plantilla, la devolvemos sin cambios
-          if (currentMicro.id == templateMicro.id) {
-            return currentMicro;
-          }
-
-          // Es una semana que necesita ser sobrescrita
-          // --- CORRECCIÓN: Ahora usamos los métodos copyWith ---
-          final newSessions = templateSessions.map((templateSession) {
-            
-            // 1. Reconstruir WorkoutExercise usando copyWith
-            final newExercises = templateSession.exercises.map((e) {
-              // Usamos el copyWith de WorkoutExercise
-              return e.copyWith(exerciseId: _uuid.v4());
-            }).toList();
-
-            // 2. Reconstruir TrainingSession usando copyWith
-            // Usamos el copyWith de TrainingSession
-            return templateSession.copyWith(
-              id: _uuid.v4(), // Nuevo ID de sesión único
-              load: _suggestedLoadFor(i, totalWeeks), // Carga recalculada
-              exercises: newExercises, // Nueva lista de ejercicios
-            );
-          }).toList();
-
-          // Devolvemos el microciclo actual con las sesiones reemplazadas
-          return currentMicro.copyWith(sessions: newSessions);
-        });
-
-        // Devolvemos el mesociclo con los microciclos actualizados
-        return m.copyWith(microcycles: newMicrocycles);
-
-      }).toList();
-
-      _program = _program.copyWith(mesocycles: newMesocycles);
-    });
-    
-    _showSuccess('Plantilla de semana aplicada a todo el bloque.');
-  }
 
   // --- CAMBIO: Diseño de la Tarjeta de Sesión ---
   Widget _buildSessionTile(TrainingSession session, Mesocycle meso, Microcycle micro) {
@@ -994,7 +588,8 @@ class _ManualProgramCreateScreenState extends ConsumerState<ManualProgramCreateS
                   reps: repsCtrl.text,
                   intensity: intensityCtrl.text,
                 );
-                Navigator.of(dialogContext, rootNavigator: true).maybePop();
+                // --- CORRECCIÓN: Navigator.pop ---
+                Navigator.of(dialogContext, rootNavigator: true).pop(updated);
               },
               child: const Text('Guardar'),
             ),
@@ -1049,6 +644,7 @@ class _ManualProgramCreateScreenState extends ConsumerState<ManualProgramCreateS
           
           final newSessions = mic.sessions
               .map((s) => s.id == updatedSession.id ? updatedSession : s)
+              // --- CORRECCIÓN: Líneas erróneas eliminadas ---
               .toList();
           return mic.copyWith(sessions: newSessions);
         }).toList();
@@ -1060,14 +656,65 @@ class _ManualProgramCreateScreenState extends ConsumerState<ManualProgramCreateS
     });
   }
 
+  // --- AÑADIDO: Widget para el nombre del programa ---
+  Widget _buildProgramNameEditor(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: TextFormField(
+        controller: _programNameCtrl,
+        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+        decoration: InputDecoration(
+          labelText: 'Nombre del Programa',
+          // --- CAMBIO: Estilo de diseño ---
+          hintText: 'Ej: Plan de Fuerza 2024',
+          filled: true,
+          fillColor: theme.colorScheme.surface, // grisPro
+          border: theme.inputDecorationTheme.border, // Usar borde del tema
+          prefixIcon: Icon(Icons.edit, color: theme.colorScheme.primary),
+        ),
+      ),
+    );
+  }
+
+  // --- AÑADIDO: Widget para el header de los bloques ---
+  Widget _buildBlockHeader(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Bloques de Entrenamiento',
+            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          // --- CAMBIO: Botón "+ bloque" ---
+          FilledButton.icon(
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Añadir'),
+            // --- CAMBIO: Navega a la nueva pantalla ---
+            onPressed: _isSaving
+              ? null
+              : _navigateToAddBlock,
+            style: FilledButton.styleFrom(
+              // Un botón más sutil
+              backgroundColor: theme.colorScheme.surface,
+              foregroundColor: theme.colorScheme.onSurface
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Scaffold(
+      // --- CAMBIO: Título de AppBar ---
       appBar: AppBar(
-        title: Text('Planificación: ${widget.profile.name}'),
+        title: const Text('Nuevo Programa'),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
@@ -1084,39 +731,35 @@ class _ManualProgramCreateScreenState extends ConsumerState<ManualProgramCreateS
           ),
         ],
       ),
-      body: Stack(
+      // --- CAMBIO: Estructura del Body ---
+      body: ListView(
+        padding: const EdgeInsets.only(bottom: 96), // Espacio para scroll
         children: [
-          ListView(
-            padding: const EdgeInsets.only(bottom: 96, top: 16), // Espacio para FAB
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          // 1. Editor de nombre de programa
+          _buildProgramNameEditor(theme),
+          
+          // 2. Header de Bloques
+          _buildBlockHeader(theme),
+          
+          // 3. Lista de Bloques (o mensaje de vacío)
+          if (_program.mesocycles.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Center(
                 child: Text(
-                  'Bloques de Entrenamiento',
-                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                  'Añade tu primer Bloque de Entrenamiento para empezar.',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.7)
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ),
-              
-              ..._buildProgramListItems(),
-            ],
-          ),
-
-          Align(
-            alignment: Alignment.bottomRight,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: FloatingActionButton.extended(
-                label: const Text('Agregar Bloque'),
-                icon: const Icon(Icons.post_add_outlined), 
-                onPressed: _isSaving
-                    ? null
-                    : () => _showCreateMesoModal(context, theme),
-                tooltip: 'Crear un nuevo Bloque de Entrenamiento',
-              ),
-            ),
-          ),
+            )
+          else
+            ..._buildProgramListItems(),
         ],
       ),
+      // --- CAMBIO: FAB eliminado ---
     );
   }
 }

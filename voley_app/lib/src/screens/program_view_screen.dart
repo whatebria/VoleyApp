@@ -5,7 +5,7 @@ import 'package:voley_app/src/models/program/program.dart';
 import 'package:voley_app/src/models/program/microcicle.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:intl/intl.dart';
-import 'package:voley_app/src/screens/manual_program_create_screen.dart';
+import 'package:voley_app/src/screens/create_new_program_screen.dart';
 // Asumo que PlayerWithProfile se define en providers.dart o un modelo importado por él
 // (basado en la lógica de _initializePlayerSelection)
 
@@ -69,7 +69,7 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ManualProgramCreateScreen(profile: profile),
+        builder: (context) => CreateNewProgramScreen(profile: profile),
       ),
     );
   }
@@ -418,13 +418,6 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              Text(
-                                'Objetivo: ${s.objective}',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  fontStyle: FontStyle.italic,
-                                  color: theme.colorScheme.onSurface.withOpacity(0.7)
-                                ),
-                              ),
                               const SizedBox(height: 4),
                               Text(
                                 'Carga: ${s.load}',

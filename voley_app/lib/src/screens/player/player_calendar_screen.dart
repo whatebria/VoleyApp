@@ -82,17 +82,10 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
           (s) => s.day.toLowerCase() == dayString,
           orElse: () => TrainingSession(
             day: '',
-            objective: 'Descanso',
             load: 0,
             exercises: [], id: '',
           ),
         );
-        if (session.objective != 'Descanso') {
-          if (newEvents[normalizedDate] == null) {
-            newEvents[normalizedDate] = [];
-          }
-          newEvents[normalizedDate]!.add(session);
-        }
       }
       currentDate = currentDate.add(const Duration(days: 7));
     }
@@ -323,12 +316,6 @@ Widget _buildEventList(BuildContext context, ThemeData theme, List<SessionLog> h
                     style: theme.textTheme.titleSmall?.copyWith(
                       color: theme.colorScheme.secondary,
                       fontWeight: FontWeight.bold
-                    ),
-                  ),
-                  Text(
-                    session.objective,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 8),
