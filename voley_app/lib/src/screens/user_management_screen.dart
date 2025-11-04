@@ -1,61 +1,18 @@
-// lib/src/screens/user_management_screen.dart (CORREGIDO)
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:voley_app/src/models/user.dart' as app_user;
-import 'package:voley_app/providers/providers.dart'; 
-import 'package:voley_app/src/models/player_profile/player_profile.dart'; // Importar PlayerProfile (necesario para PlayerWithProfile)
+import 'package:voley_app/providers/providers.dart';
+import 'package:voley_app/src/screens/coach_player_profile.dart';
 import 'package:voley_app/src/screens/create_player_screen.dart';
+// --- CAMBIO ---
+// Importamos la nueva pantalla de perfil
 
 
 class UserManagementScreen extends ConsumerWidget {
   const UserManagementScreen({super.key});
 
-  /// --- MEJORA DE UX: Muestra las opciones del jugador ---
-  // [CORRECCIÓN]: Ahora acepta PlayerWithProfile
-  void _showPlayerOptions(
-      BuildContext context, WidgetRef ref, PlayerWithProfile playerCombo) {
-    final theme = Theme.of(context);
-    
-    // [CORRECCIÓN CRÍTICA]: Asigna el objeto PlayerWithProfile completo.
-    ref.read(explorerSelectedPlayerProvider.notifier).state = playerCombo;
-
-    // 2. MUESTRA EL MENÚ
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) {
-        return SafeArea(
-          child: Wrap(
-            children: [
-              // --- Opción 1: Ir a Evaluación/Perfil ---
-              ListTile(
-                leading:
-                    Icon(Icons.assessment, color: theme.colorScheme.primary), // Volt
-                title: const Text('Ver/Editar Evaluación'),
-                subtitle: Text(playerCombo.profile == null 
-                  ? 'Perfil, posición, tests, lesiones (Perfil NO CREADO)'
-                  : 'Perfil, posición, tests, lesiones...'),
-                onTap: () {
-                  Navigator.pop(ctx); // Cierra el menú
-                  Navigator.pushNamed(context, '/evaluation');
-                },
-              ),
-              // --- Opción 2: Ir a Programas ---
-              ListTile(
-                leading:
-                    Icon(Icons.list_alt, color: theme.colorScheme.secondary), // Azul Pro
-                title: const Text('Ver/Gestionar Programas'),
-                subtitle: const Text('Calendario, mesociclos, sesiones...'),
-                onTap: () {
-                  Navigator.pop(ctx); // Cierra el menú
-                  Navigator.pushNamed(context, '/program');
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+  /// --- CAMBIO ---
+  /// La función _showPlayerOptions ha sido eliminada, ya que ahora
+  /// navegaremos directamente.
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -186,9 +143,29 @@ class UserManagementScreen extends ConsumerWidget {
                           ),
                           trailing:
                               const Icon(Icons.arrow_forward_ios, size: 16),
+                          
+                          // --- CAMBIO ---
+                          // Lógica de navegación actualizada
                           onTap: () {
-                            // [CORRECCIÓN CRÍTICA]: Pasamos el PlayerWithProfile completo
-                            _showPlayerOptions(context, ref, playerCombo);
+                            final profile = playerCombo.profile;
+
+                            // 1. Asignamos el jugador seleccionado para que
+                            // las pantallas de destino sepan quién es.
+                            ref.read(explorerSelectedPlayerProvider.notifier).state = playerCombo;
+
+                            if (profile != null) {
+                              // 2a. Si SÍ hay perfil, vamos a la pantalla de "Ver Perfil"
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => CoachPlayerProfile(profile: profile),
+                                ),
+                              );
+                            } else {
+                              // 2b. Si NO hay perfil, vamos a la pantalla de "Evaluación"
+                              // (que maneja la creación del perfil).
+                              Navigator.pushNamed(context, '/evaluation');
+                            }
                           },
                         ),
                       );

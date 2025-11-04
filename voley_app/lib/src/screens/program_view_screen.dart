@@ -1,15 +1,13 @@
-// lib/screens/program_view_screen.dart (CORREGIDO)
+// lib/screens/program_view_screen.dart (AHORA SÍ, CORREGIDO)
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
-import 'package:voley_app/src/models/user.dart' as app_user;
 import 'package:voley_app/src/models/program/program.dart';
 import 'package:voley_app/src/models/program/microcicle.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:intl/intl.dart';
-import 'package:voley_app/src/screens/program_editor_screen.dart';
+import 'package:voley_app/src/screens/manual_program_create_screen.dart';
 
-// 1. Convertido a ConsumerStatefulWidget
 class ProgramViewScreen extends ConsumerStatefulWidget {
   const ProgramViewScreen({Key? key}) : super(key: key);
 
@@ -18,11 +16,61 @@ class ProgramViewScreen extends ConsumerStatefulWidget {
 }
 
 class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
-  // --- ELIMINAMOS _initialPlayerSetup (ver build para la corrección) ---
 
   @override
   void initState() {
     super.initState();
+    // --- CAMBIO ---
+    // Ejecuta la lógica de inicialización DESPUÉS de que el primer frame se construya.
+    // Esto evita el error "setState() or markNeedsBuild() called during build".
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializePlayerSelection();
+    });
+  }
+
+  // --- CAMBIO ---
+  // Nueva función para manejar la selección inicial de jugador.
+  // Usamos ref.read() porque esto se ejecuta como una acción, no en el build.
+  void _initializePlayerSelection() {
+    // Solo actuamos si el widget sigue "montado"
+    if (!mounted) return;
+
+    final currentUser = ref.read(currentUserAppUserProvider).valueOrNull;
+    if (currentUser == null) {
+      return; // Aún no hay usuario, no podemos hacer nada.
+    }
+
+    final selectedPlayerCombo = ref.read(explorerSelectedPlayerProvider);
+    
+    // Si ya hay un jugador seleccionado, no hacemos nada.
+    if (selectedPlayerCombo != null) {
+      return;
+    }
+
+    // Lógica para el Coach
+    if (currentUser.isCoach) {
+      final playersAsync = ref.read(coachPlayersWithProfilesProvider);
+      
+      playersAsync.whenData((players) {
+        if (players.isNotEmpty) {
+          // Asignamos el primer jugador de la lista
+          ref.read(explorerSelectedPlayerProvider.notifier).state = players.first;
+        }
+      });
+
+    // Lógica para el Jugador
+    } else if (currentUser.isPlayer) {
+      final playerProfile = ref.read(playerProfileProvider).valueOrNull;
+
+      if (playerProfile != null) {
+        // Creamos el "combo" del jugador actual y lo asignamos
+        final playerCombo = PlayerWithProfile(
+          currentUser,
+          playerProfile,
+        );
+        ref.read(explorerSelectedPlayerProvider.notifier).state = playerCombo;
+      }
+    }
   }
 
 
@@ -66,17 +114,13 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     BuildContext context,
     PlayerProfile profile,
   ) async {
-    // Capturar el ScaffoldMessenger ANTES de la operación async
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     
-    // 1. Pone el estado de carga en 'true'
     ref.read(isGeneratingProgramProvider.notifier).state = true;
 
     try {
-      // 2. Llama a la acción
       await ref.read(programGeneratorAction)(profile);
 
-      // ¡Éxito!
       if (mounted) {
         scaffoldMessenger.showSnackBar(
           const SnackBar(
@@ -86,7 +130,6 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
         );
       }
     } catch (e) {
-      // Error
       if (mounted) {
         scaffoldMessenger.showSnackBar(
           SnackBar(
@@ -96,7 +139,6 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
         );
       }
     } finally {
-      // 3. Quita el estado de carga
       if (mounted) {
         ref.read(isGeneratingProgramProvider.notifier).state = false;
       }
@@ -107,7 +149,7 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ProgramEditorScreen(profile: profile),
+        builder: (context) => ManualProgramCreateScreen(profile: profile),
       ),
     );
   }
@@ -129,7 +171,6 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
           selectedProgramNotifier.state = null;
         } else {
           final currentProgram = selectedProgramNotifier.state;
-          // [CORRECCIÓN] Usamos la identidad del objeto para la comparación
           if (currentProgram == null ||
               programs.where((p) => p.id == currentProgram.id).isEmpty) {
             selectedProgramNotifier.state = programs.first;
@@ -138,17 +179,17 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
       }
     });
 
-    // 2. Observa todos los providers.
     final currentUserAsync = ref.watch(currentUserAppUserProvider);
-    // [CORRECCIÓN] Usamos el provider que agrupa Jugador + Perfil
     final playersWithProfilesAsync = ref.watch(
       coachPlayersWithProfilesProvider,
     );
 
-    // [CORRECCIÓN] El explorador selecciona un PlayerWithProfile
     final selectedPlayerCombo = ref.watch(explorerSelectedPlayerProvider);
-
+    
+    // --- CAMBIO CRÍTICO ---
+    // Este provider SÍ es un AsyncValue
     final selectedProfileAsync = ref.watch(selectedPlayerProfileProvider);
+    
     final programsAsync = ref.watch(explorerProgramsProvider);
     final selectedProgram = ref.watch(explorerSelectedProgramProvider);
     final isGenerating = ref.watch(isGeneratingProgramProvider);
@@ -165,36 +206,10 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                 return const Center(child: Text('Usuario no encontrado.'));
               }
 
-              // 3. [CORRECCIÓN] LÓGICA DE INICIALIZACIÓN DECLARATIVA
-              // Solo corre si es Coach Y no hay un jugador seleccionado.
-              if (currentUser.isCoach && selectedPlayerCombo == null) {
-                // Si aún no hay jugadores, mostramos un cargador (que PlayersWithProfilesAsync ya hace)
-                // Si la lista ya está cargada y no hay selección, intentamos seleccionar el primero.
-                playersWithProfilesAsync.whenData((players) {
-                  if (players.isNotEmpty) {
-                    // [CORRECCIÓN CRÍTICA] Asignamos el objeto PlayerWithProfile
-                    ref.read(explorerSelectedPlayerProvider.notifier).state =
-                        players.first;
-                  }
-                });
-              } else if (currentUser.isPlayer && selectedPlayerCombo == null) {
-                // Si es Jugador y no está seleccionado, forzamos su selección.
-                // Necesitamos el perfil para crear el combo PlayerWithProfile.
-                final playerProfile = ref
-                    .watch(playerProfileProvider)
-                    .valueOrNull;
-
-                if (playerProfile != null) {
-                  // [CORRECCIÓN CRÍTICA] Creamos el objeto PlayerWithProfile para asignarlo
-                  final playerCombo = PlayerWithProfile(
-                    currentUser,
-                    playerProfile,
-                  );
-                  ref.read(explorerSelectedPlayerProvider.notifier).state =
-                      playerCombo;
-                }
-              }
-              // --- FIN LÓGICA DE INICIALIZACIÓN ---
+              // --- CAMBIO ---
+              // La lógica de inicialización de selección de jugador
+              // se ha movido a initState().
+              // El build() ahora solo se dedica a construir.
 
               return Column(
                 children: [
@@ -208,7 +223,6 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                         ),
                       ),
                       error: (e, s) => Center(child: Text('Error: $e')),
-                      // [CORRECCIÓN] Usamos playersWithProfiles
                       data: (playersCombos) {
                         if (playersCombos.isEmpty) {
                           return const Padding(
@@ -218,7 +232,6 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                             ),
                           );
                         }
-                        // [CORRECCIÓN] Pasamos el combo y el combo seleccionado
                         return _buildPlayerSelector(
                           ref,
                           playersCombos,
@@ -248,24 +261,24 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                     child: programsAsync.isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : selectedProgram == null
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24.0),
-                              child: Text(
-                                programsAsync.valueOrNull?.isEmpty ?? true
-                                    ? 'Este jugador no tiene programas.'
-                                    : 'Selecciona un programa para ver.',
-                                style: Theme.of(context).textTheme.bodyLarge
-                                    ?.copyWith(
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24.0),
+                                  child: Text(
+                                    programsAsync.valueOrNull?.isEmpty ?? true
+                                        ? 'Este jugador no tiene programas.'
+                                        : 'Selecciona un programa para ver.',
+                                    style: Theme.of(context).textTheme.bodyLarge
+                                        ?.copyWith(
                                       color: Theme.of(
                                         context,
                                       ).textTheme.bodySmall?.color,
                                     ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          )
-                        : _buildProgramDetails(selectedProgram),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              )
+                            : _buildProgramDetails(selectedProgram),
                   ),
                 ],
               );
@@ -303,12 +316,13 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
         onPressed: isGenerating
             ? null
             : () {
-                // [CORRECCIÓN CRÍTICA 1]: Usamos el valor del AsyncValue que ya observamos
+                // --- CAMBIO CRÍTICO ---
+                // 1. Obtenemos el VALOR del AsyncValue
                 final profile = selectedProfileAsync;
 
-                // [CORRECCIÓN CRÍTICA 2]: Aseguramos que el perfil sea PlayerProfile
+                // 2. Comprobamos si el valor (PlayerProfile) es nulo
                 if (profile != null) {
-                  // profile aquí es de tipo PlayerProfile, que es lo que espera la función.
+                  // Ahora 'profile' SÍ es un PlayerProfile
                   _showGenerationChoice(context, profile);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -324,9 +338,8 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     );
   }
 
-  // --- WIDGETS AUXILIARES (Con Tipos Corregidos) ---
+  // --- WIDGETS AUXILIARES (Sin cambios) ---
 
-  // [CORRECCIÓN] Acepta List<PlayerWithProfile> y PlayerWithProfile?
   Widget _buildPlayerSelector(
     WidgetRef ref,
     List<PlayerWithProfile> playersCombos,
@@ -336,7 +349,6 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     return Container(
       padding: const EdgeInsets.all(16.0),
       color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-      // [CORRECCIÓN] Dropdown para PlayerWithProfile
       child: DropdownButtonFormField<PlayerWithProfile>(
         value: selectedPlayerCombo,
         isExpanded: true,
@@ -353,7 +365,6 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
           );
         }).toList(),
         onChanged: (PlayerWithProfile? newValue) {
-          // [CORRECCIÓN CRÍTICA] Asignamos el objeto PlayerWithProfile completo
           ref.read(explorerSelectedPlayerProvider.notifier).state = newValue;
           ref.read(explorerSelectedProgramProvider.notifier).state = null;
         },
@@ -367,13 +378,10 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     Program? selectedProgram,
   ) {
     final theme = Theme.of(context);
-
-    // El listener en initState se encarga de que 'selectedProgram'
-    // sea null si 'programs' está vacío.
+    
     if (programs.isEmpty) {
       return Container(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        // --- TEMA ---
         color: theme.colorScheme.secondaryContainer.withOpacity(0.2),
         child: Center(
           child: Padding(
@@ -415,7 +423,6 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
   }
 
   Widget _buildProgramDetails(Program program) {
-    // ... (Tu implementación de _buildProgramDetails)
     final theme = Theme.of(context);
     return ListView.builder(
       padding: const EdgeInsets.all(16.0),
@@ -463,7 +470,6 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
   }
 
   void _showWeekDetails(BuildContext context, Microcycle mc) {
-    // ... (Tu implementación de _showWeekDetails)
     final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
@@ -537,8 +543,8 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                                       s.day,
                                       style: theme.textTheme.titleLarge
                                           ?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ],

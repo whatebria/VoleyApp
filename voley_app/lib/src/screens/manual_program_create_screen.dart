@@ -1,6 +1,5 @@
 // lib/src/screens/program_editor_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
@@ -19,15 +18,15 @@ class _SessionTemplate {
   final String focus;
 }
 
-class ProgramEditorScreen extends ConsumerStatefulWidget {
+class ManualProgramCreateScreen extends ConsumerStatefulWidget {
   final PlayerProfile profile;
-  const ProgramEditorScreen({super.key, required this.profile});
+  const ManualProgramCreateScreen({super.key, required this.profile});
 
   @override
-  _ProgramEditorScreenState createState() => _ProgramEditorScreenState();
+  _ManualProgramCreateScreenState createState() => _ManualProgramCreateScreenState();
 }
 
-class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen> {
+class _ManualProgramCreateScreenState extends ConsumerState<ManualProgramCreateScreen> {
   Mesocycle? _currentEditingMeso;
   late Program _program;
   bool _isSaving = false;

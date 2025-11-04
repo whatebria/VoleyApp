@@ -7,7 +7,7 @@ import 'package:voley_app/src/models/program/program.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/session_log.dart';
 import 'dart:collection';
-import 'package:voley_app/src/screens/workout_session_screen.dart';
+import 'package:voley_app/src/screens/player/workout_session_screen.dart';
 import 'package:collection/collection.dart';
 
 class PlayerCalendarScreen extends ConsumerStatefulWidget {

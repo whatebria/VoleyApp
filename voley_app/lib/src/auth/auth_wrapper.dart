@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/auth/login_screen.dart';
 import 'package:voley_app/src/screens/home_screen.dart';
-import 'package:voley_app/src/screens/player_home_screen.dart';
+import 'package:voley_app/src/screens/player/player_home_screen.dart';
 
 class AuthWrapper extends ConsumerWidget {
   const AuthWrapper({super.key});

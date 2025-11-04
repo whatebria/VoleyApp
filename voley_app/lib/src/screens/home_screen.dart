@@ -9,13 +9,12 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Seguimos "observando" esto para obtener el nombre del coach
     final appUserAsync = ref.watch(currentUserAppUserProvider);
-final isLoggingOut = ref.watch(isLoggingOutProvider);
+    final isLoggingOut = ref.watch(isLoggingOutProvider);
     final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        // 1. Hacemos el título reactivo al 'appUserAsync'
         title: appUserAsync.when(
           data: (appUser) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -23,30 +22,25 @@ final isLoggingOut = ref.watch(isLoggingOutProvider);
             children: [
               Text(
                 '¡Hola, ${appUser?.name ?? 'Coach'}!',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               Text(
                 'Bienvenido a tu panel de control.',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface,
+                  color: theme.colorScheme.onPrimary.withOpacity(0.8),
                 ),
               ),
             ],
           ),
-          // Fallback mientras carga o si hay error
           loading: () => const Text('Panel de Coach'),
           error: (e, s) => const Text('Panel de Coach'),
         ),
-        toolbarHeight: 70, // Da más espacio para el título de dos líneas
+        toolbarHeight: 70,
         actions: [
           IconButton(
             icon: isLoggingOut
                 ? SizedBox(
-                    width: 24,
-                    height: 24,
+                    width: 24, height: 24,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
                       color: theme.colorScheme.onPrimary,
@@ -54,57 +48,23 @@ final isLoggingOut = ref.watch(isLoggingOutProvider);
                   )
                 : const Icon(Icons.logout),
             tooltip: 'Cerrar Sesión',
-            // 4. USA LA VARIABLE 'isLoggingOut'
-            onPressed: isLoggingOut
-                ? null
-                : () => _handleLogout(context, ref),
+            onPressed: isLoggingOut ? null : () => _handleLogout(context, ref),
           ),
         ],
       ),
+      // --- BODY MODIFICADO: Ahora es un ListView ---
       body: appUserAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) => Center(child: Text('Error al cargar perfil: $e')),
         data: (appUser) {
           if (appUser == null) {
-            // Esto es un estado de error, el AuthWrapper no debería permitirlo
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'Error: No se pudo cargar el perfil de usuario.',
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      child: const Text('Reintentar Logout'),
-                      onPressed: () => _handleLogout(context, ref),
-                    ),
-                  ],
-                ),
-              ),
-            );
+            return Center(child: Text('Error al cargar el perfil de usuario.'));
           }
-          final List<Widget> menuCards = _buildCoachMenuCards(
-            context,
-          ); // Llama a la función específica de coach
 
-          return Padding(
+          // La lista de tarjetas
+          return ListView(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: GridView.count(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    children: menuCards,
-                  ),
-                ),
-              ],
-            ),
+            children: _buildCoachMenuCards(context),
           );
         },
       ),
@@ -124,64 +84,33 @@ final isLoggingOut = ref.watch(isLoggingOutProvider);
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
-      } } finally {
-      ref.read(isLoggingOutProvider.notifier).state = false;
+      }
     }
   }
 
-  /// --- FUNCIÓN SIMPLIFICADA ---
-  /// Ya no necesita 'appUser' como parámetro.
-  /// Solo devuelve las tarjetas del Coach.
+  /// --- FUNCIÓN MODIFICADA: Solo 2 tarjetas ---
   List<Widget> _buildCoachMenuCards(BuildContext context) {
-    // Definimos las rutas para una navegación limpia
-    const String routeEvaluation = '/evaluation';
-    const String routeUserManagement = '/user_management';
-    const String routeUserCreate = '/user_create';
-    const String routeLibrary = '/library';
-    const String routePermissions = '/permiso';
-
-    // --- VISTA PARA EL COACH ---
     return [
       _buildMenuCard(
         context,
-        icon: Icons.assessment,
-        title: 'Evaluaciones',
-        subtitle: 'Crear o ver',
-        route: routeEvaluation,
+        icon: Icons.group,
+        title: 'Mis Atletas',
+        subtitle: 'Administrar, crear y evaluar',
+        // (Asegúrate de que '/user_management' exista en main.dart y lleve
+        // a una pantalla que muestre la lista de jugadores)
+        route: '/user_management', 
       ),
       _buildMenuCard(
         context,
-        icon: Icons.group_add,
-        title: 'Jugadores',
-        subtitle: 'Administrar equipo',
-        route: routeUserManagement,
-      ),
-      _buildMenuCard(
-        context,
-        icon: Icons.group_add,
-        title: 'Jugadores',
-        subtitle: 'Crear jugadores',
-        route: routeUserCreate,
-      ),
-      _buildMenuCard(
-        context,
-        icon: Icons.shield,
-        title: 'Permisos',
-        subtitle: 'Gestionar accesos',
-        route: routePermissions,
-      ),
-      _buildMenuCard(
-        context,
-        icon: Icons.video_library,
-        title: 'Biblioteca',
-        subtitle: 'Ejercicios',
-        route: routeLibrary,
+        icon: Icons.list_alt,
+        title: 'Programas',
+        subtitle: 'Ver, crear y generar planes',
+        route: '/program',
       ),
     ];
-    // --- LÓGICA DE JUGADOR ELIMINADA ---
   }
 
-  /// Widget de tarjeta refactorizado (sin cambios)
+  /// --- WIDGET DE TARJETA REDISEÑADO (Lista Vertical) ---
   Widget _buildMenuCard(
     BuildContext context, {
     required IconData icon,
@@ -192,8 +121,8 @@ final isLoggingOut = ref.watch(isLoggingOutProvider);
     final theme = Theme.of(context);
 
     return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+      elevation: 2.0,
+      margin: const EdgeInsets.only(bottom: 16.0), // Espacio entre tarjetas
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: () {
@@ -201,27 +130,33 @@ final isLoggingOut = ref.watch(isLoggingOutProvider);
         },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          padding: const EdgeInsets.all(20.0),
+          child: Row(
             children: [
+              // Icono a la izquierda
               Icon(icon, size: 48, color: theme.colorScheme.primary),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+              const SizedBox(width: 20),
+              // Textos a la derecha
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleLarge
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: theme.textTheme.bodySmall?.color),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
-                ),
-              ),
+              // Icono de flecha
+              Icon(Icons.arrow_forward_ios, color: theme.colorScheme.primary.withOpacity(0.7)),
             ],
           ),
         ),

@@ -5,7 +5,7 @@ import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/providers/auth_provider.dart';
 import 'package:voley_app/src/auth/login_screen.dart';
 import 'package:voley_app/src/screens/program_view_screen.dart'; // Tu explorador de coach
-import 'package:voley_app/src/screens/player_calendar_screen.dart'; // La nueva pantalla de calendario
+import 'package:voley_app/src/screens/player/player_calendar_screen.dart'; // La nueva pantalla de calendario
 
 class AuthWrapper extends ConsumerWidget {
   const AuthWrapper({Key? key}) : super(key: key);
