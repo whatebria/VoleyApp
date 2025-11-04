@@ -44,4 +44,5 @@ class Exercise {
         contraindicatedFor: List<String>.from(json['contraindicatedFor'] ?? []),
         description: json['description'] as String? ?? '',
       );
+
 }

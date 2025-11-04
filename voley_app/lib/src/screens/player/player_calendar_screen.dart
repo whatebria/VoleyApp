@@ -84,7 +84,7 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
             day: '',
             objective: 'Descanso',
             load: 0,
-            exercises: [],
+            exercises: [], id: '',
           ),
         );
         if (session.objective != 'Descanso') {

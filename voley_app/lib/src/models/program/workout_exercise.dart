@@ -31,4 +31,19 @@ class WorkoutExercise {
     'reps': reps,
     'intensity': intensity,
   };
+  WorkoutExercise copyWith({
+    String? exerciseId,
+    String? name,
+    int? sets,
+    String? reps,
+    String? intensity,
+  }) {
+    return WorkoutExercise(
+      exerciseId: exerciseId ?? this.exerciseId,
+      name: name ?? this.name,
+      sets: sets ?? this.sets,
+      reps: reps ?? this.reps,
+      intensity: intensity ?? this.intensity,
+    );
+  }
 }
