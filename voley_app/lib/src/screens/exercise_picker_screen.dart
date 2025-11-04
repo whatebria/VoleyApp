@@ -1,11 +1,9 @@
-// lib/src/screens/exercise_picker_screen.dart (CORREGIDO)
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:voley_app/providers/providers.dart';
-import 'package:voley_app/src/models/bd/exercise.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
+import 'package:voley_app/src/screens/searchable_excersice_list_screen.dart';
 
 class ExercisePickerScreen extends ConsumerStatefulWidget {
   final TrainingSession session;
@@ -22,9 +20,6 @@ class ExercisePickerScreen extends ConsumerStatefulWidget {
 }
 
 class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
-  final _searchController = TextEditingController();
-  String _searchQuery = '';
-
   // [CORRECCIÓN]: ESTADO LOCAL. Mantenemos una lista mutable localmente.
   late TrainingSession _currentSession;
 
@@ -33,43 +28,32 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
     super.initState();
     // [CORRECCIÓN]: Inicializa el estado local como una copia de la sesión inmutable.
     _currentSession = widget.session;
-
-    _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text.toLowerCase();
-      });
-    });
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
     super.dispose();
   }
 
-  /// [CORRECCIÓN]: Agrega el ejercicio al estado local (_currentSession)
-  void _addExerciseToSession(WorkoutExercise workoutExercise) {
-    setState(() {
-      // 1. Clonar la lista de ejercicios existente a una mutable temporal
-      final newExercises = List<WorkoutExercise>.from(
-        _currentSession.exercises,
-      );
-
-      // 2. Añadir el nuevo ejercicio a la lista mutable
-      newExercises.add(workoutExercise);
-
-      // 3. Clonar la sesión completa con la nueva lista inmutable (patrón copyWith)
-      _currentSession = _currentSession.copyWith(exercises: newExercises);
-    });
-
-    // Opcional: Mostrar notificación de que se añadió
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${workoutExercise.name} añadido a la sesión.'),
-        backgroundColor: Colors.green,
+  /// [NUEVO MÉTODO]: Navega a la pantalla de búsqueda y espera un resultado
+  Future<void> _navigateAndAddExercise(BuildContext context) async {
+    final newExercise = await Navigator.push<WorkoutExercise>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SearchableExerciseListScreen(profile: widget.profile),
       ),
     );
+
+    // Si el usuario seleccionó un ejercicio, lo añade al estado local
+    if (newExercise != null && mounted) {
+      setState(() {
+        final newExercises = List<WorkoutExercise>.from(_currentSession.exercises);
+        newExercises.add(newExercise);
+        _currentSession = _currentSession.copyWith(exercises: newExercises);
+      });
+    }
   }
+
 
   /// [NUEVO MÉTODO]: Devuelve la sesión modificada y cierra
   void _handleSaveAndClose() {
@@ -77,18 +61,22 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
     Navigator.pop(context, _currentSession);
   }
 
-  /// Muestra el diálogo para añadir series, repeticiones e intensidad.
-  Future<void> _showAddExerciseDialog(Exercise exercise) async {
-    final setsCtrl = TextEditingController(text: '3');
-    final repsCtrl = TextEditingController(text: '10');
-    final intensityCtrl = TextEditingController(text: 'RPE 7');
+  /// [MÉTODO MOVIDO]: Muestra el diálogo para EDITAR series, repeticiones e intensidad.
+  Future<void> _showEditExerciseDialog(
+    WorkoutExercise exercise,
+    int index,
+  ) async {
+    final theme = Theme.of(context);
+    final setsCtrl = TextEditingController(text: exercise.sets.toString());
+    final repsCtrl = TextEditingController(text: exercise.reps);
+    final intensityCtrl = TextEditingController(text: exercise.intensity);
 
-    final result = await showDialog<WorkoutExercise>(
+    final updatedExercise = await showDialog<WorkoutExercise>(
       context: context,
-      // ... (Tu implementación del diálogo sigue siendo la misma)
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
-          title: Text(exercise.name),
+          backgroundColor: theme.colorScheme.surface,
+          title: Text('Editar ${exercise.name}', style: TextStyle(color: theme.colorScheme.primary)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -100,209 +88,161 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
               TextField(
                 controller: repsCtrl,
                 decoration: const InputDecoration(labelText: 'Repeticiones'),
+                keyboardType: TextInputType.text,
               ),
               TextField(
                 controller: intensityCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Intensidad (RPE, %...)',
-                ),
+                decoration: const InputDecoration(labelText: 'Intensidad (RPE)'),
+                keyboardType: TextInputType.text,
               ),
             ],
           ),
           actions: [
             TextButton(
-              onPressed: () =>
-                  Navigator.of(context, rootNavigator: true).maybePop(),
+              onPressed: () => Navigator.of(dialogContext, rootNavigator: true).maybePop(),
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
               onPressed: () {
-                // 1. Crear el objeto WorkoutExercise
-                final workoutExercise = WorkoutExercise(
-                  exerciseId: exercise.id,
-                  name: exercise.name,
-                  sets: int.tryParse(setsCtrl.text) ?? 3,
+                final updated = exercise.copyWith(
+                  sets: int.tryParse(setsCtrl.text) ?? exercise.sets,
                   reps: repsCtrl.text,
                   intensity: intensityCtrl.text,
                 );
-                // 2. Devolver el objeto al presionar "Añadir"
-                Navigator.of(context, rootNavigator: true).pop(workoutExercise);
+                Navigator.of(dialogContext, rootNavigator: true).pop(updated);
               },
-              child: const Text('Añadir'),
+              child: const Text('Guardar'),
             ),
           ],
         );
       },
     );
 
-    // 3. Si el diálogo devolvió un ejercicio, añadirlo
-    if (result != null && mounted) {
-      _addExerciseToSession(
-        result,
-      ); // [CORRECCIÓN]: Usamos el método inmutable.
+    if (updatedExercise != null && mounted) {
+      // Actualiza el ejercicio en el estado local
+      setState(() {
+        final newExercises = List<WorkoutExercise>.from(_currentSession.exercises);
+        newExercises[index] = updatedExercise;
+        _currentSession = _currentSession.copyWith(exercises: newExercises);
+      });
     }
+    
+    setsCtrl.dispose();
+    repsCtrl.dispose();
+    intensityCtrl.dispose();
   }
+  
+  /// [NUEVO WIDGET]: Construye la lista principal de ejercicios de la sesión
+  Widget _buildExerciseList(ThemeData theme) {
+    final exercises = _currentSession.exercises;
 
-  // --- WIDGETS AUXILIARES ---
-
-  // [NUEVO WIDGET]: Lista de Ejercicios Añadidos (para visualización y eliminación)
-  Widget _buildCurrentWorkoutList(ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+    if (exercises.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
           child: Text(
-            'Ejercicios en Sesión (${_currentSession.exercises.length})',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
+            'Sesión vacía.\nPresiona "+" para añadir ejercicios.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.7)
             ),
           ),
         ),
-        SizedBox(
-          height: 180, // Altura fija para la lista de ejercicios actuales
-          child: _currentSession.exercises.isEmpty
-              ? Center(child: Text('Sesión vacía. Añade ejercicios abajo.'))
-              : ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  itemCount: _currentSession.exercises.length,
-                  itemBuilder: (context, index) {
-                    final ex = _currentSession.exercises[index];
-                    return Card(
-                      margin: const EdgeInsets.only(right: 12.0),
-                      color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  ex.name,
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.close,
-                                    size: 16,
-                                    color: Colors.red,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      // [CORRECCIÓN]: Clonación para eliminar
-                                      final newList =
-                                          List<WorkoutExercise>.from(
-                                            _currentSession.exercises,
-                                          );
-                                      newList.removeAt(index);
-                                      _currentSession = _currentSession
-                                          .copyWith(exercises: newList);
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                            Text(
-                              '${ex.sets} sets x ${ex.reps}',
-                              style: theme.textTheme.bodyMedium,
-                            ),
-                            Text(
-                              'Intensidad: ${ex.intensity}',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+      );
+    }
+    
+    return ListView.builder(
+      itemCount: exercises.length,
+      padding: const EdgeInsets.all(8.0),
+      itemBuilder: (context, index) {
+        final ex = exercises[index];
+        return Card(
+          elevation: 0,
+          color: theme.colorScheme.background,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: theme.colorScheme.surface)
+          ),
+          margin: const EdgeInsets.symmetric(vertical: 4.0),
+          child: ListTile(
+            // --- CAMBIO: Añadido número ---
+            leading: CircleAvatar(
+              backgroundColor: theme.colorScheme.secondary,
+              foregroundColor: theme.colorScheme.onSecondary,
+              child: Text('${index + 1}'),
+            ),
+            title: Text(ex.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('${ex.sets}x${ex.reps} @ ${ex.intensity}'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.edit, color: theme.colorScheme.secondary),
+                  tooltip: 'Editar series/reps',
+                  onPressed: () => _showEditExerciseDialog(ex, index),
+                ),
+                IconButton(
+                  icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
+                  tooltip: 'Eliminar ejercicio',
+                  onPressed: () {
+                    setState(() {
+                      final newList = List<WorkoutExercise>.from(_currentSession.exercises);
+                      newList.removeAt(index);
+                      _currentSession = _currentSession.copyWith(exercises: newList);
+                    });
                   },
                 ),
-        ),
-        const Divider(),
-      ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final exercisesAsync = ref.watch(exercisesProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Buscar Ejercicio'),
+        // --- CAMBIO: Título de la sesión ---
+        title: Text(widget.session.day),
         actions: [
+          // --- CAMBIO: Botón de Añadir ---
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'Añadir Ejercicio',
+            onPressed: () => _navigateAndAddExercise(context),
+          ),
+          // --- CAMBIO: Botón de Guardar ---
           IconButton(
             icon: const Icon(Icons.check),
             tooltip: 'Guardar y Cerrar',
-            onPressed: _handleSaveAndClose, // [CORRECCIÓN]: Botón de guardar
+            onPressed: _handleSaveAndClose,
           ),
         ],
       ),
+      // --- CAMBIO: El body es la lista de ejercicios ---
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Lista de ejercicios actuales (horizontal)
-          _buildCurrentWorkoutList(theme),
-
-          // --- BARRA DE BÚSQUEDA ---
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                labelText: 'Buscar por nombre...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text(
+              'Ejercicios en Sesión (${_currentSession.exercises.length})',
+              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
           ),
-
-          // --- LISTA DE EJERCICIOS DISPONIBLES ---
+          // --- CAMBIO: La lista de ejercicios es el contenido principal ---
           Expanded(
-            child: exercisesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, s) => Center(child: Text('Error al cargar: $e')),
-              data: (allExercises) {
-                final profileInjuries = widget.profile.injuries;
-
-                final filteredList = allExercises.where((ex) {
-                  final nameMatch = ex.name.toLowerCase().contains(
-                    _searchQuery,
-                  );
-
-                  final notContra = !ex.contraindicatedFor.any(
-                    (c) => profileInjuries.contains(c),
-                  );
-
-                  return nameMatch && notContra;
-                }).toList();
-
-                if (filteredList.isEmpty) {
-                  return const Center(
-                    child: Text('No se encontraron ejercicios.'),
-                  );
-                }
-
-                return ListView.builder(
-                  itemCount: filteredList.length,
-                  itemBuilder: (context, index) {
-                    final exercise = filteredList[index];
-                    return ListTile(
-                      title: Text(exercise.name),
-                      subtitle: Text(exercise.category),
-                      trailing: const Icon(Icons.add_circle_outline),
-                      onTap: () {
-                        _showAddExerciseDialog(exercise);
-                      },
-                    );
-                  },
-                );
-              },
+            child: Card(
+              elevation: 0,
+              margin: const EdgeInsets.all(16),
+              color: theme.colorScheme.surface, // grisPro
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              clipBehavior: Clip.antiAlias,
+              child: _buildExerciseList(theme),
             ),
           ),
         ],

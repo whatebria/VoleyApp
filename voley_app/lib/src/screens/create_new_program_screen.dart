@@ -684,7 +684,7 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'Bloques de Entrenamiento',
+            'Bloques',
             style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           // --- CAMBIO: Botón "+ bloque" ---

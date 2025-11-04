@@ -231,13 +231,7 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildSectionHeader(theme, 'Define tu Semana Tipo', Icons.edit_calendar_outlined),
-            Text(
-              'Edita las sesiones de esta semana. Se copiarán a las ${_mesoWeeks} semanas del bloque.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7)
-              )
-            ),
-            const Divider(height: 24),
+            const Divider(height: 14),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
