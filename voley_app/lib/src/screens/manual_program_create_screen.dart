@@ -55,7 +55,6 @@ class _ManualProgramCreateScreenState extends ConsumerState<ManualProgramCreateS
   void initState() {
     super.initState();
     _macroWeeks = {
-      for (final phase in MacroPhase.values) phase: phase.defaultWeeks,
     };
     _program = Program(
       id: _uuid.v4(),

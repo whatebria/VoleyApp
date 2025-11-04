@@ -16,6 +16,9 @@ class ProgramViewScreen extends ConsumerStatefulWidget {
   ConsumerState<ProgramViewScreen> createState() => _ProgramViewScreenState();
 }
 
+// --- CAMBIO ---
+// No se necesita TickerProviderStateMixin si usamos DefaultTabController
+// de forma inteligente.
 class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
 
   @override
@@ -62,10 +65,6 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     }
   }
 
-  // --- CAMBIO ---
-  // La función _showGenerationChoice y _runAutomaticGenerator han sido eliminadas
-  // ya que el FAB ahora solo tiene una acción.
-
   void _runManualEditor(BuildContext context, PlayerProfile profile) {
     Navigator.push(
       context,
@@ -101,21 +100,13 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     });
 
     final selectedPlayerCombo = ref.watch(explorerSelectedPlayerProvider);
-    
-    // Observamos el perfil, que es un PlayerProfile? (no un AsyncValue)
     final selectedProfile = ref.watch(selectedPlayerProfileProvider);
-    
     final programsAsync = ref.watch(explorerProgramsProvider);
     final selectedProgram = ref.watch(explorerSelectedProgramProvider);
-    
-    // --- CAMBIO ---
-    // 'isGenerating' y el 'Stack' han sido eliminados.
     
     return Scaffold(
       appBar: AppBar(title: const Text('Explorador de Programas')),
       body: selectedPlayerCombo == null
-            // Muestra un cargador mientras 'initState' y '_initializePlayerSelection'
-            // seleccionan al jugador inicial.
             ? const Center(child: CircularProgressIndicator())
             : Column(
                 children: [
@@ -127,6 +118,7 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                     ),
                     error: (e, s) => Center(child: Text('Error: $e')),
                     data: (programs) {
+                      // --- CAMBIO: De Dropdown a Chips Horizontales ---
                       return _buildProgramSelector(
                         ref,
                         programs,
@@ -157,6 +149,7 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                                   ),
                                 ),
                               )
+                            // --- CAMBIO: De ExpansionTile a TabBar ---
                             : _buildProgramDetails(selectedProgram),
                   ),
                 ],
@@ -164,15 +157,10 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
 
       floatingActionButton: FloatingActionButton(
         tooltip: 'Crear Programa Manual',
-        child: const Icon(Icons.edit), // Icono cambiado a 'edit'
-        // --- CAMBIO ---
-        // 'onPressed' ahora llama directamente a _runManualEditor
+        child: const Icon(Icons.edit), 
         onPressed: () {
-                // Usamos el perfil (PlayerProfile?) que ya observamos
                 final profile = selectedProfile;
-
                 if (profile != null) {
-                  // 'profile' es un PlayerProfile
                   _runManualEditor(context, profile);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -188,118 +176,169 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     );
   }
 
+  // --- CAMBIO: Selector de Programa rediseñado a Chips ---
   Widget _buildProgramSelector(
     WidgetRef ref,
     List<Program> programs,
     Program? selectedProgram,
   ) {
     final theme = Theme.of(context);
-    
+
     if (programs.isEmpty) {
       return Container(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        color: theme.colorScheme.secondaryContainer.withOpacity(0.2),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(
-              'Este jugador no tiene programas.',
-              style: TextStyle(color: theme.colorScheme.onSecondaryContainer),
-            ),
-          ),
+        padding: const EdgeInsets.all(16.0),
+        alignment: Alignment.center,
+        child: Text(
+          'Este jugador no tiene programas.',
+          style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.7)),
         ),
       );
     }
+
+    // Un scroll horizontal de Chips
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      color: theme.colorScheme.secondaryContainer.withOpacity(0.2),
-      child: DropdownButtonFormField<Program>(
-        value: selectedProgram,
-        isExpanded: true,
-        decoration: InputDecoration(
-          labelText: 'Seleccionar Programa',
-          // Usamos el estilo del tema
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      color: theme.colorScheme.surface.withOpacity(0.5), // grisPro transparente
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: programs.map((program) {
+            final isSelected = selectedProgram?.id == program.id;
+            final label = '${DateFormat('dd/MM/yy').format(program.startDate)} - ${DateFormat('dd/MM/yy').format(program.endDate)}';
+            
+            return Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: ChoiceChip(
+                label: Text(label),
+                selected: isSelected,
+                onSelected: (selected) {
+                  if (selected) {
+                    ref.read(explorerSelectedProgramProvider.notifier).state = program;
+                  }
+                },
+                // --- Estilo del Tema ---
+                selectedColor: theme.colorScheme.primary, // voltNeon
+                backgroundColor: theme.colorScheme.surface, // grisPro
+                labelStyle: TextStyle(
+                  color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.w600
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(
+                    color: isSelected ? theme.colorScheme.primary : theme.colorScheme.surface, // Borde voltNeon
+                  )
+                ),
+              ),
+            );
+          }).toList(),
         ),
-        items: programs.map((program) {
-          return DropdownMenuItem<Program>(
-            value: program,
-            child: Text(
-              '${DateFormat('dd/MM/yy').format(program.startDate)} - ${DateFormat('dd/MM/yy').format(program.endDate)} ',
-              overflow: TextOverflow.ellipsis,
-            ),
-          );
-        }).toList(),
-        onChanged: (Program? newValue) {
-          ref.read(explorerSelectedProgramProvider.notifier).state = newValue;
-        },
       ),
     );
   }
 
-  // --- CAMBIO: Diseño de la lista de Mesociclos ---
+  // --- CAMBIO: Diseño de la lista de Mesociclos a TabBar ---
   Widget _buildProgramDetails(Program program) {
     final theme = Theme.of(context);
+
+    if (program.mesocycles.isEmpty) {
+      return const Center(
+        child: Text(
+          'Este programa aún no tiene mesociclos.',
+          style: TextStyle(fontStyle: FontStyle.italic),
+        ),
+      );
+    }
+
+    // --- CAMBIO: Usamos DefaultTabController ---
+    // La 'key' asegura que el controlador se reinicie si cambiamos de programa
+    return DefaultTabController(
+      key: ValueKey(program.id),
+      length: program.mesocycles.length,
+      child: Column(
+        children: [
+          // 1. EL PANORAMA (Pestañas de Mesociclos)
+          Container(
+            color: theme.colorScheme.surface, // grisPro
+            child: TabBar(
+              isScrollable: true,
+              indicatorColor: theme.colorScheme.primary, // voltNeon
+              labelColor: theme.colorScheme.primary, // voltNeon
+              unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.7),
+              tabs: program.mesocycles.map((m) {
+                return Tab(
+                  child: Text(
+                    m.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          
+          // 2. EL DETALLE (Vistas de Pestañas)
+          Expanded(
+            child: TabBarView(
+              children: program.mesocycles.map((mesocycle) {
+                // Devolvemos la lista de semanas (microciclos)
+                return _buildMicrocycleList(context, theme, mesocycle.microcycles);
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- NUEVO WIDGET: Lista de Microciclos (Semanas) ---
+  /// Construye la lista de microciclos (semanas) para una pestaña
+  Widget _buildMicrocycleList(BuildContext context, ThemeData theme, List<Microcycle> microcycles) {
+    
+    if (microcycles.isEmpty) {
+      return const Center(
+        child: Text(
+          'Este mesociclo no tiene semanas.',
+          style: TextStyle(fontStyle: FontStyle.italic),
+        ),
+      );
+    }
+    
     return ListView.builder(
       padding: const EdgeInsets.all(16.0),
-      itemCount: program.mesocycles.length,
+      itemCount: microcycles.length,
       itemBuilder: (context, i) {
-        final m = program.mesocycles[i];
-        // Reemplazamos Card por un ExpansionTile estilizado
+        final mc = microcycles[i];
+        // ListTile estilizado para las semanas (extraído del diseño anterior)
         return Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
-          child: ExpansionTile(
-            // Estilo Moderno
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: ListTile(
+            tileColor: theme.colorScheme.surface, // grisPro
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            backgroundColor: theme.colorScheme.surface, // grisPro
-            collapsedBackgroundColor: theme.colorScheme.surface, // grisPro
-            childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            clipBehavior: Clip.antiAlias,
-            // fin de Estilo
-            
-            title: Text(
-              m.name,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.primary, // voltNeon
-                fontSize: 18
+            leading: CircleAvatar(
+              backgroundColor: theme.colorScheme.secondary, // azulPro
+              foregroundColor: theme.colorScheme.onSecondary, // blancoNeutro
+              child: Text(
+                '${mc.weekNumber}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-            subtitle: Text('${m.weeks} semanas — Enfoque: ${m.focus}'),
-            children: m.microcycles.map((mc) {
-              // ListTile estilizado para las semanas
-              return Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: ListTile(
-                  tileColor: theme.colorScheme.background, // negroEnfocado
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  leading: CircleAvatar(
-                    backgroundColor: theme.colorScheme.secondary, // azulPro
-                    foregroundColor: theme.colorScheme.onSecondary, // blancoNeutro
-                    child: Text(
-                      '${mc.weekNumber}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  title: Text('Semana ${mc.weekNumber}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text('${mc.sessions.length} sesiones'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    _showWeekDetails(context, mc);
-                  },
-                ),
-              );
-            }).toList(),
+            title: Text('Semana ${mc.weekNumber}', style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text('${mc.sessions.length} sesiones'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              _showWeekDetails(context, mc);
+            },
           ),
         );
       },
     );
   }
 
-  // --- CAMBIO: Diseño del Modal de Sesiones ---
+
+  // --- Sin cambios en el Modal de Sesiones ---
   void _showWeekDetails(BuildContext context, Microcycle mc) {
     final theme = Theme.of(context);
     showModalBottomSheet(
@@ -399,30 +438,34 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                                 ),
                               ),
                               const SizedBox(height: 8),
+                              
+                              // --- CAMBIO: Lista de Ejercicios más dinámica ---
                               ...s.exercises.map(
                                 (e) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '• ',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: theme.colorScheme.primary, // voltNeon
-                                        ),
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: ListTile(
+                                    leading: Icon(
+                                      Icons.bolt, // Icono "Volt"
+                                      color: theme.colorScheme.primary, // voltNeon
+                                    ),
+                                    title: Text(
+                                      e.name,
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                      Expanded(
-                                        child: Text(
-                                          '${e.name} (${e.sets}x${e.reps} @ ${e.intensity})',
-                                          style: theme.textTheme.bodyMedium,
-                                        ),
+                                    ),
+                                    subtitle: Text(
+                                      '${e.sets}x${e.reps} @ ${e.intensity}',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: theme.colorScheme.onSurface.withOpacity(0.8),
                                       ),
-                                    ],
+                                    ),
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero, // Lo hace más compacto
                                   ),
                                 ),
                               ),
+                              // --- FIN DEL CAMBIO ---
                             ],
                           ),
                         ),
@@ -438,4 +481,5 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     );
   }
 }
+
 

@@ -100,13 +100,6 @@ class HomeScreen extends ConsumerWidget {
         // a una pantalla que muestre la lista de jugadores)
         route: '/user_management', 
       ),
-      _buildMenuCard(
-        context,
-        icon: Icons.list_alt,
-        title: 'Programas',
-        subtitle: 'Ver, crear y generar planes',
-        route: '/program',
-      ),
     ];
   }
 
