@@ -7,6 +7,7 @@ import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/player_event.dart';
 import 'package:voley_app/src/models/player_profile/form_peak.dart';
 
+
 class PlayerProfileScreen extends ConsumerWidget {
   const PlayerProfileScreen({super.key});
 

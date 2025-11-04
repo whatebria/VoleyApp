@@ -3,6 +3,7 @@ import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
 import 'package:voley_app/src/models/player_profile/form_peak.dart';
 import 'package:voley_app/src/models/player_profile/player_event.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PlayerProfile {
   final String id;
@@ -12,12 +13,14 @@ class PlayerProfile {
   final String level; // "recreativo", "competitivo", "semiprofesional"
   final List<String> goals;
   final List<String> injuries;
+  final List<String> chronicConditions;
   final Availability availability;
   final EvaluationResult evaluation;
   final List<Tournament> tournaments;
   final String? assignedCoachId; // UID del entrenador asignado
   final List<String> equipment; // Equipamiento disponible
   final int? age;
+  final DateTime? birthDate;
   final double? heightCm;
   final double? weightKg;
   final double? wingspanCm;
@@ -38,11 +41,13 @@ class PlayerProfile {
     this.assignedCoachId,
     this.equipment = const [],
     this.age,
+    this.birthDate,
     this.heightCm,
     this.weightKg,
     this.wingspanCm,
     this.keyEvents = const [],
     this.formPeaks = const [],
+    this.chronicConditions = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -52,13 +57,14 @@ class PlayerProfile {
         'position': position,
         'level': level,
         'goals': goals,
-        'injuries': injuries,
+        'injuries': injuries,'chronicConditions': chronicConditions,
         'availability': availability.toJson(),
         'evaluation': evaluation.toJson(),
         'tournaments': tournaments.map((t) => t.toJson()).toList(),
         'assignedCoachId': assignedCoachId,
         'equipment': equipment,
         'age': age,
+        'birthDate': birthDate != null ? Timestamp.fromDate(birthDate!) : null,
         'heightCm': heightCm,
         'weightKg': weightKg,
         'wingspanCm': wingspanCm,
@@ -74,6 +80,7 @@ class PlayerProfile {
         level: json['level'] as String? ?? 'recreativo',
         goals: List<String>.from(json['goals'] ?? []),
         injuries: List<String>.from(json['injuries'] ?? []),
+        chronicConditions: List<String>.from(json['chronicConditions'] ?? []),
         availability: Availability.fromJson(Map<String, dynamic>.from(json['availability'] ?? {})),
         evaluation: EvaluationResult.fromJson(Map<String, dynamic>.from(json['evaluation'] ?? {})),
         tournaments: (json['tournaments'] as List<dynamic>? ?? [])
@@ -82,6 +89,11 @@ class PlayerProfile {
         assignedCoachId: json['assignedCoachId'] as String?,
         equipment: List<String>.from(json['equipment'] ?? []),
         age: json['age'] as int?,
+        birthDate: json['birthDate'] == null
+            ? null
+            : json['birthDate'] is Timestamp
+                ? (json['birthDate'] as Timestamp).toDate()
+                : DateTime.tryParse(json['birthDate'].toString()),
         heightCm: (json['heightCm'] as num?)?.toDouble(),
         weightKg: (json['weightKg'] as num?)?.toDouble(),
         wingspanCm: (json['wingspanCm'] as num?)?.toDouble(),
@@ -102,11 +114,13 @@ class PlayerProfile {
     String? level,
     List<String>? goals,
     List<String>? injuries,
+    List<String>? chronicConditions,
     Availability? availability,
     EvaluationResult? evaluation,
     List<Tournament>? tournaments,
     List<String>? equipment,
     int? age,
+    DateTime? birthDate,
     double? heightCm,
     double? weightKg,
     double? wingspanCm,
@@ -114,7 +128,7 @@ class PlayerProfile {
     List<FormPeak>? formPeaks,
   }) {
     return PlayerProfile(
-      id: id ?? this.id,
+       id: id ?? this.id,
       userId: userId ?? this.userId,
       assignedCoachId: assignedCoachId ?? this.assignedCoachId,
       name: name ?? this.name,
@@ -122,11 +136,13 @@ class PlayerProfile {
       level: level ?? this.level,
       goals: goals ?? this.goals,
       injuries: injuries ?? this.injuries,
+      chronicConditions: chronicConditions ?? this.chronicConditions,
       availability: availability ?? this.availability,
       evaluation: evaluation ?? this.evaluation,
       tournaments: tournaments ?? this.tournaments,
       equipment: equipment ?? this.equipment,
       age: age ?? this.age,
+      birthDate: birthDate ?? this.birthDate,
       heightCm: heightCm ?? this.heightCm,
       weightKg: weightKg ?? this.weightKg,
       wingspanCm: wingspanCm ?? this.wingspanCm,

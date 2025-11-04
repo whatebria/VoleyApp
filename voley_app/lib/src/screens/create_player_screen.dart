@@ -7,7 +7,6 @@ import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
 import 'package:voley_app/src/models/player_profile/player_event.dart';
-import 'package:voley_app/src/models/player_profile/form_peak.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 
@@ -34,23 +33,34 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
   final nameCtrl = TextEditingController();
   final emailCtrl = TextEditingController();
   final passwordCtrl = TextEditingController();
-  final ageCtrl = TextEditingController();
+  DateTime? _birthDate;
   final heightCtrl = TextEditingController();
   final weightCtrl = TextEditingController();
-  final wingspanCtrl = TextEditingController();
-  final goalCtrl = TextEditingController();
   final uuid = Uuid();
 
   // Estado del formulario (Efímero, se queda en la UI)
   String selectedPosition = 'Central';
-  String selectedLevel = 'Competitivo';
   List<Tournament> _selectedTournaments = [];
   List<String> selectedInjuries = [];
+  List<String> _chronicConditions = [];
   List<String> selectedDays = [];
   List<String> _goals = [];
   Map<String, double> _testScores = {};
   List<PlayerEvent> _keyEvents = [];
-  List<FormPeak> _formPeaks = [];
+  final List<String> _presetGoals = const [
+    'Quiero ganar fuerza',
+    'Quiero saltar más',
+    'Quiero perder peso',
+    'Quiero ganar peso',
+    'Quiero mejorar mi resistencia',
+    'Quiero prevenir lesiones',
+  ];
+  final List<String> _presetChronicConditions = const [
+    'Asma',
+    'Diabetes',
+    'Hipertensión',
+    'Cardiopatía',
+  ];
   final List<String> _allDays = [
     'Lunes',
     'Martes',
@@ -68,6 +78,17 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
     '90+ minutos': 120,
   };
   int _selectedDurationMinutes = 60;
+
+  int? _calculateAge(DateTime? birthDate) {
+    if (birthDate == null) return null;
+    final today = DateTime.now();
+    int age = today.year - birthDate.year;
+    if (today.month < birthDate.month ||
+        (today.month == birthDate.month && today.day < birthDate.day)) {
+      age--;
+    }
+    return age;
+  }
 
   String _eventTypeLabel(String type) {
     switch (type) {
@@ -90,11 +111,8 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
     nameCtrl.dispose();
     emailCtrl.dispose();
     passwordCtrl.dispose();
-    ageCtrl.dispose();
     heightCtrl.dispose();
     weightCtrl.dispose();
-    wingspanCtrl.dispose();
-    goalCtrl.dispose();
     super.dispose();
   }
 
@@ -138,12 +156,6 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
         sessionMinutes: _selectedDurationMinutes,
       );
 
-      int? parseAge(String value) {
-        final trimmed = value.trim();
-        if (trimmed.isEmpty) return null;
-        return int.tryParse(trimmed);
-      }
-
       double? parseDouble(String value) {
         final trimmed = value.trim();
         if (trimmed.isEmpty) return null;
@@ -156,9 +168,10 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
         assignedCoachId: coachId,
         name: nameCtrl.text.trim(),
         position: selectedPosition,
-        level: selectedLevel.toLowerCase(),
+        level: 'personalizado',
         goals: _goals,
         injuries: selectedInjuries.contains('Ninguna') ? [] : selectedInjuries,
+        chronicConditions: _chronicConditions,
         availability: availability,
         evaluation: EvaluationResult(
           testScores: _testScores,
@@ -166,12 +179,11 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
           weaknesses: [],
         ),
         tournaments: _selectedTournaments,
-        age: parseAge(ageCtrl.text),
+        age: _calculateAge(_birthDate),
+        birthDate: _birthDate,
         heightCm: parseDouble(heightCtrl.text),
         weightKg: parseDouble(weightCtrl.text),
-        wingspanCm: parseDouble(wingspanCtrl.text),
         keyEvents: _keyEvents,
-        formPeaks: _formPeaks,
       );
 
       // 3. Guardar el Perfil
@@ -302,20 +314,38 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
     nameCtrl.dispose();
   }
 
-  Future<void> _showAddGoalDialog() async {
-    goalCtrl.clear();
+  Future<void> _selectBirthDate() async {
+    final now = DateTime.now();
+    final initialDate =
+        _birthDate ?? DateTime(now.year - 18, now.month, now.day);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(now.year - 70),
+      lastDate: DateTime(now.year - 8),
+      helpText: 'Seleccioná tu fecha de nacimiento',
+      cancelText: 'Cancelar',
+      confirmText: 'Listo',
+    );
+    if (picked != null) {
+      setState(() => _birthDate = picked);
+    }
+  }
+
+  Future<void> _promptCustomGoal() async {
+    final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Agregar Objetivo'),
+          title: const Text('Agregar objetivo personal'),
           content: TextField(
-            controller: goalCtrl,
+            controller: controller,
+            autofocus: true,
             decoration: const InputDecoration(
               labelText: 'Objetivo',
-              helperText: 'Ej: Mejorar salto vertical',
+              helperText: 'Ej: Recuperar mi confianza al atacar',
             ),
-            autofocus: true,
           ),
           actions: [
             TextButton(
@@ -325,11 +355,9 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                if (goalCtrl.text.trim().isNotEmpty) {
-                  Navigator.of(
-                    context,
-                    rootNavigator: true,
-                  ).pop(goalCtrl.text.trim());
+                final value = controller.text.trim();
+                if (value.isNotEmpty) {
+                  Navigator.of(context, rootNavigator: true).pop(value);
                 }
               },
               child: const Text('Guardar'),
@@ -339,9 +367,51 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
       },
     );
 
-    if (result != null) {
+    if (result != null && !_goals.contains(result)) {
       setState(() => _goals.add(result));
     }
+    controller.dispose();
+  }
+
+  Future<void> _promptCustomChronicCondition() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Agregar condición crónica'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Condición',
+              helperText: 'Ej: Tiroides, anemia, etc.',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).maybePop(),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final value = controller.text.trim();
+                if (value.isNotEmpty) {
+                  Navigator.of(context, rootNavigator: true).pop(value);
+                }
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null && !_chronicConditions.contains(result)) {
+      setState(() => _chronicConditions.add(result));
+    }
+    controller.dispose();
   }
 
   Future<void> _showAddTestDialog() async {
@@ -529,82 +599,6 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
     descriptionCtrl.dispose();
   }
 
-  Future<void> _showAddFormPeakDialog() async {
-    DateTime selectedDate = DateTime.now();
-    final noteCtrl = TextEditingController();
-
-    final result = await showDialog<FormPeak>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Registrar Pico de Forma'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.calendar_today),
-                    title: const Text('Fecha estimada'),
-                    subtitle: Text(
-                      DateFormat('dd/MM/yyyy').format(selectedDate),
-                    ),
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate,
-                        firstDate: DateTime.now().subtract(
-                          const Duration(days: 365),
-                        ),
-                        lastDate: DateTime.now().add(const Duration(days: 730)),
-                      );
-                      if (picked != null) {
-                        setDialogState(() => selectedDate = picked);
-                      }
-                    },
-                  ),
-                  TextField(
-                    controller: noteCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Nota (opcional)',
-                      helperText: 'Ej: Preparar pico para play-offs',
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () =>
-                      Navigator.of(context, rootNavigator: true).maybePop(),
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context, rootNavigator: true).pop(
-                      FormPeak(
-                        date: selectedDate,
-                        note: noteCtrl.text.trim().isEmpty
-                            ? null
-                            : noteCtrl.text.trim(),
-                      ),
-                    );
-                  },
-                  child: const Text('Guardar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (result != null) {
-      setState(() => _formPeaks.add(result));
-    }
-    noteCtrl.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -612,7 +606,7 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
     final isCreating = ref.watch(isCreatingPlayerProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Crear Nuevo Jugador')),
+      appBar: AppBar(title: const Text('Queremos conocerte')),
       body: coachUserAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) => Center(child: Text("Error al cargar usuario: $e")),
@@ -745,6 +739,10 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
 
   /// --- Paso 2 del Stepper: Perfil ---
   Step _buildStep2Perfil(ThemeData theme) {
+    final birthDateLabel = _birthDate != null
+        ? DateFormat('dd/MM/yyyy').format(_birthDate!)
+        : 'Selecciona tu fecha';
+    final age = _calculateAge(_birthDate);
     return Step(
       title: const Text('Perfil'),
       isActive: _currentStep >= 1,
@@ -752,11 +750,17 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
       content: Form(
         key: _step2Key,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              'Queremos conocerte mejor para personalizar tu experiencia.',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               value: selectedPosition,
               decoration: const InputDecoration(
-                labelText: 'Posición',
+                labelText: '¿Cuál es tu posición principal?',
                 prefixIcon: Icon(Icons.sports_volleyball),
               ),
               items: ['Central', 'Libero', 'Punta', 'Opuesto', 'Armadora']
@@ -767,47 +771,64 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                     ),
                   )
                   .toList(),
-              onChanged: (newValue) {
-                setState(() => selectedPosition = newValue!);
-              },
+              onChanged: (newValue) =>
+                  setState(() => selectedPosition = newValue!),
             ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: selectedLevel,
-              decoration: const InputDecoration(
-                labelText: 'Nivel',
-                prefixIcon: Icon(Icons.bar_chart),
-              ),
-              items: ['Competitivo', 'Recreativo']
-                  .map(
-                    (String value) => DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value),
+            const SizedBox(height: 16),
+            Text('Fecha de nacimiento', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: _selectBirthDate,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: theme.dividerColor),
+                  color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.cake_outlined),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            birthDateLabel,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: _birthDate == null
+                                  ? theme.hintColor
+                                  : theme.textTheme.bodyLarge?.color,
+                            ),
+                          ),
+                          Text(
+                            'Mostraremos tu edad automáticamente en la app.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.hintColor,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  )
-                  .toList(),
-              onChanged: (newValue) {
-                setState(() => selectedLevel = newValue!);
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: ageCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Edad',
-                prefixIcon: Icon(Icons.cake_outlined),
+                    if (age != null)
+                      Text(
+                        '$age años',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.calendar_today_outlined),
+                  ],
+                ),
               ),
-              keyboardType: TextInputType.number,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) return null;
-                final parsed = int.tryParse(value.trim());
-                if (parsed == null || parsed <= 0) {
-                  return 'Ingresa una edad válida';
-                }
-                return null;
-              },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
@@ -849,81 +870,70 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: wingspanCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Envergadura (cm)',
-                prefixIcon: Icon(Icons.swap_horiz_outlined),
-              ),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) return null;
-                return double.tryParse(value.replaceAll(',', '.')) == null
-                    ? 'Número inválido'
-                    : null;
-              },
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            const SizedBox(height: 24),
+            Text('Tus objetivos personales', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Text('Objetivos', style: theme.textTheme.titleSmall),
-                IconButton(
-                  tooltip: 'Agregar objetivo',
-                  onPressed: _showAddGoalDialog,
-                  icon: const Icon(Icons.add_circle_outline),
+                ..._presetGoals.map((goal) {
+                  final isSelected = _goals.contains(goal);
+                  return FilterChip(
+                    label: Text(goal),
+                    selected: isSelected,
+                    selectedColor: theme.colorScheme.primary,
+                    labelStyle: TextStyle(
+                      color: isSelected
+                          ? theme.colorScheme.onPrimary
+                          : theme.colorScheme.onSurface,
+                    ),
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          if (!_goals.contains(goal)) _goals.add(goal);
+                        } else {
+                          _goals.remove(goal);
+                        }
+                      });
+                    },
+                  );
+                }),
+                ..._goals
+                    .where((goal) => !_presetGoals.contains(goal))
+                    .map(
+                      (goal) => InputChip(
+                        label: Text(goal),
+                        onDeleted: () => setState(() => _goals.remove(goal)),
+                      ),
+                    ),
+                ActionChip(
+                  avatar: const Icon(Icons.add),
+                  label: const Text('Agregar otro objetivo'),
+                  onPressed: _promptCustomGoal,
                 ),
               ],
             ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: _goals.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.only(bottom: 8.0),
-                      child: Text(
-                        'Define objetivos concretos para el jugador.',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    )
-                  : Wrap(
-                      spacing: 8.0,
-                      runSpacing: 4.0,
-                      children: _goals
-                          .map(
-                            (goal) => Chip(
-                              label: Text(goal),
-                              deleteIcon: const Icon(Icons.cancel, size: 18),
-                              onDeleted: () =>
-                                  setState(() => _goals.remove(goal)),
-                            ),
-                          )
-                          .toList(),
-                    ),
-            ),
-            const Divider(height: 24),
+            const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Evaluación Inicial', style: theme.textTheme.titleSmall),
+                Text(
+                  'Tus números iniciales',
+                  style: theme.textTheme.titleSmall,
+                ),
                 IconButton(
-                  tooltip: 'Agregar test',
+                  tooltip: 'Registrar test',
                   onPressed: _showAddTestDialog,
                   icon: const Icon(Icons.add_chart),
                 ),
               ],
             ),
             if (_testScores.isEmpty)
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: 8.0),
-                  child: Text(
-                    'Añade resultados de tests físicos (opcional).',
-                    style: TextStyle(color: Colors.grey),
-                  ),
+              Text(
+                'Añade resultados de tests cuando los tengas disponibles (opcional).',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.hintColor,
                 ),
               )
             else
@@ -947,56 +957,84 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                     )
                     .toList(),
               ),
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Lesiones (opcional)',
-                style: theme.textTheme.titleSmall,
-              ),
-            ),
+            const SizedBox(height: 24),
+            Text('Historial de lesiones (opcional)', style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
-            // --- MEJORA DE DISEÑO: FilterChip con tema ---
-            Wrap(
+           Wrap(
               spacing: 8.0,
-              runSpacing: 4.0,
-              children:
-                  [
-                    'Rodilla',
-                    'Tobillo',
-                    'Hombro',
-                    'Espalda',
-                    'Muñeca',
-                    'Dedo',
-                    'Ninguna',
-                  ].map((injury) {
-                    final isSelected = selectedInjuries.contains(injury);
-                    return FilterChip(
-                      label: Text(injury),
-                      selected: isSelected,
-                      // --- MEJORA DE DISEÑO: Colores del tema ---
-                      selectedColor: theme.colorScheme.primary,
-                      labelStyle: TextStyle(
-                        color: isSelected
-                            ? theme.colorScheme.onPrimary
-                            : theme.colorScheme.onSurface,
-                      ),
-                      onSelected: (bool selected) {
-                        setState(() {
-                          if (injury == 'Ninguna') {
-                            selectedInjuries.clear();
-                            if (selected) selectedInjuries.add('Ninguna');
-                          } else {
-                            selectedInjuries.remove('Ninguna');
-                            if (selected)
-                              selectedInjuries.add(injury);
-                            else
-                              selectedInjuries.remove(injury);
+           runSpacing: 8.0,
+              children: [
+                ...['Rodilla', 'Tobillo', 'Hombro', 'Espalda', 'Muñeca', 'Dedo', 'Ninguna']
+                    .map((injury) {
+                  final isSelected = selectedInjuries.contains(injury);
+                  return FilterChip(
+                    label: Text(injury),
+                    selected: isSelected,
+                    selectedColor: theme.colorScheme.secondary,
+                    labelStyle: TextStyle(
+                      color: isSelected
+                          ? theme.colorScheme.onSecondary
+                          : theme.colorScheme.onSurface,
+                    ),
+                    onSelected: (selected) {
+                      setState(() {
+                        if (injury == 'Ninguna') {
+                          selectedInjuries.clear();
+                          if (selected) selectedInjuries.add('Ninguna');
+                        } else {
+                          selectedInjuries.remove('Ninguna');
+                          if (selected) {
+                            selectedInjuries.add(injury);
+                        } else {
+                          selectedInjuries.remove(injury);
                           }
-                        });
-                      },
-                    );
-                  }).toList(),
+                         }
+                      });
+                    },
+                  );
+                }).toList(),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Text('Enfermedades crónicas (opcional)', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ..._presetChronicConditions.map((condition) {
+                  final isSelected = _chronicConditions.contains(condition);
+                  return FilterChip(
+                    label: Text(condition),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          if (!_chronicConditions.contains(condition)) {
+                            _chronicConditions.add(condition);
+                          }
+                        } else {
+                          _chronicConditions.remove(condition);
+                        }
+                      });
+                    },
+                  );
+                }),
+                ..._chronicConditions
+                    .where((condition) => !_presetChronicConditions.contains(condition))
+                    .map(
+                      (condition) => InputChip(
+                        label: Text(condition),
+                        onDeleted: () =>
+                            setState(() => _chronicConditions.remove(condition)),
+                      ),
+                    ),
+                ActionChip(
+                  avatar: const Icon(Icons.add),
+                  label: const Text('Agregar condición'),
+                  onPressed: _promptCustomChronicCondition,
+                ),
+              ],
             ),
           ],
         ),
@@ -1007,7 +1045,7 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
   /// --- Paso 3 del Stepper: Disponibilidad ---
   Step _buildStep3Disponibilidad(ThemeData theme) {
     return Step(
-      title: const Text('Disponibilidad'),
+      title: const Text('Tu rutina'),
       isActive: _currentStep >= 2,
       content: Form(
         key: _step3Key,
@@ -1015,7 +1053,12 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Días de Entrenamiento (opcional)',
+              'Cuentanos cuándo te viene mejor entrenar.',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Días de entrenamiento (opcional)',
               style: theme.textTheme.titleSmall,
             ),
             Wrap(
@@ -1044,11 +1087,11 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                   )
                   .toList(),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             DropdownButtonFormField<int>(
               value: _selectedDurationMinutes,
               decoration: const InputDecoration(
-                labelText: 'Duración por Sesión',
+                labelText: 'Duración habitual por sesión',
                 prefixIcon: Icon(Icons.timer),
               ),
               items: _durationOptions.entries
@@ -1147,43 +1190,7 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                     )
                     .toList(),
               ),
-            const Divider(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Picos de Forma', style: theme.textTheme.titleSmall),
-                IconButton(
-                  icon: Icon(
-                    Icons.trending_up,
-                    color: theme.colorScheme.primary,
-                  ),
-                  tooltip: 'Añadir pico',
-                  onPressed: _showAddFormPeakDialog,
-                ),
-              ],
-            ),
-            if (_formPeaks.isEmpty)
-              const Text(
-                'Planifica los momentos de máximo rendimiento.',
-                style: TextStyle(color: Colors.grey),
-              )
-            else
-              Wrap(
-                spacing: 8.0,
-                runSpacing: 4.0,
-                children: _formPeaks
-                    .map(
-                      (peak) => Chip(
-                        label: Text(
-                          '${DateFormat('dd/MM/yy').format(peak.date)}${peak.note != null ? ' • ${peak.note}' : ''}',
-                        ),
-                        deleteIcon: const Icon(Icons.cancel, size: 18),
-                        onDeleted: () =>
-                            setState(() => _formPeaks.remove(peak)),
-                      ),
-                    )
-                    .toList(),
-              ),
+            
           ],
         ),
       ),
