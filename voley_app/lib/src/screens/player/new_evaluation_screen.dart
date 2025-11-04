@@ -105,7 +105,7 @@ class _NewEvaluationScreenState extends ConsumerState<NewEvaluationScreen> {
                   final score = double.tryParse(scoreController.text);
                   if (nameController.text.isNotEmpty && score != null) {
                     setState(() => _testScores[nameController.text] = score);
-                    Navigator.pop(context); // Cierra el bottom sheet
+                    Navigator.of(context, rootNavigator: true).maybePop(); // Cierra el bottom sheet
                   } else {
                     // Opcional: Mostrar error en el sheet
                   }

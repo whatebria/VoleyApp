@@ -694,7 +694,7 @@ class _PlayerEvaluationScreenState
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context);
+        Navigator.of(context, rootNavigator: true).maybePop();
       }
     } catch (e) {
       if (mounted) {

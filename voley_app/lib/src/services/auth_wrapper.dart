@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/providers/auth_provider.dart';
 import 'package:voley_app/src/auth/login_screen.dart';
-import 'package:voley_app/src/screens/program_view_screen.dart'; // Tu explorador de coach
+import 'package:voley_app/src/screens/program_explorer_screen.dart'; // Tu explorador de coach
 import 'package:voley_app/src/screens/player/player_calendar_screen.dart'; // La nueva pantalla de calendario
 
 class AuthWrapper extends ConsumerWidget {
@@ -45,7 +45,7 @@ class AuthWrapper extends ConsumerWidget {
             // 5. ¡AQUÍ ESTÁ LA LÓGICA DE ROL!
             if (appUser.isCoach) {
               // Si es Coach, va al explorador de programas
-              return const ProgramViewScreen();
+              return const ProgramExplorerScreen();
             } else {
               // Si es Jugador, carga su perfil y va al Calendario
               _loadPlayerProfile(ref, appUser.id);

@@ -156,7 +156,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
       await firestore.saveSessionLog(log);
       ref.invalidate(sessionLogHistoryProvider);
 
-      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.of(context, rootNavigator: true).maybePop();
     } catch (e) {
       _showError('Error al guardar: $e');
     } finally {

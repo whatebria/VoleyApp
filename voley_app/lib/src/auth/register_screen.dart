@@ -298,7 +298,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                       TextButton(
                         onPressed: () {
-                          Navigator.pop(context);
+                          Navigator.of(context, rootNavigator: true).maybePop();
                         },
                         // Estilo heredado del tema global
                         child: const Text('Inicia Sesión'),

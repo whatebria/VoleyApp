@@ -91,7 +91,7 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context);
+        Navigator.of(context, rootNavigator: true).maybePop();
       }
     } catch (e) {
       if (mounted) {
@@ -351,11 +351,11 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.of(context, rootNavigator: false).maybePop(),
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.of(context, rootNavigator: true).maybePop(),
               child: const Text('Aplicar'),
             ),
           ],

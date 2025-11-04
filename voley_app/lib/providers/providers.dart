@@ -2,6 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:voley_app/providers/auth_provider.dart';
+import 'package:voley_app/providers/program_editor_notifier.dart';
 import 'package:voley_app/providers/program_generator.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/bd/exercise.dart';
@@ -199,4 +200,8 @@ final isCreatingPlayerProvider = StateProvider<bool>((ref) => false);
 /// Provider que expone la lógica de negocio para crear programas.
 final programGeneratorProvider = Provider<ProgramGenerator>((ref) {
   return ProgramGenerator();
+});
+
+final programEditorProvider = StateNotifierProvider<ProgramEditorNotifier, Program?>((ref) {
+  return ProgramEditorNotifier(ref);
 });
