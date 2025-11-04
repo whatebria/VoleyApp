@@ -5,8 +5,11 @@ import 'package:voley_app/src/models/player_profile/form_peak.dart';
 import 'package:voley_app/src/models/player_profile/player_event.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
-import 'package:voley_app/theme/app_theme.dart'; 
+import 'package:voley_app/theme/app_theme.dart';
 
+// --- CAMBIO ---
+// Renombrado de 'CoachPlayerProfile' a 'CoachPlayerProfile' para
+// coincidir con la pantalla que 'user_management_screen.dart' espera.
 class CoachPlayerProfile extends StatelessWidget {
   final PlayerProfile profile;
 
@@ -25,6 +28,10 @@ class CoachPlayerProfile extends StatelessWidget {
         children: [
           // --- Sección de Cabecera ---
           _buildHeader(context),
+          const SizedBox(height: 24),
+
+          // --- CAMBIO: Botones de Acción ---
+          _buildActionButtons(context),
           const SizedBox(height: 24),
 
           // --- Sección de Biometría ---
@@ -119,6 +126,47 @@ class CoachPlayerProfile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  // --- CAMBIO: Nuevo Widget para los botones ---
+  Widget _buildActionButtons(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        // Botón 1: Ver/Editar Evaluación
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 50),
+            backgroundColor: theme.colorScheme.secondary, // azulPro
+            foregroundColor: theme.colorScheme.onSecondary, // blancoNeutro
+          ),
+          icon: const Icon(Icons.assessment_outlined),
+          label: const Text('Ver/Editar Evaluación'),
+          onPressed: () {
+            // Navega a la pantalla de evaluación.
+            // Esta pantalla debe leer 'explorerSelectedPlayerProvider'
+            // que ya fue asignado en la pantalla anterior.
+            Navigator.pushNamed(context, '/evaluation');
+          },
+        ),
+        const SizedBox(height: 12),
+        // Botón 2: Ver/Crear Programas
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 50),
+            // Este usará el estilo primario (voltNeon) por defecto
+          ),
+          icon: const Icon(Icons.list_alt_outlined),
+          label: const Text('Ver/Crear Programas'),
+          onPressed: () {
+            // Navega al hub de programas.
+            // Esta pantalla leerá 'explorerSelectedPlayerProvider'
+            // y mostrará los programas de este jugador.
+            Navigator.pushNamed(context, '/program');
+          },
+        ),
+      ],
     );
   }
 
@@ -294,6 +342,10 @@ class CoachPlayerProfile extends StatelessWidget {
         trailing: const Icon(Icons.arrow_forward_ios),
         onTap: () {
           // Navegar a la pantalla de detalle de NewEvaluationScreen o similar
+          // --- CAMBIO SUGERIDO ---
+          // Ya que el botón de arriba ya hace esto, podríamos
+          // simplemente llamar a la misma acción.
+          Navigator.pushNamed(context, '/evaluation');
         },
       ),
     );
@@ -327,7 +379,7 @@ class CoachPlayerProfile extends StatelessWidget {
     // TODO: Implementar la vista para la lista de Eventos Clave
     return Card(
       child: ListTile(
-        leading: Icon(Icons.calendar_month,
+        leading: Icon(Icons.calendar_month, // Corregido (no existe calendar_star_outlined)
             color: theme.colorScheme.secondary),
         title: const Text('Eventos Clave'),
         subtitle: Text(
@@ -359,3 +411,4 @@ class CoachPlayerProfile extends StatelessWidget {
     );
   }
 }
+

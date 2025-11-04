@@ -1,9 +1,11 @@
-// lib/screens/new_evaluation_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
+// Importamos los modelos necesarios para crear un perfil por defecto
+import 'package:voley_app/src/models/player_profile/availability.dart';
+import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
 
 class NewEvaluationScreen extends ConsumerStatefulWidget {
   const NewEvaluationScreen({super.key});
@@ -17,70 +19,102 @@ class _NewEvaluationScreenState extends ConsumerState<NewEvaluationScreen> {
   Map<String, double> _testScores = {};
   List<Tournament> _selectedTournaments = [];
   PlayerProfile? _currentLoadedProfile;
-  bool _isLoadingProfile = false;
+  bool _isLoadingProfile = true; // Empezamos cargando por defecto
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Comprobación inicial
+    _checkInitialProfile();
+  }
+
+  /// Comprueba el perfil al cargar la pantalla
+  void _checkInitialProfile() {
+    // Usamos 'read' aquí porque es una acción de una sola vez en initState
+    final profile = ref.read(selectedPlayerProfileProvider);
+    _loadProfileData(profile);
+  }
 
   /// Carga el perfil del jugador y sus tests/torneos al estado local
   void _loadProfileData(PlayerProfile? profile) {
-    if (profile == null) {
-      setState(() {
+    if (!mounted) return;
+
+    setState(() {
+      _currentLoadedProfile = profile;
+      if (profile == null) {
         _testScores = {};
         _selectedTournaments = [];
-      });
-    } else {
-      // Usamos el perfil cargado para inicializar el estado local
-      setState(() {
-        // Hacemos copias defensivas de los Mapas y Listas
+      } else {
         _testScores = Map.from(profile.evaluation.testScores);
         _selectedTournaments = List.from(profile.tournaments);
-      });
-    }
+      }
+      _isLoadingProfile = false; // Terminamos de cargar/sincronizar
+    });
   }
 
-  /// Muestra el diálogo para añadir una puntuación de test (Sin cambios funcionales)
-  Future<void> _showAddTestDialog() async {
+  /// [NUEVO DISEÑO] Muestra un BottomSheet para añadir un test
+  Future<void> _showAddTestBottomSheet() async {
+    final theme = Theme.of(context);
     final nameController = TextEditingController();
     final scoreController = TextEditingController();
-    await showDialog(
+
+    await showModalBottomSheet(
       context: context,
+      isScrollControlled: true, // Para que el teclado no tape el sheet
+      backgroundColor: theme.colorScheme.surface, // grisPro
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Añadir Puntuación de Test'),
-          content: Column(
+        return Padding(
+          // Padding para el teclado
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 24,
+            right: 24,
+            top: 24,
+          ),
+          child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Text(
+                'Añadir Nuevo Test',
+                style: theme.textTheme.headlineMedium
+                    ?.copyWith(color: theme.colorScheme.primary), // voltNeon
+              ),
+              const SizedBox(height: 24),
               TextField(
                 controller: nameController,
                 decoration: const InputDecoration(labelText: 'Nombre del Test'),
                 autofocus: true,
               ),
+              const SizedBox(height: 16),
               TextField(
                 controller: scoreController,
                 decoration: const InputDecoration(
-                  labelText: 'Puntuación (Ej: 55.5)',
-                ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+                    labelText: 'Puntuación (Ej: 55.5)'),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
               ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                // Usa el estilo 'voltNeon' por defecto del tema
+                onPressed: () {
+                  final score = double.tryParse(scoreController.text);
+                  if (nameController.text.isNotEmpty && score != null) {
+                    setState(() => _testScores[nameController.text] = score);
+                    Navigator.pop(context); // Cierra el bottom sheet
+                  } else {
+                    // Opcional: Mostrar error en el sheet
+                  }
+                },
+                child: const Text('Guardar Test'),
+              ),
+              const SizedBox(height: 24), // Espacio inferior
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(context, rootNavigator: true).maybePop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final score = double.tryParse(scoreController.text);
-                if (nameController.text.isNotEmpty && score != null) {
-                  setState(() => _testScores[nameController.text] = score);
-                  Navigator.of(context, rootNavigator: true).maybePop();
-                }
-              },
-              child: const Text('Añadir'),
-            ),
-          ],
         );
       },
     );
@@ -94,45 +128,77 @@ class _NewEvaluationScreenState extends ConsumerState<NewEvaluationScreen> {
     }
   }
 
-  /// [REFACTOR] Envía la actualización del perfil
-  Future<void> _handleSubmit(PlayerProfile profileToEdit) async {
-    final selectedPlayer = ref.read(explorerSelectedPlayerProvider);
+  /// [REFACTOR] Envía la actualización (o creación) del perfil
+  Future<void> _handleSubmit() async {
+    final selectedPlayerCombo = ref.read(explorerSelectedPlayerProvider);
+    
+    // Debería ser imposible llegar aquí sin un jugador, pero comprobamos
+    if (selectedPlayerCombo == null) {
+      _showError("Error fatal: No hay ningún jugador seleccionado.");
+      return;
+    }
 
-    // Usaremos el provider de carga para el botón
-    // No necesitamos _isSubmitting local, pero lo mantengo por simplicidad visual
-    // en este widget.
     setState(() => _isSubmitting = true);
 
     try {
-      // Crea una copia actualizada del perfil
-      final updatedProfile = profileToEdit.copyWith(
-        evaluation: profileToEdit.evaluation.copyWith(testScores: _testScores),
-        tournaments: _selectedTournaments,
-      );
+      final PlayerProfile profileToSave;
+      final player = selectedPlayerCombo.player;
 
+      if (_currentLoadedProfile == null) {
+        // --- MODO CREACIÓN ---
+        // Creamos un perfil nuevo con los datos mínimos
+        profileToSave = PlayerProfile(
+          id: player.id, // Asumimos que el ID del perfil es el UID del jugador
+          userId: player.id,
+          name: player.name,
+          position: 'Sin definir',
+          level: 'recreativo',
+          goals: [],
+          injuries: [],
+          // Rellenamos con valores por defecto
+          availability: Availability(trainingDays: [], sessionMinutes: 0), 
+          evaluation: EvaluationResult(
+            testScores: _testScores, // Las puntuaciones que acabamos de añadir
+            strengths: [],
+            weaknesses: []
+          ),
+          tournaments: _selectedTournaments,
+          equipment: [],
+          keyEvents: [],
+          formPeaks: [],
+        );
+      } else {
+        // --- MODO EDICIÓN ---
+        // Actualizamos solo los campos que esta pantalla maneja
+        profileToSave = _currentLoadedProfile!.copyWith(
+          evaluation: _currentLoadedProfile!.evaluation.copyWith(
+            testScores: _testScores,
+          ),
+          tournaments: _selectedTournaments,
+        );
+      }
+
+      // Guardamos en la base de datos
       final firestore = ref.read(firestoreProvider);
-      await firestore.savePlayerProfile(updatedProfile);
+      await firestore.savePlayerProfile(profileToSave);
 
-      // --- [CORRECCIÓN CRÍTICA] INVALIDACIÓN DE PROVIDERS ---
-      // 1. Invalidar el perfil del jugador seleccionado para que la app sepa que cambió.
+      // Invalidamos los providers para que toda la app se actualice
       ref.invalidate(selectedPlayerProfileProvider);
-
-      // 2. Invalidar la lista de jugadores con perfiles (si este cambio afecta, ej. el perfil se crea por primera vez)
-      // Aunque en este caso solo editamos, una invalidación es más segura.
       ref.invalidate(coachPlayersWithProfilesProvider);
-      // ----------------------------------------------------
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Evaluación actualizada'),
+            content: Text('Evaluación guardada con éxito'),
             backgroundColor: Colors.green,
           ),
         );
+        // Opcional: navegar atrás después de guardar
+        Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        _showError('Error al actualizar: $e');
+        _showError('Error al guardar: $e');
       }
     } finally {
       if (mounted) {
@@ -141,183 +207,169 @@ class _NewEvaluationScreenState extends ConsumerState<NewEvaluationScreen> {
     }
   }
 
-  // Bandera local de carga del botón (lo mantengo para tu lógica de UI)
-  bool _isSubmitting = false;
-
   @override
   Widget build(BuildContext context) {
-    // [REFACTOR] Observar los providers del explorador (que ya son reactivos)
-    final playersWithProfilesAsync = ref.watch(
-      coachPlayersWithProfilesProvider,
-    );
-    final selectedPlayerWithProfile = ref.watch(explorerSelectedPlayerProvider);
-
-    final profileFromProvider = ref.watch(selectedPlayerProfileProvider);
-
     final theme = Theme.of(context);
 
-    // --- [REFACTOR] Lógica de Sincronización de Estado ---
-    // Sincroniza el estado local del formulario (_testScores) con el perfil
-    // cargado desde el provider global. Esto solo se hace UNA VEZ
-    // cuando el perfil cambia y se resuelve.
+    // --- [REFACTOR] Lógica de Sincronización ---
+    // Escuchamos el provider global. Si cambia (ej: por un 'invalidate'),
+    // volvemos a cargar los datos en nuestro estado local.
     ref.listen<PlayerProfile?>(selectedPlayerProfileProvider, (_, nextProfile) {
-      setState(() {
-        _isLoadingProfile = false; // El valor ya se resolvió/actualizó
-        _currentLoadedProfile = nextProfile;
-      });
       _loadProfileData(nextProfile);
     });
 
-    ref.listen<PlayerWithProfile?>(explorerSelectedPlayerProvider, (
-      prev,
-      next,
-    ) {
-      // Si seleccionamos un jugador, ponemos el indicador de carga mientras
-      // esperamos que selectedPlayerProfileProvider se actualice.
-      if (next != null) {
-        setState(() {
-          _isLoadingProfile = true;
-        });
-      }
-    });
-
-    // Extraer el perfil actual para el formulario
-    final profileToEdit = _currentLoadedProfile;
+    // Leemos el jugador seleccionado (sabemos que no es nulo si llegamos aquí)
+    final selectedPlayerCombo = ref.watch(explorerSelectedPlayerProvider);
+    final playerName = selectedPlayerCombo?.player.name ?? 'Jugador';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Registrar Nueva Evaluación')),
+      appBar: AppBar(title: const Text('Gestión de Evaluación')),
       body: Stack(
         children: [
-          playersWithProfilesAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, s) =>
-                Center(child: Text('Error al cargar jugadores: $e')),
-            data: (playersWithProfiles) {
-              return SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // 1. Selector de Jugador
-                    // [REFACTOR] Usamos PlayerWithProfile para el Dropdown
-                    DropdownButtonFormField<PlayerWithProfile>(
-                      initialValue: selectedPlayerWithProfile,
-                      decoration: const InputDecoration(
-                        labelText: 'Seleccionar Jugador',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: playersWithProfiles
-                          .map(
-                            (combo) => DropdownMenuItem(
-                              value: combo,
-                              child: Text(combo.player.name),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (combo) {
-                        // [CORREGIDO] Almacenamos el PlayerWithProfile completo
-                        ref
-                                .read(explorerSelectedPlayerProvider.notifier)
-                                .state =
-                            combo;
-                      },
-                    ),
-                    const SizedBox(height: 24),
+          // --- [REFACTOR] Contenido principal ---
+          // Ya no usamos .when() aquí, el 'ref.listen' maneja la carga
+          // y `_isLoadingProfile` nos dice si estamos listos.
+          if (_isLoadingProfile)
+            const Center(child: CircularProgressIndicator())
+          else if (selectedPlayerCombo == null)
+            const Center(
+              child: Text('Por favor, selecciona un jugador primero.'),
+            )
+          else
+            // [NUEVO WIDGET] El formulario real
+            _buildEvaluationForm(context, theme, playerName),
 
-                    // 2. Contenido del Formulario (Solo si hay un jugador seleccionado)
-                    if (selectedPlayerWithProfile != null) ...[
-                      // 2.A. Indicador de carga del perfil
-                      if (_isLoadingProfile) // Usamos el flag local
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: CircularProgressIndicator(),
-                          ),
-                        )
-                      else if (profileToEdit == null)
-                        const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Text(
-                            'El jugador aún no tiene un perfil. Creando uno nuevo al guardar.',
-                          ),
-                        )
-                      else ...[
-                        // 2.B. Sección de Tests (Editable)
-                        Text(
-                          'Puntuaciones de Test',
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        const Divider(),
-                        if (_testScores.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8.0),
-                            child: Text(
-                              'Añade tests...',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ),
-                        ..._testScores.entries.map(
-                          (entry) => ListTile(
-                            title: Text(entry.key),
-                            trailing: Text(
-                              entry.value.toStringAsFixed(2),
-                            ), // Mejor formateo
-                            // Lógica de onTap simplificada
-                            onTap: _showAddTestDialog,
-                            // Añade botón de eliminar
-                            leading: IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () {
-                                setState(() => _testScores.remove(entry.key));
-                              },
-                            ),
-                          ),
-                        ),
-                        Center(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.add_circle_outline),
-                            label: const Text('Añadir Test'),
-                            onPressed: _showAddTestDialog,
-                          ),
-                        ),
-
-                        const SizedBox(height: 32),
-
-                        // 2.C. Botón de Enviar
-                        ElevatedButton(
-                          // Pasamos el perfil cargado o el perfil por defecto para el guardado
-                          onPressed: _isSubmitting
-                              ? null
-                              : () => _handleSubmit(profileToEdit),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: _isSubmitting
-                              ? const Text('Guardando...')
-                              : const Text('Actualizar Evaluación'),
-                        ),
-                      ],
-                    ] else
-                      const Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Text(
-                          'Selecciona un jugador para comenzar la evaluación.',
-                          style: TextStyle(fontStyle: FontStyle.italic),
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            },
-          ),
-          // Indicador de carga de superposición (solo si no hay indicador interno)
-          if (_isSubmitting && selectedPlayerWithProfile == null)
+          // --- Overlay de Carga ---
+          if (_isSubmitting)
             Container(
-              color: Colors.black.withOpacity(0.3),
+              color: Colors.black.withOpacity(0.5),
               child: const Center(child: CircularProgressIndicator()),
             ),
         ],
       ),
+    );
+  }
+
+  /// [NUEVO WIDGET] Construye solo el formulario
+  Widget _buildEvaluationForm(BuildContext context, ThemeData theme, String playerName) {
+    final isCreating = (_currentLoadedProfile == null);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 1. Título
+          Text(
+            isCreating ? 'Creando Evaluación para' : 'Editando Evaluación de',
+            style: theme.textTheme.headlineMedium,
+          ),
+          Text(
+            playerName,
+            style: theme.textTheme.headlineMedium
+                ?.copyWith(color: theme.colorScheme.primary), // voltNeon
+          ),
+          if (isCreating)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text(
+                'Este jugador aún no tiene perfil. Al guardar, se creará uno nuevo con estos datos.',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.7)),
+              ),
+            ),
+          const SizedBox(height: 24),
+
+          // 2. Sección de Tests (Editable)
+          Text(
+            'Puntuaciones de Test',
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: theme.colorScheme.secondary, // azulPro
+              fontWeight: FontWeight.bold
+            ),
+          ),
+          const Divider(),
+          const SizedBox(height: 8),
+
+          // [NUEVO DISEÑO] Lista de Chips
+          _buildTestList(context),
+          const SizedBox(height: 16),
+
+          // [NUEVO DISEÑO] Botón de añadir
+          Center(
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.add_circle_outline),
+              label: const Text('Añadir Test'),
+              onPressed: _showAddTestBottomSheet,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: theme.colorScheme.onSurface.withOpacity(0.8)
+              ),
+            ),
+          ),
+
+          // TODO: Añadir la lógica para _selectedTournaments si es necesario
+          // ... (puedes seguir el mismo patrón que los tests)
+
+          const SizedBox(height: 32),
+
+          // 3. Botón de Enviar
+          ElevatedButton(
+            onPressed: _isSubmitting ? null : _handleSubmit,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: _isSubmitting
+                ? const CircularProgressIndicator(strokeWidth: 2)
+                : Text(
+                    isCreating ? 'Crear y Guardar' : 'Actualizar Evaluación',
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// [NUEVO WIDGET] Construye la lista de tests como Chips
+  Widget _buildTestList(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (_testScores.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Center(
+          child: Text(
+            'No hay tests registrados.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontStyle: FontStyle.italic,
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // [NUEVO DISEÑO]
+    return Wrap(
+      spacing: 8.0, // Espacio horizontal entre chips
+      runSpacing: 8.0, // Espacio vertical entre filas
+      children: _testScores.entries.map((entry) {
+        return Chip(
+          backgroundColor: theme.colorScheme.secondary.withOpacity(0.8), // azulPro
+          label: Text(
+            '${entry.key}: ${entry.value.toStringAsFixed(1)}',
+            style: TextStyle(
+              color: theme.colorScheme.onSecondary, // blancoNeutro
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          onDeleted: () {
+            setState(() => _testScores.remove(entry.key));
+          },
+          deleteIcon: const Icon(Icons.close, size: 18),
+          deleteIconColor: theme.colorScheme.onSecondary.withOpacity(0.8),
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
+        );
+      }).toList(),
     );
   }
 }

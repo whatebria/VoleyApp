@@ -1,4 +1,3 @@
-// lib/screens/program_view_screen.dart (AHORA SÍ, CORREGIDO)
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
@@ -7,6 +6,8 @@ import 'package:voley_app/src/models/program/microcicle.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:intl/intl.dart';
 import 'package:voley_app/src/screens/manual_program_create_screen.dart';
+// Asumo que PlayerWithProfile se define en providers.dart o un modelo importado por él
+// (basado en la lógica de _initializePlayerSelection)
 
 class ProgramViewScreen extends ConsumerStatefulWidget {
   const ProgramViewScreen({Key? key}) : super(key: key);
@@ -20,50 +21,38 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
   @override
   void initState() {
     super.initState();
-    // --- CAMBIO ---
-    // Ejecuta la lógica de inicialización DESPUÉS de que el primer frame se construya.
-    // Esto evita el error "setState() or markNeedsBuild() called during build".
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializePlayerSelection();
     });
   }
 
-  // --- CAMBIO ---
-  // Nueva función para manejar la selección inicial de jugador.
-  // Usamos ref.read() porque esto se ejecuta como una acción, no en el build.
   void _initializePlayerSelection() {
-    // Solo actuamos si el widget sigue "montado"
     if (!mounted) return;
 
     final currentUser = ref.read(currentUserAppUserProvider).valueOrNull;
     if (currentUser == null) {
-      return; // Aún no hay usuario, no podemos hacer nada.
+      return; 
     }
 
     final selectedPlayerCombo = ref.read(explorerSelectedPlayerProvider);
     
-    // Si ya hay un jugador seleccionado, no hacemos nada.
     if (selectedPlayerCombo != null) {
       return;
     }
 
-    // Lógica para el Coach
     if (currentUser.isCoach) {
       final playersAsync = ref.read(coachPlayersWithProfilesProvider);
       
       playersAsync.whenData((players) {
         if (players.isNotEmpty) {
-          // Asignamos el primer jugador de la lista
           ref.read(explorerSelectedPlayerProvider.notifier).state = players.first;
         }
       });
 
-    // Lógica para el Jugador
     } else if (currentUser.isPlayer) {
       final playerProfile = ref.read(playerProfileProvider).valueOrNull;
 
       if (playerProfile != null) {
-        // Creamos el "combo" del jugador actual y lo asignamos
         final playerCombo = PlayerWithProfile(
           currentUser,
           playerProfile,
@@ -73,77 +62,9 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     }
   }
 
-
-  void _showGenerationChoice(BuildContext context, PlayerProfile profile) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        final theme = Theme.of(context);
-        return SafeArea(
-          child: Wrap(
-            children: <Widget>[
-              ListTile(
-                leading: Icon(
-                  Icons.auto_awesome,
-                  color: theme.colorScheme.primary,
-                ),
-                title: const Text('Generar Programa Automático (IA)'),
-                subtitle: const Text('Crear un programa basado en el perfil.'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _runAutomaticGenerator(context, profile);
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.edit, color: theme.colorScheme.secondary),
-                title: const Text('Crear Programa Manual'),
-                subtitle: const Text('Construir el programa paso a paso.'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _runManualEditor(context, profile);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _runAutomaticGenerator(
-    BuildContext context,
-    PlayerProfile profile,
-  ) async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    
-    ref.read(isGeneratingProgramProvider.notifier).state = true;
-
-    try {
-      await ref.read(programGeneratorAction)(profile);
-
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(
-            content: Text('¡Programa automático generado!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text('Error al generar: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        ref.read(isGeneratingProgramProvider.notifier).state = false;
-      }
-    }
-  }
+  // --- CAMBIO ---
+  // La función _showGenerationChoice y _runAutomaticGenerator han sido eliminadas
+  // ya que el FAB ahora solo tiene una acción.
 
   void _runManualEditor(BuildContext context, PlayerProfile profile) {
     Navigator.push(
@@ -179,67 +100,25 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
       }
     });
 
-    final currentUserAsync = ref.watch(currentUserAppUserProvider);
-    final playersWithProfilesAsync = ref.watch(
-      coachPlayersWithProfilesProvider,
-    );
-
     final selectedPlayerCombo = ref.watch(explorerSelectedPlayerProvider);
     
-    // --- CAMBIO CRÍTICO ---
-    // Este provider SÍ es un AsyncValue
-    final selectedProfileAsync = ref.watch(selectedPlayerProfileProvider);
+    // Observamos el perfil, que es un PlayerProfile? (no un AsyncValue)
+    final selectedProfile = ref.watch(selectedPlayerProfileProvider);
     
     final programsAsync = ref.watch(explorerProgramsProvider);
     final selectedProgram = ref.watch(explorerSelectedProgramProvider);
-    final isGenerating = ref.watch(isGeneratingProgramProvider);
-
+    
+    // --- CAMBIO ---
+    // 'isGenerating' y el 'Stack' han sido eliminados.
+    
     return Scaffold(
       appBar: AppBar(title: const Text('Explorador de Programas')),
-      body: Stack(
-        children: [
-          currentUserAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, s) => Center(child: Text('Error al cargar usuario: $e')),
-            data: (currentUser) {
-              if (currentUser == null) {
-                return const Center(child: Text('Usuario no encontrado.'));
-              }
-
-              // --- CAMBIO ---
-              // La lógica de inicialización de selección de jugador
-              // se ha movido a initState().
-              // El build() ahora solo se dedica a construir.
-
-              return Column(
+      body: selectedPlayerCombo == null
+            // Muestra un cargador mientras 'initState' y '_initializePlayerSelection'
+            // seleccionan al jugador inicial.
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
                 children: [
-                  // --- Dropdown de Jugadores (Solo para Coaches) ---
-                  if (currentUser.isCoach)
-                    playersWithProfilesAsync.when(
-                      loading: () => const Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                      error: (e, s) => Center(child: Text('Error: $e')),
-                      data: (playersCombos) {
-                        if (playersCombos.isEmpty) {
-                          return const Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: Center(
-                              child: Text('No tienes jugadores vinculados.'),
-                            ),
-                          );
-                        }
-                        return _buildPlayerSelector(
-                          ref,
-                          playersCombos,
-                          selectedPlayerCombo,
-                        );
-                      },
-                    ),
-
                   // --- Dropdown de Programas ---
                   programsAsync.when(
                     loading: () => const Padding(
@@ -281,49 +160,20 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                             : _buildProgramDetails(selectedProgram),
                   ),
                 ],
-              );
-            },
-          ),
-
-          // --- Overlay de Carga No-Modal ---
-          if (isGenerating)
-            Container(
-              color: Colors.black.withOpacity(0.5),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Generando programa (IA)...',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyLarge?.copyWith(color: Colors.white),
-                    ),
-                  ],
-                ),
               ),
-            ),
-        ],
-      ),
 
       floatingActionButton: FloatingActionButton(
-        tooltip: 'Crear Programa',
-        child: const Icon(Icons.add),
-        onPressed: isGenerating
-            ? null
-            : () {
-                // --- CAMBIO CRÍTICO ---
-                // 1. Obtenemos el VALOR del AsyncValue
-                final profile = selectedProfileAsync;
+        tooltip: 'Crear Programa Manual',
+        child: const Icon(Icons.edit), // Icono cambiado a 'edit'
+        // --- CAMBIO ---
+        // 'onPressed' ahora llama directamente a _runManualEditor
+        onPressed: () {
+                // Usamos el perfil (PlayerProfile?) que ya observamos
+                final profile = selectedProfile;
 
-                // 2. Comprobamos si el valor (PlayerProfile) es nulo
                 if (profile != null) {
-                  // Ahora 'profile' SÍ es un PlayerProfile
-                  _showGenerationChoice(context, profile);
+                  // 'profile' es un PlayerProfile
+                  _runManualEditor(context, profile);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -334,40 +184,6 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                   );
                 }
               },
-      ),
-    );
-  }
-
-  // --- WIDGETS AUXILIARES (Sin cambios) ---
-
-  Widget _buildPlayerSelector(
-    WidgetRef ref,
-    List<PlayerWithProfile> playersCombos,
-    PlayerWithProfile? selectedPlayerCombo,
-  ) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-      child: DropdownButtonFormField<PlayerWithProfile>(
-        value: selectedPlayerCombo,
-        isExpanded: true,
-        decoration: InputDecoration(
-          labelText: 'Seleccionar Jugador',
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          filled: true,
-          fillColor: theme.colorScheme.surface,
-        ),
-        items: playersCombos.map((combo) {
-          return DropdownMenuItem<PlayerWithProfile>(
-            value: combo,
-            child: Text(combo.player.name, overflow: TextOverflow.ellipsis),
-          );
-        }).toList(),
-        onChanged: (PlayerWithProfile? newValue) {
-          ref.read(explorerSelectedPlayerProvider.notifier).state = newValue;
-          ref.read(explorerSelectedProgramProvider.notifier).state = null;
-        },
       ),
     );
   }
@@ -402,9 +218,7 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
         isExpanded: true,
         decoration: InputDecoration(
           labelText: 'Seleccionar Programa',
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          filled: true,
-          fillColor: theme.colorScheme.surface,
+          // Usamos el estilo del tema
         ),
         items: programs.map((program) {
           return DropdownMenuItem<Program>(
@@ -422,6 +236,7 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     );
   }
 
+  // --- CAMBIO: Diseño de la lista de Mesociclos ---
   Widget _buildProgramDetails(Program program) {
     final theme = Theme.of(context);
     return ListView.builder(
@@ -429,38 +244,53 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
       itemCount: program.mesocycles.length,
       itemBuilder: (context, i) {
         final m = program.mesocycles[i];
-        return Card(
-          color: theme.colorScheme.surface,
-          surfaceTintColor: theme.colorScheme.surface,
-          margin: const EdgeInsets.only(bottom: 12),
-          elevation: 2,
+        // Reemplazamos Card por un ExpansionTile estilizado
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
           child: ExpansionTile(
+            // Estilo Moderno
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            backgroundColor: theme.colorScheme.surface, // grisPro
+            collapsedBackgroundColor: theme.colorScheme.surface, // grisPro
+            childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            clipBehavior: Clip.antiAlias,
+            // fin de Estilo
+            
             title: Text(
               m.name,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: theme.colorScheme.primary,
+                color: theme.colorScheme.primary, // voltNeon
+                fontSize: 18
               ),
             ),
             subtitle: Text('${m.weeks} semanas — Enfoque: ${m.focus}'),
             children: m.microcycles.map((mc) {
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: theme.colorScheme.secondary,
-                  child: Text(
-                    '${mc.weekNumber}',
-                    style: TextStyle(
-                      color: theme.colorScheme.onSecondary,
-                      fontSize: 12,
+              // ListTile estilizado para las semanas
+              return Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: ListTile(
+                  tileColor: theme.colorScheme.background, // negroEnfocado
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  leading: CircleAvatar(
+                    backgroundColor: theme.colorScheme.secondary, // azulPro
+                    foregroundColor: theme.colorScheme.onSecondary, // blancoNeutro
+                    child: Text(
+                      '${mc.weekNumber}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
+                  title: Text('Semana ${mc.weekNumber}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text('${mc.sessions.length} sesiones'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () {
+                    _showWeekDetails(context, mc);
+                  },
                 ),
-                title: Text('Semana ${mc.weekNumber}'),
-                subtitle: Text('${mc.sessions.length} sesiones'),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () {
-                  _showWeekDetails(context, mc);
-                },
               );
             }).toList(),
           ),
@@ -469,12 +299,13 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     );
   }
 
+  // --- CAMBIO: Diseño del Modal de Sesiones ---
   void _showWeekDetails(BuildContext context, Microcycle mc) {
     final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: theme.colorScheme.surface, // grisPro
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -487,22 +318,15 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
           builder: (context, scrollController) {
             return Column(
               children: [
+                // Header del Modal
                 Container(
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.secondaryContainer.withOpacity(
-                      0.3,
-                    ),
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
                         Icons.calendar_today,
-                        color: theme.colorScheme.secondary,
+                        color: theme.colorScheme.primary, // voltNeon
                       ),
                       const SizedBox(width: 12),
                       Text(
@@ -517,14 +341,19 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                 Expanded(
                   child: ListView.builder(
                     controller: scrollController,
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     itemCount: mc.sessions.length,
                     itemBuilder: (context, index) {
                       final s = mc.sessions[index];
+                      // Card de Sesión Estilizada
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
-                        color: theme.colorScheme.surfaceVariant.withOpacity(
-                          0.3,
+                        color: theme.colorScheme.background, // negroEnfocado
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: theme.colorScheme.surface, // Borde grisPro
+                            )
                         ),
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
@@ -535,7 +364,7 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                                 children: [
                                   Icon(
                                     Icons.fitness_center,
-                                    color: theme.colorScheme.primary,
+                                    color: theme.colorScheme.secondary, // azulPro
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
@@ -554,6 +383,7 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                                 'Objetivo: ${s.objective}',
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   fontStyle: FontStyle.italic,
+                                  color: theme.colorScheme.onSurface.withOpacity(0.7)
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -561,7 +391,7 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                                 'Carga: ${s.load}',
                                 style: theme.textTheme.bodyMedium,
                               ),
-                              const Divider(height: 16),
+                              const Divider(height: 24),
                               Text(
                                 'Ejercicios:',
                                 style: theme.textTheme.titleMedium?.copyWith(
@@ -580,12 +410,13 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
                                         '• ',
                                         style: TextStyle(
                                           fontSize: 16,
-                                          color: theme.colorScheme.primary,
+                                          color: theme.colorScheme.primary, // voltNeon
                                         ),
                                       ),
                                       Expanded(
                                         child: Text(
                                           '${e.name} (${e.sets}x${e.reps} @ ${e.intensity})',
+                                          style: theme.textTheme.bodyMedium,
                                         ),
                                       ),
                                     ],
@@ -607,3 +438,4 @@ class _ProgramViewScreenState extends ConsumerState<ProgramViewScreen> {
     );
   }
 }
+

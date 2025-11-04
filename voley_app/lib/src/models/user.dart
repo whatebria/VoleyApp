@@ -2,9 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum UserRole {
   coach,
-
   player;
-
   String toJson() => name;
 
   static UserRole fromJson(String json) {
@@ -18,7 +16,6 @@ enum UserRole {
 
 class User {
   final String id;
-
   final String email;
 
   final String name;
