@@ -20,7 +20,8 @@ class PlayerEvaluationScreen extends ConsumerStatefulWidget {
       _PlayerEvaluationScreenState();
 }
 
-class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen> {
+class _PlayerEvaluationScreenState
+    extends ConsumerState<PlayerEvaluationScreen> {
   // --- Estado del Formulario y Controladores ---
   final _formKey = GlobalKey<FormState>();
   final nameCtrl = TextEditingController();
@@ -38,11 +39,20 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
   List<PlayerEvent> _keyEvents = [];
   List<FormPeak> _formPeaks = [];
   final List<String> _allDays = [
-    'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'
+    'Lunes',
+    'Martes',
+    'Miércoles',
+    'Jueves',
+    'Viernes',
+    'Sábado',
+    'Domingo',
   ];
   final Map<String, int> _durationOptions = {
-    '30-45 minutos': 45, '45-60 minutos': 60, '60-75 minutos': 75,
-    '75-90 minutos': 90, '90+ minutos': 120,
+    '30-45 minutos': 45,
+    '45-60 minutos': 60,
+    '60-75 minutos': 75,
+    '75-90 minutos': 90,
+    '90+ minutos': 120,
   };
   int _selectedDurationMinutes = 60;
 
@@ -78,7 +88,8 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
   void _populateForm(PlayerProfile? p) {
     // Si p es null, se usa para inicializar un formulario nuevo
     if (p == null) {
-      final userName = ref.read(currentUserAppUserProvider).value?.name ?? 'Jugador';
+      final userName =
+          ref.read(currentUserAppUserProvider).value?.name ?? 'Jugador';
       setState(() {
         _loadedProfile = null;
         nameCtrl.text = userName;
@@ -109,7 +120,9 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
       weightCtrl.text = p.weightKg?.toString() ?? '';
       wingspanCtrl.text = p.wingspanCm?.toString() ?? '';
       selectedPosition = p.position;
-      selectedLevel = p.level.isNotEmpty ? p.level[0].toUpperCase() + p.level.substring(1) : 'Competitivo';
+      selectedLevel = p.level.isNotEmpty
+          ? p.level[0].toUpperCase() + p.level.substring(1)
+          : 'Competitivo';
       selectedDays = p.availability.trainingDays;
       _selectedDurationMinutes = p.availability.sessionMinutes;
       selectedInjuries = p.injuries.isEmpty ? ['Ninguna'] : p.injuries;
@@ -120,7 +133,6 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
       _formPeaks = List.from(p.formPeaks);
     });
   }
-
 
   @override
   void dispose() {
@@ -157,8 +169,9 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                         prefixIcon: Icon(Icons.emoji_events),
                         helperText: 'Ej: Copa Nacional 2024',
                       ),
-                      validator: (v) =>
-                          (v?.isEmpty ?? true) ? 'El nombre es requerido' : null,
+                      validator: (v) => (v?.isEmpty ?? true)
+                          ? 'El nombre es requerido'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     ListTile(
@@ -175,7 +188,9 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                           context: context,
                           initialDate: selectedDate,
                           firstDate: DateTime(2020),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365),
+                          ),
                         );
                         if (picked != null) {
                           setDialogState(() => selectedDate = picked);
@@ -187,7 +202,8 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () =>
+                      Navigator.of(context, rootNavigator: true).maybePop(),
                   child: const Text('Cancelar'),
                 ),
                 ElevatedButton(
@@ -197,7 +213,10 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                         name: nameCtrl.text.trim(),
                         date: selectedDate,
                       );
-                      Navigator.pop(context, tournament);
+                      Navigator.of(
+                        context,
+                        rootNavigator: true,
+                      ).pop(tournament);
                     }
                   },
                   child: const Text('Añadir'),
@@ -223,16 +242,20 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
     final formKey = GlobalKey<FormState>();
 
     // Fetch available tests from Firestore
-    final testsSnapshot = await ref.read(firestoreProvider).firestore
+    final testsSnapshot = await ref
+        .read(firestoreProvider)
+        .firestore
         .collection('tests')
         .get();
-    
+
     final availableTests = testsSnapshot.docs
-        .map((doc) => {
-              'id': doc.id,
-              'name': doc.data()['name'] as String? ?? 'Sin nombre',
-              'measure': doc.data()['measure'] as String? ?? '',
-            })
+        .map(
+          (doc) => {
+            'id': doc.id,
+            'name': doc.data()['name'] as String? ?? 'Sin nombre',
+            'measure': doc.data()['measure'] as String? ?? '',
+          },
+        )
         .toList();
 
     if (availableTests.isEmpty) {
@@ -287,10 +310,14 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                             : '',
                         helperText: 'Ingresa el resultado del test',
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       validator: (v) {
-                        if (v?.isEmpty ?? true) return 'La puntuación es requerida';
-                        if (double.tryParse(v!) == null) return 'Ingresa un número válido';
+                        if (v?.isEmpty ?? true)
+                          return 'La puntuación es requerida';
+                        if (double.tryParse(v!) == null)
+                          return 'Ingresa un número válido';
                         return null;
                       },
                     ),
@@ -299,17 +326,18 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () =>
+                      Navigator.of(context, rootNavigator: true).maybePop(),
                   child: const Text('Cancelar'),
                 ),
                 ElevatedButton(
                   onPressed: () {
                     if (formKey.currentState?.validate() ?? false) {
                       final score = double.parse(scoreCtrl.text.trim());
-                      Navigator.pop(
+                      Navigator.of(
                         context,
-                        MapEntry(selectedTestName, score),
-                      );
+                        rootNavigator: true,
+                      ).pop(MapEntry(selectedTestName, score));
                     }
                   },
                   child: const Text('Añadir'),
@@ -344,13 +372,17 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).maybePop(),
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
               onPressed: () {
                 if (controller.text.trim().isNotEmpty) {
-                  Navigator.pop(context, controller.text.trim());
+                  Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).pop(controller.text.trim());
                 }
               },
               child: const Text('Guardar'),
@@ -391,7 +423,9 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                 children: [
                   DropdownButtonFormField<String>(
                     value: selectedType,
-                    decoration: const InputDecoration(labelText: 'Tipo de evento'),
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo de evento',
+                    ),
                     items: eventOptions.entries
                         .map(
                           (entry) => DropdownMenuItem<String>(
@@ -411,12 +445,16 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.calendar_today),
                     title: const Text('Fecha'),
-                    subtitle: Text(DateFormat('dd/MM/yyyy').format(selectedDate)),
+                    subtitle: Text(
+                      DateFormat('dd/MM/yyyy').format(selectedDate),
+                    ),
                     onTap: () async {
                       final picked = await showDatePicker(
                         context: context,
                         initialDate: selectedDate,
-                        firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                        firstDate: DateTime.now().subtract(
+                          const Duration(days: 365),
+                        ),
                         lastDate: DateTime.now().add(const Duration(days: 730)),
                       );
                       if (picked != null) {
@@ -435,13 +473,13 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () =>
+                      Navigator.of(context, rootNavigator: true).maybePop(),
                   child: const Text('Cancelar'),
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(
-                      context,
+                    Navigator.of(context, rootNavigator: true).pop(
                       PlayerEvent(
                         type: selectedType,
                         date: selectedDate,
@@ -484,12 +522,16 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.calendar_today),
                     title: const Text('Fecha estimada'),
-                    subtitle: Text(DateFormat('dd/MM/yyyy').format(selectedDate)),
+                    subtitle: Text(
+                      DateFormat('dd/MM/yyyy').format(selectedDate),
+                    ),
                     onTap: () async {
                       final picked = await showDatePicker(
                         context: context,
                         initialDate: selectedDate,
-                        firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                        firstDate: DateTime.now().subtract(
+                          const Duration(days: 365),
+                        ),
                         lastDate: DateTime.now().add(const Duration(days: 730)),
                       );
                       if (picked != null) {
@@ -508,13 +550,13 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () =>
+                      Navigator.of(context, rootNavigator: true).maybePop(),
                   child: const Text('Cancelar'),
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(
-                      context,
+                    Navigator.of(context, rootNavigator: true).pop(
                       FormPeak(
                         date: selectedDate,
                         note: noteCtrl.text.trim().isEmpty
@@ -556,10 +598,12 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
     }
 
     final appUserAsync = ref.read(currentUserAppUserProvider);
-    final appUser = appUserAsync.value; 
-    
+    final appUser = appUserAsync.value;
+
     if (appUser == null) {
-      _showError('Error: No se pudo identificar al jugador. Intenta cerrar y abrir sesión.');
+      _showError(
+        'Error: No se pudo identificar al jugador. Intenta cerrar y abrir sesión.',
+      );
       return;
     }
 
@@ -595,7 +639,9 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
         profileToSave = _loadedProfile!.copyWith(
           position: selectedPosition,
           level: selectedLevel.toLowerCase(),
-          injuries: selectedInjuries.contains('Ninguna') ? [] : selectedInjuries,
+          injuries: selectedInjuries.contains('Ninguna')
+              ? []
+              : selectedInjuries,
           availability: availability,
           evaluation: evaluation,
           tournaments: _selectedTournaments,
@@ -617,7 +663,9 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
           position: selectedPosition,
           level: selectedLevel.toLowerCase(),
           goals: _goals,
-          injuries: selectedInjuries.contains('Ninguna') ? [] : selectedInjuries,
+          injuries: selectedInjuries.contains('Ninguna')
+              ? []
+              : selectedInjuries,
           availability: availability,
           evaluation: evaluation,
           tournaments: _selectedTournaments,
@@ -631,10 +679,10 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
       }
 
       await _firestoreService.savePlayerProfile(profileToSave);
-      
+
       // --- [CORRECCIÓN CRÍTICA] INVALIDACIÓN DE PROVIDERS ---
       // Invalidamos el FutureProvider original (que carga el perfil)
-      ref.invalidate(playerProfileProvider); 
+      ref.invalidate(playerProfileProvider);
       // El generatedProgramProvider depende de playerProfileProvider, se actualizará solo.
       // ----------------------------------------------------
 
@@ -646,7 +694,7 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context); 
+        Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
@@ -659,25 +707,25 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     // [CORRECCIÓN] Observamos el FutureProvider completo
     final profileAsync = ref.watch(playerProfileProvider);
-    
+
     // [CORRECCIÓN] Escuchamos los cambios para llenar el formulario una vez
     ref.listen<AsyncValue<PlayerProfile?>>(playerProfileProvider, (_, next) {
-        // El 'listen' solo se activa cuando el provider resuelve o cambia.
-        next.whenOrNull(
-          data: (profile) {
-            // Comprobamos si es la carga inicial o si el perfil ha cambiado
-            // forzamos el llenado solo si _loadedProfile es null (primera carga)
-            // o si el profile es diferente.
-            if (_loadedProfile == null || profile?.id != _loadedProfile?.id) {
-               _populateForm(profile);
-            }
-          },
-          // Si hay un error al cargar, también inicializamos el formulario vacío
-          error: (_, __) => _populateForm(null), 
-        );
+      // El 'listen' solo se activa cuando el provider resuelve o cambia.
+      next.whenOrNull(
+        data: (profile) {
+          // Comprobamos si es la carga inicial o si el perfil ha cambiado
+          // forzamos el llenado solo si _loadedProfile es null (primera carga)
+          // o si el profile es diferente.
+          if (_loadedProfile == null || profile?.id != _loadedProfile?.id) {
+            _populateForm(profile);
+          }
+        },
+        // Si hay un error al cargar, también inicializamos el formulario vacío
+        error: (_, __) => _populateForm(null),
+      );
     });
 
     return Scaffold(
@@ -686,49 +734,57 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
       ),
       // [CORRECCIÓN] Usamos profileAsync.when para el estado principal de la pantalla
       body: profileAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, s) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Text('Error al cargar datos: $e', textAlign: TextAlign.center),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, s) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Text(
+              'Error al cargar datos: $e',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+        data: (profile) {
+          // El resto del formulario se mantiene igual, ya que usa los estados locales
+          return Stack(
+            children: [
+              Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
+                  children: [
+                    _buildSectionHeader(theme, Icons.person, "Perfil Básico"),
+                    _buildPerfilSection(theme),
+                    const SizedBox(height: 24),
+
+                    _buildSectionHeader(
+                      theme,
+                      Icons.calendar_today,
+                      "Disponibilidad",
+                    ),
+                    _buildDisponibilidadSection(theme),
+                    const SizedBox(height: 24),
+
+                    _buildSectionHeader(theme, Icons.healing, "Estado Físico"),
+                    _buildEstadoFisicoSection(theme),
+                    const SizedBox(height: 24),
+
+                    _buildSectionHeader(theme, Icons.bar_chart, "Rendimiento"),
+                    _buildRendimientoSection(theme),
+                  ],
                 ),
               ),
-          data: (profile) {
-            // El resto del formulario se mantiene igual, ya que usa los estados locales
-            return Stack(
-              children: [
-                Form(
-                  key: _formKey,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
-                    children: [
-                      _buildSectionHeader(theme, Icons.person, "Perfil Básico"),
-                      _buildPerfilSection(theme),
-                      const SizedBox(height: 24),
-
-                      _buildSectionHeader(theme, Icons.calendar_today, "Disponibilidad"),
-                      _buildDisponibilidadSection(theme),
-                      const SizedBox(height: 24),
-
-                      _buildSectionHeader(theme, Icons.healing, "Estado Físico"),
-                      _buildEstadoFisicoSection(theme),
-                      const SizedBox(height: 24),
-
-                      _buildSectionHeader(theme, Icons.bar_chart, "Rendimiento"),
-                      _buildRendimientoSection(theme),
-                    ],
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: _buildStickySaveButton(theme, _isSubmitting),
-                )
-              ],
-            );
-          }),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: _buildStickySaveButton(theme, _isSubmitting),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
-  
+
   Widget _buildSectionHeader(ThemeData theme, IconData icon, String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
@@ -738,7 +794,9 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
           const SizedBox(width: 8),
           Text(
             title,
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -766,20 +824,34 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               value: selectedPosition,
-              decoration: const InputDecoration(labelText: 'Posición Principal'),
+              decoration: const InputDecoration(
+                labelText: 'Posición Principal',
+              ),
               items: ['Central', 'Libero', 'Punta', 'Opuesto', 'Armadora']
-                  .map((String value) => DropdownMenuItem<String>(value: value, child: Text(value)))
+                  .map(
+                    (String value) => DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    ),
+                  )
                   .toList(),
-              onChanged: (newValue) => setState(() => selectedPosition = newValue!),
+              onChanged: (newValue) =>
+                  setState(() => selectedPosition = newValue!),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               value: selectedLevel,
               decoration: const InputDecoration(labelText: 'Nivel de Juego'),
               items: ['Competitivo', 'Recreativo']
-                  .map((String value) => DropdownMenuItem<String>(value: value, child: Text(value)))
+                  .map(
+                    (String value) => DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    ),
+                  )
                   .toList(),
-              onChanged: (newValue) => setState(() => selectedLevel = newValue!),
+              onChanged: (newValue) =>
+                  setState(() => selectedLevel = newValue!),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -808,7 +880,9 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                       labelText: 'Altura (cm)',
                       prefixIcon: Icon(Icons.height),
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) return null;
                       return double.tryParse(value.replaceAll(',', '.')) == null
@@ -825,7 +899,9 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                       labelText: 'Peso (kg)',
                       prefixIcon: Icon(Icons.monitor_weight_outlined),
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) return null;
                       return double.tryParse(value.replaceAll(',', '.')) == null
@@ -843,7 +919,9 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                 labelText: 'Envergadura (cm)',
                 prefixIcon: Icon(Icons.swap_horiz_outlined),
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) return null;
                 return double.tryParse(value.replaceAll(',', '.')) == null
@@ -855,7 +933,12 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Objetivos', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  'Objetivos',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 IconButton(
                   tooltip: 'Agregar objetivo',
                   icon: const Icon(Icons.add_circle_outline),
@@ -881,7 +964,8 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                             (goal) => Chip(
                               label: Text(goal),
                               deleteIcon: const Icon(Icons.cancel, size: 18),
-                              onDeleted: () => setState(() => _goals.remove(goal)),
+                              onDeleted: () =>
+                                  setState(() => _goals.remove(goal)),
                             ),
                           )
                           .toList(),
@@ -908,26 +992,44 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
               children: [
                 Expanded(
                   child: Column(
-                    children: _allDays.sublist(0, 4).map((day) => CheckboxListTile(
-                          title: Text(day),
-                          value: selectedDays.contains(day),
-                          onChanged: (v) => setState(() => v! ? selectedDays.add(day) : selectedDays.remove(day)),
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          controlAffinity: ListTileControlAffinity.leading,
-                        )).toList(),
+                    children: _allDays
+                        .sublist(0, 4)
+                        .map(
+                          (day) => CheckboxListTile(
+                            title: Text(day),
+                            value: selectedDays.contains(day),
+                            onChanged: (v) => setState(
+                              () => v!
+                                  ? selectedDays.add(day)
+                                  : selectedDays.remove(day),
+                            ),
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            controlAffinity: ListTileControlAffinity.leading,
+                          ),
+                        )
+                        .toList(),
                   ),
                 ),
                 Expanded(
                   child: Column(
-                    children: _allDays.sublist(4).map((day) => CheckboxListTile(
-                          title: Text(day),
-                          value: selectedDays.contains(day),
-                          onChanged: (v) => setState(() => v! ? selectedDays.add(day) : selectedDays.remove(day)),
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          controlAffinity: ListTileControlAffinity.leading,
-                        )).toList(),
+                    children: _allDays
+                        .sublist(4)
+                        .map(
+                          (day) => CheckboxListTile(
+                            title: Text(day),
+                            value: selectedDays.contains(day),
+                            onChanged: (v) => setState(
+                              () => v!
+                                  ? selectedDays.add(day)
+                                  : selectedDays.remove(day),
+                            ),
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            controlAffinity: ListTileControlAffinity.leading,
+                          ),
+                        )
+                        .toList(),
                   ),
                 ),
               ],
@@ -935,12 +1037,20 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
               value: _selectedDurationMinutes,
-              decoration: const InputDecoration(labelText: 'Duración por Sesión'),
+              decoration: const InputDecoration(
+                labelText: 'Duración por Sesión',
+              ),
               items: _durationOptions.entries
-                  .map((entry) => DropdownMenuItem<int>(value: entry.value, child: Text(entry.key)))
+                  .map(
+                    (entry) => DropdownMenuItem<int>(
+                      value: entry.value,
+                      child: Text(entry.key),
+                    ),
+                  )
                   .toList(),
               onChanged: (newValue) {
-                if (newValue != null) setState(() => _selectedDurationMinutes = newValue);
+                if (newValue != null)
+                  setState(() => _selectedDurationMinutes = newValue);
               },
             ),
           ],
@@ -959,30 +1069,42 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
         child: Wrap(
           spacing: 8.0,
           runSpacing: 4.0,
-          children: [ 'Rodilla', 'Tobillo', 'Hombro', 'Espalda', 'Muñeca', 'Dedo', 'Ninguna']
-              .map((injury) {
-            final isSelected = selectedInjuries.contains(injury);
-            return FilterChip(
-              label: Text(injury),
-              selected: isSelected,
-              selectedColor: theme.colorScheme.primary, // Volt
-              labelStyle: TextStyle(
-                color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
-              ),
-              onSelected: (bool selected) {
-                setState(() {
-                  if (injury == 'Ninguna') {
-                    selectedInjuries.clear();
-                    if (selected) selectedInjuries.add('Ninguna');
-                  } else {
-                    selectedInjuries.remove('Ninguna');
-                    if (selected) selectedInjuries.add(injury);
-                    else selectedInjuries.remove(injury);
-                  }
-                });
-              },
-            );
-          }).toList(),
+          children:
+              [
+                'Rodilla',
+                'Tobillo',
+                'Hombro',
+                'Espalda',
+                'Muñeca',
+                'Dedo',
+                'Ninguna',
+              ].map((injury) {
+                final isSelected = selectedInjuries.contains(injury);
+                return FilterChip(
+                  label: Text(injury),
+                  selected: isSelected,
+                  selectedColor: theme.colorScheme.primary, // Volt
+                  labelStyle: TextStyle(
+                    color: isSelected
+                        ? theme.colorScheme.onPrimary
+                        : theme.colorScheme.onSurface,
+                  ),
+                  onSelected: (bool selected) {
+                    setState(() {
+                      if (injury == 'Ninguna') {
+                        selectedInjuries.clear();
+                        if (selected) selectedInjuries.add('Ninguna');
+                      } else {
+                        selectedInjuries.remove('Ninguna');
+                        if (selected)
+                          selectedInjuries.add(injury);
+                        else
+                          selectedInjuries.remove(injury);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
         ),
       ),
     );
@@ -1001,14 +1123,20 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Tests Físicos', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  'Tests Físicos',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 OutlinedButton.icon(
                   onPressed: _showAddTestDialog,
                   icon: const Icon(Icons.add, size: 18),
                   label: const Text('Añadir'),
                   // --- MEJORA DE DISEÑO: Botón "Volt Pro" ---
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: theme.colorScheme.primary, side: BorderSide(color: theme.colorScheme.primary),
+                    foregroundColor: theme.colorScheme.primary,
+                    side: BorderSide(color: theme.colorScheme.primary),
                   ),
                 ),
               ],
@@ -1016,34 +1144,52 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
             if (_testScores.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12.0),
-                child: Text('Añade tus puntuaciones (ej: Salto Vertical)...', style: TextStyle(color: Colors.grey)),
+                child: Text(
+                  'Añade tus puntuaciones (ej: Salto Vertical)...',
+                  style: TextStyle(color: Colors.grey),
+                ),
               )
             else
               ..._testScores.entries.map((entry) {
                 return ListTile(
                   title: Text(entry.key),
-                  trailing: Text(entry.value.toString(), style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
+                  trailing: Text(
+                    entry.value.toString(),
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   dense: true,
                   contentPadding: const EdgeInsets.only(left: 16),
                   onTap: () => setState(() => _testScores.remove(entry.key)),
-                  leading: Icon(Icons.remove_circle_outline, color: theme.colorScheme.error, size: 20),
+                  leading: Icon(
+                    Icons.remove_circle_outline,
+                    color: theme.colorScheme.error,
+                    size: 20,
+                  ),
                 );
               }).toList(),
-            
+
             const Divider(height: 24),
 
             // --- Torneos ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Torneos', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  'Torneos',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 OutlinedButton.icon(
                   onPressed: _showAddTournamentDialog,
                   icon: const Icon(Icons.add, size: 18),
                   label: const Text('Añadir'),
                   // --- MEJORA DE DISEÑO: Botón "Azul Pro" ---
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: theme.colorScheme.secondary, side: BorderSide(color: theme.colorScheme.secondary),
+                    foregroundColor: theme.colorScheme.secondary,
+                    side: BorderSide(color: theme.colorScheme.secondary),
                   ),
                 ),
               ],
@@ -1051,7 +1197,10 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
             if (_selectedTournaments.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12.0),
-                child: Text('Añade torneos (opcional)...', style: TextStyle(color: Colors.grey)),
+                child: Text(
+                  'Añade torneos (opcional)...',
+                  style: TextStyle(color: Colors.grey),
+                ),
               )
             else
               Padding(
@@ -1061,9 +1210,13 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                   runSpacing: 4.0,
                   children: _selectedTournaments.map((tournament) {
                     return Chip(
-                      label: Text('${tournament.name} (${DateFormat('dd/MM/yy').format(tournament.date)})'),
+                      label: Text(
+                        '${tournament.name} (${DateFormat('dd/MM/yy').format(tournament.date)})',
+                      ),
                       deleteIcon: const Icon(Icons.cancel, size: 18),
-                      onDeleted: () => setState(() => _selectedTournaments.remove(tournament)),
+                      onDeleted: () => setState(
+                        () => _selectedTournaments.remove(tournament),
+                      ),
                     );
                   }).toList(),
                 ),
@@ -1072,7 +1225,12 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Fechas Clave', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  'Fechas Clave',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 OutlinedButton.icon(
                   onPressed: _showAddEventDialog,
                   icon: const Icon(Icons.event_available_outlined, size: 18),
@@ -1087,19 +1245,26 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
             if (_keyEvents.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12.0),
-                child: Text('Registra ligas, copas, selecciones o viajes próximos.',
-                    style: TextStyle(color: Colors.grey)),
+                child: Text(
+                  'Registra ligas, copas, selecciones o viajes próximos.',
+                  style: TextStyle(color: Colors.grey),
+                ),
               )
             else
               ..._keyEvents.map(
                 (event) => ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.flag_outlined, color: theme.colorScheme.secondary),
+                  leading: Icon(
+                    Icons.flag_outlined,
+                    color: theme.colorScheme.secondary,
+                  ),
                   title: Text(
                     '${_eventTypeLabel(event.type)} - ${DateFormat('dd/MM/yy').format(event.date)}',
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  subtitle: event.description != null ? Text(event.description!) : null,
+                  subtitle: event.description != null
+                      ? Text(event.description!)
+                      : null,
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline),
                     onPressed: () => setState(() => _keyEvents.remove(event)),
@@ -1110,7 +1275,12 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Picos de Forma', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  'Picos de Forma',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 OutlinedButton.icon(
                   onPressed: _showAddFormPeakDialog,
                   icon: const Icon(Icons.trending_up, size: 18),
@@ -1125,8 +1295,10 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
             if (_formPeaks.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12.0),
-                child: Text('Planifica cuándo quieres alcanzar tu máximo rendimiento.',
-                    style: TextStyle(color: Colors.grey)),
+                child: Text(
+                  'Planifica cuándo quieres alcanzar tu máximo rendimiento.',
+                  style: TextStyle(color: Colors.grey),
+                ),
               )
             else
               Wrap(
@@ -1139,7 +1311,8 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                           '${DateFormat('dd/MM/yy').format(peak.date)}${peak.note != null ? ' • ${peak.note}' : ''}',
                         ),
                         deleteIcon: const Icon(Icons.cancel, size: 18),
-                        onDeleted: () => setState(() => _formPeaks.remove(peak)),
+                        onDeleted: () =>
+                            setState(() => _formPeaks.remove(peak)),
                       ),
                     )
                     .toList(),
@@ -1149,7 +1322,7 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
       ),
     );
   }
-  
+
   /// --- MEJORA DE UI: Botón de Guardar Pegajoso ---
   Widget _buildStickySaveButton(ThemeData theme, bool isSubmitting) {
     return Container(
@@ -1162,7 +1335,7 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
             color: Colors.black.withOpacity(0.1),
             blurRadius: 8,
             offset: const Offset(0, -4),
-          )
+          ),
         ],
       ),
       child: SizedBox(
@@ -1183,7 +1356,10 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
                 )
               : Text(
                   _loadedProfile == null ? 'Crear Perfil' : 'Actualizar Perfil',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
         ),
       ),

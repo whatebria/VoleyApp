@@ -24,16 +24,16 @@ class ExercisePickerScreen extends ConsumerStatefulWidget {
 class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  
+
   // [CORRECCIÓN]: ESTADO LOCAL. Mantenemos una lista mutable localmente.
-  late TrainingSession _currentSession; 
+  late TrainingSession _currentSession;
 
   @override
   void initState() {
     super.initState();
     // [CORRECCIÓN]: Inicializa el estado local como una copia de la sesión inmutable.
-    _currentSession = widget.session; 
-    
+    _currentSession = widget.session;
+
     _searchController.addListener(() {
       setState(() {
         _searchQuery = _searchController.text.toLowerCase();
@@ -51,15 +51,17 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
   void _addExerciseToSession(WorkoutExercise workoutExercise) {
     setState(() {
       // 1. Clonar la lista de ejercicios existente a una mutable temporal
-      final newExercises = List<WorkoutExercise>.from(_currentSession.exercises);
-      
+      final newExercises = List<WorkoutExercise>.from(
+        _currentSession.exercises,
+      );
+
       // 2. Añadir el nuevo ejercicio a la lista mutable
       newExercises.add(workoutExercise);
-      
+
       // 3. Clonar la sesión completa con la nueva lista inmutable (patrón copyWith)
       _currentSession = _currentSession.copyWith(exercises: newExercises);
     });
-    
+
     // Opcional: Mostrar notificación de que se añadió
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -68,13 +70,12 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
       ),
     );
   }
-  
+
   /// [NUEVO MÉTODO]: Devuelve la sesión modificada y cierra
   void _handleSaveAndClose() {
     // Devuelve la sesión actualizada e inmutable al ProgramEditorScreen
     Navigator.pop(context, _currentSession);
   }
-
 
   /// Muestra el diálogo para añadir series, repeticiones e intensidad.
   Future<void> _showAddExerciseDialog(Exercise exercise) async {
@@ -102,13 +103,16 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
               ),
               TextField(
                 controller: intensityCtrl,
-                decoration: const InputDecoration(labelText: 'Intensidad (RPE, %...)'),
+                decoration: const InputDecoration(
+                  labelText: 'Intensidad (RPE, %...)',
+                ),
               ),
             ],
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).maybePop(),
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
@@ -122,7 +126,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                   intensity: intensityCtrl.text,
                 );
                 // 2. Devolver el objeto al presionar "Añadir"
-                Navigator.pop(context, workoutExercise);
+                Navigator.of(context, rootNavigator: true).pop(workoutExercise);
               },
               child: const Text('Añadir'),
             ),
@@ -133,12 +137,14 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
 
     // 3. Si el diálogo devolvió un ejercicio, añadirlo
     if (result != null && mounted) {
-      _addExerciseToSession(result); // [CORRECCIÓN]: Usamos el método inmutable.
+      _addExerciseToSession(
+        result,
+      ); // [CORRECCIÓN]: Usamos el método inmutable.
     }
   }
-  
+
   // --- WIDGETS AUXILIARES ---
-  
+
   // [NUEVO WIDGET]: Lista de Ejercicios Añadidos (para visualización y eliminación)
   Widget _buildCurrentWorkoutList(ThemeData theme) {
     return Column(
@@ -148,7 +154,9 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Text(
             'Ejercicios en Sesión (${_currentSession.exercises.length})',
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
         SizedBox(
@@ -171,22 +179,41 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                           children: [
                             Row(
                               children: [
-                                Text(ex.name, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                                Text(
+                                  ex.name,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                                 IconButton(
-                                  icon: const Icon(Icons.close, size: 16, color: Colors.red),
+                                  icon: const Icon(
+                                    Icons.close,
+                                    size: 16,
+                                    color: Colors.red,
+                                  ),
                                   onPressed: () {
                                     setState(() {
                                       // [CORRECCIÓN]: Clonación para eliminar
-                                      final newList = List<WorkoutExercise>.from(_currentSession.exercises);
+                                      final newList =
+                                          List<WorkoutExercise>.from(
+                                            _currentSession.exercises,
+                                          );
                                       newList.removeAt(index);
-                                      _currentSession = _currentSession.copyWith(exercises: newList);
+                                      _currentSession = _currentSession
+                                          .copyWith(exercises: newList);
                                     });
                                   },
                                 ),
                               ],
                             ),
-                            Text('${ex.sets} sets x ${ex.reps}', style: theme.textTheme.bodyMedium),
-                            Text('Intensidad: ${ex.intensity}', style: theme.textTheme.bodySmall),
+                            Text(
+                              '${ex.sets} sets x ${ex.reps}',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                            Text(
+                              'Intensidad: ${ex.intensity}',
+                              style: theme.textTheme.bodySmall,
+                            ),
                           ],
                         ),
                       ),
@@ -198,7 +225,6 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
       ],
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -220,7 +246,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
         children: [
           // 1. Lista de ejercicios actuales (horizontal)
           _buildCurrentWorkoutList(theme),
-          
+
           // --- BARRA DE BÚSQUEDA ---
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -235,7 +261,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
               ),
             ),
           ),
-          
+
           // --- LISTA DE EJERCICIOS DISPONIBLES ---
           Expanded(
             child: exercisesAsync.when(
@@ -243,19 +269,23 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
               error: (e, s) => Center(child: Text('Error al cargar: $e')),
               data: (allExercises) {
                 final profileInjuries = widget.profile.injuries;
-                
+
                 final filteredList = allExercises.where((ex) {
-                  final nameMatch = ex.name.toLowerCase().contains(_searchQuery);
-                  
-                  final notContra = !ex.contraindicatedFor.any(
-                    (c) => profileInjuries.contains(c)
+                  final nameMatch = ex.name.toLowerCase().contains(
+                    _searchQuery,
                   );
-                  
+
+                  final notContra = !ex.contraindicatedFor.any(
+                    (c) => profileInjuries.contains(c),
+                  );
+
                   return nameMatch && notContra;
                 }).toList();
 
                 if (filteredList.isEmpty) {
-                  return const Center(child: Text('No se encontraron ejercicios.'));
+                  return const Center(
+                    child: Text('No se encontraron ejercicios.'),
+                  );
                 }
 
                 return ListView.builder(

@@ -850,13 +850,13 @@ class _ProgramEditorScreenState extends ConsumerState<ProgramEditorScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).maybePop(),
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.pop(
-                  context,
+                Navigator.of(context, rootNavigator: true).pop(
                   session.copyWith(
                     day: _allDays[selectedDayIndex],
                     objective: objectiveCtrl.text,

@@ -237,8 +237,9 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                         prefixIcon: Icon(Icons.emoji_events),
                         helperText: 'Ej: Copa Nacional 2024',
                       ),
-                      validator: (v) =>
-                          (v?.isEmpty ?? true) ? 'El nombre es requerido' : null,
+                      validator: (v) => (v?.isEmpty ?? true)
+                          ? 'El nombre es requerido'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     ListTile(
@@ -255,7 +256,9 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                           context: context,
                           initialDate: selectedDate,
                           firstDate: DateTime(2020),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365),
+                          ),
                         );
                         if (picked != null) {
                           setDialogState(() => selectedDate = picked);
@@ -267,7 +270,8 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () =>
+                      Navigator.of(context, rootNavigator: true).maybePop(),
                   child: const Text('Cancelar'),
                 ),
                 ElevatedButton(
@@ -277,7 +281,10 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                         name: nameCtrl.text.trim(),
                         date: selectedDate,
                       );
-                      Navigator.pop(context, tournament);
+                      Navigator.of(
+                        context,
+                        rootNavigator: true,
+                      ).pop(tournament);
                     }
                   },
                   child: const Text('Añadir'),
@@ -312,13 +319,17 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).maybePop(),
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
               onPressed: () {
                 if (goalCtrl.text.trim().isNotEmpty) {
-                  Navigator.pop(context, goalCtrl.text.trim());
+                  Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).pop(goalCtrl.text.trim());
                 }
               },
               child: const Text('Guardar'),
@@ -354,8 +365,9 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                     labelText: 'Nombre del Test *',
                     helperText: 'Ej: Salto vertical',
                   ),
-                  validator: (value) =>
-                      (value == null || value.trim().isEmpty) ? 'Ingresa un nombre' : null,
+                  validator: (value) => (value == null || value.trim().isEmpty)
+                      ? 'Ingresa un nombre'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -364,7 +376,9 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                     labelText: 'Resultado *',
                     helperText: 'Ej: 45.5',
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Ingresa un resultado';
@@ -379,14 +393,20 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).maybePop(),
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
               onPressed: () {
                 if (formKey.currentState?.validate() ?? false) {
-                  final value = double.parse(valueCtrl.text.replaceAll(',', '.'));
-                  Navigator.pop(context, MapEntry(nameCtrl.text.trim(), value));
+                  final value = double.parse(
+                    valueCtrl.text.replaceAll(',', '.'),
+                  );
+                  Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).pop(MapEntry(nameCtrl.text.trim(), value));
                 }
               },
               child: const Text('Añadir'),
@@ -428,7 +448,9 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                 children: [
                   DropdownButtonFormField<String>(
                     value: selectedType,
-                    decoration: const InputDecoration(labelText: 'Tipo de evento'),
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo de evento',
+                    ),
                     items: eventOptions.entries
                         .map(
                           (entry) => DropdownMenuItem<String>(
@@ -448,12 +470,16 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.calendar_today),
                     title: const Text('Fecha'),
-                    subtitle: Text(DateFormat('dd/MM/yyyy').format(selectedDate)),
+                    subtitle: Text(
+                      DateFormat('dd/MM/yyyy').format(selectedDate),
+                    ),
                     onTap: () async {
                       final picked = await showDatePicker(
                         context: context,
                         initialDate: selectedDate,
-                        firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                        firstDate: DateTime.now().subtract(
+                          const Duration(days: 365),
+                        ),
                         lastDate: DateTime.now().add(const Duration(days: 730)),
                       );
                       if (picked != null) {
@@ -472,13 +498,13 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () =>
+                      Navigator.of(context, rootNavigator: true).maybePop(),
                   child: const Text('Cancelar'),
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(
-                      context,
+                    Navigator.of(context, rootNavigator: true).pop(
                       PlayerEvent(
                         type: selectedType,
                         date: selectedDate,
@@ -521,12 +547,16 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.calendar_today),
                     title: const Text('Fecha estimada'),
-                    subtitle: Text(DateFormat('dd/MM/yyyy').format(selectedDate)),
+                    subtitle: Text(
+                      DateFormat('dd/MM/yyyy').format(selectedDate),
+                    ),
                     onTap: () async {
                       final picked = await showDatePicker(
                         context: context,
                         initialDate: selectedDate,
-                        firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                        firstDate: DateTime.now().subtract(
+                          const Duration(days: 365),
+                        ),
                         lastDate: DateTime.now().add(const Duration(days: 730)),
                       );
                       if (picked != null) {
@@ -545,13 +575,13 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () =>
+                      Navigator.of(context, rootNavigator: true).maybePop(),
                   child: const Text('Cancelar'),
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(
-                      context,
+                    Navigator.of(context, rootNavigator: true).pop(
                       FormPeak(
                         date: selectedDate,
                         note: noteCtrl.text.trim().isEmpty
@@ -787,7 +817,9 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                       labelText: 'Altura (cm)',
                       prefixIcon: Icon(Icons.height),
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) return null;
                       return double.tryParse(value.replaceAll(',', '.')) == null
@@ -804,7 +836,9 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                       labelText: 'Peso (kg)',
                       prefixIcon: Icon(Icons.monitor_weight_outlined),
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) return null;
                       return double.tryParse(value.replaceAll(',', '.')) == null
@@ -822,7 +856,9 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                 labelText: 'Envergadura (cm)',
                 prefixIcon: Icon(Icons.swap_horiz_outlined),
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) return null;
                 return double.tryParse(value.replaceAll(',', '.')) == null
@@ -834,10 +870,7 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Objetivos',
-                  style: theme.textTheme.titleSmall,
-                ),
+                Text('Objetivos', style: theme.textTheme.titleSmall),
                 IconButton(
                   tooltip: 'Agregar objetivo',
                   onPressed: _showAddGoalDialog,
@@ -863,7 +896,8 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                             (goal) => Chip(
                               label: Text(goal),
                               deleteIcon: const Icon(Icons.cancel, size: 18),
-                              onDeleted: () => setState(() => _goals.remove(goal)),
+                              onDeleted: () =>
+                                  setState(() => _goals.remove(goal)),
                             ),
                           )
                           .toList(),
@@ -873,10 +907,7 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Evaluación Inicial',
-                  style: theme.textTheme.titleSmall,
-                ),
+                Text('Evaluación Inicial', style: theme.textTheme.titleSmall),
                 IconButton(
                   tooltip: 'Agregar test',
                   onPressed: _showAddTestDialog,
@@ -909,7 +940,8 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                         ),
                         leading: IconButton(
                           icon: const Icon(Icons.delete_outline),
-                          onPressed: () => setState(() => _testScores.remove(entry.key)),
+                          onPressed: () =>
+                              setState(() => _testScores.remove(entry.key)),
                         ),
                       ),
                     )
@@ -1108,7 +1140,8 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                         ),
                         trailing: IconButton(
                           icon: const Icon(Icons.delete_outline),
-                          onPressed: () => setState(() => _keyEvents.remove(event)),
+                          onPressed: () =>
+                              setState(() => _keyEvents.remove(event)),
                         ),
                       ),
                     )
@@ -1145,7 +1178,8 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                           '${DateFormat('dd/MM/yy').format(peak.date)}${peak.note != null ? ' • ${peak.note}' : ''}',
                         ),
                         deleteIcon: const Icon(Icons.cancel, size: 18),
-                        onDeleted: () => setState(() => _formPeaks.remove(peak)),
+                        onDeleted: () =>
+                            setState(() => _formPeaks.remove(peak)),
                       ),
                     )
                     .toList(),

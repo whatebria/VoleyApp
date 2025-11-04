@@ -99,7 +99,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
     setState(() {
       // Usa clamp() para asegurar que el tiempo no sea negativo
       _restTimeRemaining = (_restTimeRemaining + seconds).clamp(0, 9999);
-      
+
       if (_restTimeRemaining == 0) {
         // Si el usuario lo baja a 0, cancela el timer
         _cancelRestTimer();
@@ -112,7 +112,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
       _workoutData[exerciseId]![setIndex] = log;
     });
     FocusScope.of(context).unfocus();
-    
+
     bool isLastSet = setIndex == _exercises[_currentExerciseIndex].sets - 1;
     _startRestTimer(isLastSet: isLastSet);
   }
@@ -120,7 +120,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
   /// Lógica de "Terminar" (Pide feedback y luego guarda)
   Future<void> _finishWorkout() async {
     _restTimer?.cancel();
-    
+
     final feedback = await _showFeedbackDialog();
     if (feedback == null) return; // El usuario canceló
 
@@ -155,7 +155,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
       final firestore = ref.read(firestoreProvider);
       await firestore.saveSessionLog(log);
       ref.invalidate(sessionLogHistoryProvider);
-      
+
       if (mounted) Navigator.pop(context);
     } catch (e) {
       _showError('Error al guardar: $e');
@@ -169,7 +169,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
   /// Diálogo de Feedback
   Future<Map<String, dynamic>?> _showFeedbackDialog() async {
     _rpeValue = 5;
-    _notesController.clear(); 
+    _notesController.clear();
 
     return await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
@@ -180,15 +180,23 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 16, right: 16, top: 20,
+                left: 16,
+                right: 16,
+                top: 20,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Feedback de la Sesión', style: Theme.of(context).textTheme.headlineSmall),
+                  Text(
+                    'Feedback de la Sesión',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
                   const SizedBox(height: 16),
-                  Text('¿Qué tan difícil fue? (RPE)', style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    '¿Qué tan difícil fue? (RPE)',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   Row(
                     children: [
                       Expanded(
@@ -198,10 +206,14 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
                           max: 10,
                           divisions: 9,
                           label: _rpeValue.round().toString(),
-                          onChanged: (value) => setModalState(() => _rpeValue = value),
+                          onChanged: (value) =>
+                              setModalState(() => _rpeValue = value),
                         ),
                       ),
-                      Text(_rpeValue.round().toString(), style: Theme.of(context).textTheme.titleLarge),
+                      Text(
+                        _rpeValue.round().toString(),
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
                     ],
                   ),
                   TextField(
@@ -266,7 +278,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
               itemBuilder: (context, index) {
                 final exercise = _exercises[index];
                 final loggedSets = _workoutData[exercise.exerciseId]!;
-                
+
                 return _WorkoutExerciseCard(
                   exercise: exercise,
                   loggedSets: loggedSets,
@@ -277,7 +289,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
               },
             ),
           ),
-          
+
           _buildBottomNavBar(theme, isSubmitting),
         ],
       ),
@@ -286,21 +298,29 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
 
   Widget _buildBottomNavBar(ThemeData theme, bool isSubmitting) {
     final bool isLastPage = _currentExerciseIndex == _exercises.length - 1;
-    final String timerText = '${(_restTimeRemaining ~/ 60)}:${(_restTimeRemaining % 60).toString().padLeft(2, '0')}';
+    final String timerText =
+        '${(_restTimeRemaining ~/ 60)}:${(_restTimeRemaining % 60).toString().padLeft(2, '0')}';
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final bool isCompact = constraints.maxWidth < 420;
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0)
-              .copyWith(bottom: MediaQuery.of(context).padding.bottom + 12.0),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16.0,
+            vertical: 12.0,
+          ).copyWith(bottom: MediaQuery.of(context).padding.bottom + 12.0),
           color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
           child: AnimatedSize(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
             child: _isResting
                 ? _buildRestControls(theme, timerText, isCompact)
-                : _buildNavigationControls(theme, isSubmitting, isLastPage, isCompact),
+                : _buildNavigationControls(
+                    theme,
+                    isSubmitting,
+                    isLastPage,
+                    isCompact,
+                  ),
           ),
         );
       },
@@ -409,7 +429,11 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
       child: const Text('Anterior'),
     );
 
-    final actionButton = _buildPrimaryActionButton(theme, isLastPage, isSubmitting);
+    final actionButton = _buildPrimaryActionButton(
+      theme,
+      isLastPage,
+      isSubmitting,
+    );
 
     if (isCompact) {
       return Column(
@@ -421,7 +445,9 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
               previousButton,
               Text(
                 '${_currentExerciseIndex + 1} / ${_exercises.length}',
-                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -437,14 +463,20 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
         previousButton,
         Text(
           '${_currentExerciseIndex + 1} / ${_exercises.length}',
-          style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
         ),
         actionButton,
       ],
     );
   }
 
-  Widget _buildPrimaryActionButton(ThemeData theme, bool isLastPage, bool isSubmitting) {
+  Widget _buildPrimaryActionButton(
+    ThemeData theme,
+    bool isLastPage,
+    bool isSubmitting,
+  ) {
     return ElevatedButton(
       onPressed: isSubmitting
           ? null
@@ -459,10 +491,12 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
               }
             },
       style: ElevatedButton.styleFrom(
-        backgroundColor:
-            isLastPage ? theme.colorScheme.secondary : theme.colorScheme.primary,
-        foregroundColor:
-            isLastPage ? theme.colorScheme.onSecondary : theme.colorScheme.onPrimary,
+        backgroundColor: isLastPage
+            ? theme.colorScheme.secondary
+            : theme.colorScheme.primary,
+        foregroundColor: isLastPage
+            ? theme.colorScheme.onSecondary
+            : theme.colorScheme.onPrimary,
       ),
       child: isSubmitting && isLastPage
           ? SizedBox(
@@ -495,30 +529,44 @@ class _WorkoutExerciseCard extends ConsumerWidget {
     final historyAsync = ref.watch(sessionLogHistoryProvider);
 
     return historyAsync.when(
-      loading: () => const Text('Buscando historial...', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
-      error: (e, s) => Text('Error al cargar historial', style: TextStyle(color: theme.colorScheme.error, fontSize: 12)),
+      loading: () => const Text(
+        'Buscando historial...',
+        style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+      ),
+      error: (e, s) => Text(
+        'Error al cargar historial',
+        style: TextStyle(color: theme.colorScheme.error, fontSize: 12),
+      ),
       data: (history) {
-        String lastTimeText = "¡A por un récord!"; 
+        String lastTimeText = "¡A por un récord!";
 
         for (final log in history) {
           if (log.exercises.containsKey(exercise.exerciseId)) {
             final sets = log.exercises[exercise.exerciseId]!;
             if (sets.isNotEmpty) {
-              final bestSet = sets.reduce((a, b) => a.weight > b.weight ? a : b);
+              final bestSet = sets.reduce(
+                (a, b) => a.weight > b.weight ? a : b,
+              );
               lastTimeText = "${bestSet.weight} kg x ${bestSet.reps} reps";
-              break; 
+              break;
             }
           }
         }
-        
+
         return Row(
           children: [
-            Icon(Icons.history, size: 16, color: theme.textTheme.bodySmall?.color),
+            Icon(
+              Icons.history,
+              size: 16,
+              color: theme.textTheme.bodySmall?.color,
+            ),
             const SizedBox(width: 4),
             Text('Última vez: ', style: theme.textTheme.bodySmall),
             Text(
               lastTimeText,
-              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         );
@@ -539,15 +587,20 @@ class _WorkoutExerciseCard extends ConsumerWidget {
             children: [
               Text(
                 exercise.name,
-                style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Chip(
                 label: Text(
                   'OBJETIVO: ${exercise.sets} series x ${exercise.reps} @ ${exercise.intensity}',
-                  style: TextStyle(color: theme.colorScheme.onSecondaryContainer),
+                  style: TextStyle(
+                    color: theme.colorScheme.onSecondaryContainer,
+                  ),
                 ),
-                backgroundColor: theme.colorScheme.secondaryContainer.withOpacity(0.6),
+                backgroundColor: theme.colorScheme.secondaryContainer
+                    .withOpacity(0.6),
                 side: BorderSide.none,
               ),
               const SizedBox(height: 8),
@@ -564,18 +617,27 @@ class _WorkoutExerciseCard extends ConsumerWidget {
                     Expanded(
                       flex: 3, // Columna ancha
                       child: Center(
-                          child: Text('Peso (kg)', style: theme.textTheme.bodySmall)),
+                        child: Text(
+                          'Peso (kg)',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
                     ),
                     Expanded(
                       flex: 3, // Columna ancha
                       child: Center(
-                          child: Text('Reps', style: theme.textTheme.bodySmall)),
+                        child: Text('Reps', style: theme.textTheme.bodySmall),
+                      ),
                     ),
                     Expanded(
                       flex: 1, // Columna angosta
                       child: Center(
-                          child: Icon(Icons.check,
-                              size: 16, color: theme.textTheme.bodySmall?.color)),
+                        child: Icon(
+                          Icons.check,
+                          size: 16,
+                          color: theme.textTheme.bodySmall?.color,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -654,8 +716,10 @@ class __SetRowState extends State<_SetRow> {
       _currentWeight = widget.completedLog!.weight;
       _currentReps = widget.completedLog!.reps;
     } else {
-      _currentWeight = (double.tryParse(
-              widget.targetIntensity.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+      _currentWeight =
+          (double.tryParse(
+            widget.targetIntensity.replaceAll(RegExp(r'[^0-9.]'), ''),
+          ) ??
           0);
       _currentReps = int.tryParse(widget.targetReps) ?? 0;
     }
@@ -819,14 +883,19 @@ class __SetRowState extends State<_SetRow> {
     );
   }
 
-  Widget _buildLabeledStepper(ThemeData theme,
-      {required String label, required Widget child}) {
+  Widget _buildLabeledStepper(
+    ThemeData theme, {
+    required String label,
+    required Widget child,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 4),
         child,
@@ -852,7 +921,11 @@ class __SetRowState extends State<_SetRow> {
         // --- Botón de Restar ---
         IconButton(
           padding: EdgeInsets.zero,
-          icon: Icon(Icons.remove, size: 20, color: theme.colorScheme.secondary),
+          icon: Icon(
+            Icons.remove,
+            size: 20,
+            color: theme.colorScheme.secondary,
+          ),
           onPressed: !isEnabled
               ? null
               : () {
@@ -909,8 +982,10 @@ class __SetRowState extends State<_SetRow> {
   /// Helper para mostrar un NumberPad para entrada manual
   Future<double?> _showNumberPad(double initialValue) {
     final controller = TextEditingController(text: initialValue.toString());
-    controller.selection =
-        TextSelection(baseOffset: 0, extentOffset: controller.text.length);
+    controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: controller.text.length,
+    );
 
     return showDialog<double>(
       context: context,
@@ -924,11 +999,16 @@ class __SetRowState extends State<_SetRow> {
           ),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancelar')),
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).maybePop(),
+              child: const Text('Cancelar'),
+            ),
             ElevatedButton(
               onPressed: () {
-                Navigator.pop(context, double.tryParse(controller.text));
+                Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).pop(double.tryParse(controller.text));
               },
               child: const Text('OK'),
             ),

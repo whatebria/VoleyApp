@@ -66,7 +66,8 @@ class _NewEvaluationScreenState extends ConsumerState<NewEvaluationScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).maybePop(),
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
@@ -74,7 +75,7 @@ class _NewEvaluationScreenState extends ConsumerState<NewEvaluationScreen> {
                 final score = double.tryParse(scoreController.text);
                 if (nameController.text.isNotEmpty && score != null) {
                   setState(() => _testScores[nameController.text] = score);
-                  Navigator.pop(context);
+                  Navigator.of(context, rootNavigator: true).maybePop();
                 }
               },
               child: const Text('Añadir'),
