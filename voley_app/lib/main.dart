@@ -24,7 +24,7 @@ import 'package:voley_app/theme/app_theme.dart'; // Asegúrate de tener esta dep
 void main() async {
   // 1. Asegura que el binding esté inicializado para llamar a métodos nativos
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // 2. [CORRECCIÓN CRÍTICA] Inicializa Firebase de forma asíncrona
   try {
     await Firebase.initializeApp(
@@ -34,7 +34,7 @@ void main() async {
     // Manejo de errores de inicialización (ej: logs)
     print("Error al inicializar Firebase: $e");
   }
-  
+
   // 3. Lanza la aplicación solo después de que Firebase esté listo
   runApp(const ProviderScope(child: MyApp()));
 }
@@ -49,7 +49,7 @@ class MyApp extends StatelessWidget {
       title: 'Voley App',
       home: const RootScreen(),
       theme: AppTheme.voltProTheme,
-      
+
       routes: {
         '/login': (c) => const LoginScreen(),
         '/register': (c) => const RegisterScreen(),
@@ -63,27 +63,12 @@ class MyApp extends StatelessWidget {
         '/player_link_code': (c) => const PlayerLinkCodeScreen(),
         '/library': (c) => const ExerciseLibraryScreen(),
         '/profile_settings': (c) => const ProfileSettingsScreen(),
-        '/player_evaluation': (context) => const PlayerEvaluationScreen(),
         '/edit_basic_info': (context) => const EditBasicInfoScreen(),
         '/edit_availability': (context) => const EditAvailabilityScreen(),
         '/edit_goals': (context) => const EditGoalsScreen(),
         '/edit_key_events': (context) => const EditKeyEventsScreen(),
         '/edit_tournaments': (context) => const EditTournamentsScreen(),
-      });
-      }
-}
-
-class PlaceholderScreen extends StatelessWidget {
-  final String title;
-  const PlaceholderScreen({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text('Pantalla de "$title"'),
-      ),
+      },
     );
   }
 }
