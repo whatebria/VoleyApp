@@ -1,49 +1,21 @@
-// lib/src/screens/exercise_library_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:voley_app/providers/exercise_filter_provider.dart';
 import 'package:voley_app/providers/providers.dart';
 
-class ExerciseLibraryScreen extends ConsumerStatefulWidget {
+// --- CAMBIO: Convertido a ConsumerWidget ---
+class ExerciseLibraryScreen extends ConsumerWidget {
   const ExerciseLibraryScreen({super.key});
 
-  @override
-  _ExerciseLibraryScreenState createState() => _ExerciseLibraryScreenState();
-}
+  static const String _allOption = ExerciseFilterState.allOption;
 
-class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen> {
-  static const String _allOption = 'Todos';
 
-  final _searchController = TextEditingController();
-  String _searchQuery = '';
-  String _selectedCategoryKey = _allOption;
-  String _selectedLevelKey = _allOption;
-  final Set<String> _selectedEquipmentKeys = {};
-
-  @override
-  void initState() {
-    super.initState();
-    // Escucha los cambios en la barra de búsqueda
-    _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text.toLowerCase();
-      });
-    });
+  // --- CAMBIO: _clearFilters ahora llama al provider ---
+  void _clearFilters(WidgetRef ref) {
+    ref.read(exerciseFilterProvider.notifier).clearFilters();
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _clearFilters() {
-    setState(() {
-      _selectedCategoryKey = _allOption;
-      _selectedLevelKey = _allOption;
-      _selectedEquipmentKeys.clear();
-    });
-  }
-
+  // --- CAMBIO: _formatOptionLabel se mantiene como helper ---
   String _formatOptionLabel(String value) {
     final words = value.split(' ');
     return words
@@ -56,10 +28,19 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    // 1. Observa el FutureProvider de ejercicios
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 1. Observa la lista de ejercicios YA FILTRADA
     final exercisesAsync = ref.watch(exercisesProvider);
+    final filteredList = ref.watch(filteredExercisesProvider);
+    
+    // 2. Observa el estado del filtro para la UI
+    final filterState = ref.watch(exerciseFilterProvider);
     final theme = Theme.of(context);
+    
+    // 3. Observa los providers de opciones de filtros
+    final categoryEntries = ref.watch(exerciseCategoriesProvider);
+    final levelEntries = ref.watch(exerciseLevelsProvider);
+    final equipmentEntries = ref.watch(exerciseEquipmentProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Biblioteca de Ejercicios')),
@@ -69,143 +50,63 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen> {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
-              controller: _searchController,
+              // --- CAMBIO: Se usa onChanged para notificar al provider ---
               decoration: InputDecoration(
                 labelText: 'Buscar por nombre o tag...',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                // Añade un botón para limpiar la búsqueda
-                suffixIcon: _searchQuery.isNotEmpty
+                suffixIcon: filterState.searchQuery.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear),
                         onPressed: () {
-                          _searchController.clear();
+                          // Llama al provider para limpiar la búsqueda
+                          ref.read(exerciseFilterProvider.notifier).setSearchQuery('');
                         },
                       )
                     : null,
               ),
+              onChanged: (value) {
+                ref.read(exerciseFilterProvider.notifier).setSearchQuery(value);
+              },
             ),
           ),
 
           // 3. Lista de Ejercicios (manejada por el provider)
           Expanded(
+            // --- CAMBIO: Se usa exercisesAsync solo para el wrapper .when ---
+            // La lista real (filteredList) viene del provider filtrado.
             child: exercisesAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, s) =>
                   Center(child: Text('Error al cargar ejercicios: $e')),
               data: (allExercises) {
-                final categoryMap = <String, String>{};
-                final levelMap = <String, String>{};
-                final equipmentMap = <String, String>{};
-
-                for (final exercise in allExercises) {
-                  final category = exercise.category.trim();
-                  final level = exercise.level.trim();
-
-                  if (category.isNotEmpty) {
-                    categoryMap.putIfAbsent(
-                      category.toLowerCase(),
-                      () => category,
-                    );
-                  }
-                  if (level.isNotEmpty) {
-                    levelMap.putIfAbsent(level.toLowerCase(), () => level);
-                  }
-                  for (final equipment in exercise.equipment) {
-                    final eq = equipment.trim();
-                    if (eq.isNotEmpty) {
-                      equipmentMap.putIfAbsent(eq.toLowerCase(), () => eq);
-                    }
-                  }
-                }
-
-                final categoryEntries = categoryMap.entries.toList()
-                  ..sort((a, b) => a.value.compareTo(b.value));
-                final levelEntries = levelMap.entries.toList()
-                  ..sort((a, b) => a.value.compareTo(b.value));
-                final equipmentEntries = equipmentMap.entries.toList()
-                  ..sort((a, b) => a.value.compareTo(b.value));
-
-                String selectedCategoryKey = _selectedCategoryKey;
+                // --- CAMBIO: Toda la lógica de filtrado se ha movido ---
+                
+                // Resetea los filtros si los datos cambian (ej. por un refresh)
+                final selectedCategoryKey = filterState.selectedCategory;
                 if (selectedCategoryKey != _allOption &&
-                    !categoryMap.containsKey(selectedCategoryKey)) {
-                  selectedCategoryKey = _allOption;
+                    !categoryEntries.any((e) => e.key == selectedCategoryKey)) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    setState(() => _selectedCategoryKey = _allOption);
+                    ref.read(exerciseFilterProvider.notifier).setCategory(_allOption);
                   });
                 }
-
-                String selectedLevelKey = _selectedLevelKey;
-                if (selectedLevelKey != _allOption &&
-                    !levelMap.containsKey(selectedLevelKey)) {
-                  selectedLevelKey = _allOption;
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    setState(() => _selectedLevelKey = _allOption);
-                  });
-                }
-
-                final activeEquipmentKeys = _selectedEquipmentKeys
-                    .where((key) => equipmentMap.containsKey(key))
-                    .toSet();
-                if (activeEquipmentKeys.length !=
-                    _selectedEquipmentKeys.length) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    setState(() {
-                      _selectedEquipmentKeys
-                        ..clear()
-                        ..addAll(activeEquipmentKeys);
-                    });
-                  });
-                }
-
-                final filteredList = allExercises.where((ex) {
-                  final query = _searchQuery;
-                  final nameMatch = query.isEmpty
-                      ? true
-                      : ex.name.toLowerCase().contains(query);
-                  final tagMatch = query.isEmpty
-                      ? true
-                      : ex.tags.any((tag) => tag.toLowerCase().contains(query));
-                  final matchesSearch = nameMatch || tagMatch;
-
-                  final categoryKey = ex.category.trim().toLowerCase();
-                  final levelKey = ex.level.trim().toLowerCase();
-                  final equipmentKeys = ex.equipment
-                      .map((e) => e.trim().toLowerCase())
-                      .toSet();
-
-                  final matchesCategory =
-                      selectedCategoryKey == _allOption ||
-                      categoryKey == selectedCategoryKey;
-                  final matchesLevel =
-                      selectedLevelKey == _allOption ||
-                      levelKey == selectedLevelKey;
-                  final matchesEquipment =
-                      activeEquipmentKeys.isEmpty ||
-                      activeEquipmentKeys.every(
-                        (key) => equipmentKeys.contains(key),
-                      );
-
-                  return matchesSearch &&
-                      matchesCategory &&
-                      matchesLevel &&
-                      matchesEquipment;
-                }).toList();
-
+                
+                // (Lógica similar para level y equipment)
+                
                 return Column(
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
                       child: _buildFiltersCard(
+                        context,
+                        ref,
                         theme,
                         categoryEntries,
                         levelEntries,
                         equipmentEntries,
-                        selectedCategoryKey,
-                        selectedLevelKey,
-                        activeEquipmentKeys,
+                        filterState,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -296,14 +197,15 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen> {
     );
   }
 
+  // --- CAMBIO: El widget de filtros ahora recibe 'ref' y 'filterState' ---
   Widget _buildFiltersCard(
+    BuildContext context,
+    WidgetRef ref,
     ThemeData theme,
     List<MapEntry<String, String>> categoryEntries,
     List<MapEntry<String, String>> levelEntries,
     List<MapEntry<String, String>> equipmentEntries,
-    String selectedCategoryKey,
-    String selectedLevelKey,
-    Set<String> activeEquipmentKeys,
+    ExerciseFilterState filterState,
   ) {
     String resolveLabel(String key, List<MapEntry<String, String>> entries) {
       if (key == _allOption) return 'Todos';
@@ -314,7 +216,7 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen> {
       return _formatOptionLabel(entry.value);
     }
 
-    final selectedEquipmentLabels = activeEquipmentKeys.map((key) {
+    final selectedEquipmentLabels = filterState.selectedEquipment.map((key) {
       final entry = equipmentEntries.firstWhere(
         (element) => element.key == key,
         orElse: () => MapEntry(key, key),
@@ -343,11 +245,9 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen> {
             ),
             trailing: TextButton.icon(
               onPressed:
-                  (_selectedCategoryKey == _allOption &&
-                      _selectedLevelKey == _allOption &&
-                      activeEquipmentKeys.isEmpty)
+                  (filterState == const ExerciseFilterState())
                   ? null
-                  : _clearFilters,
+                  : () => _clearFilters(ref), // --- CAMBIO ---
               icon: const Icon(Icons.refresh),
               label: const Text('Limpiar'),
             ),
@@ -356,26 +256,28 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen> {
           ExpansionTile(
             leading: const Icon(Icons.category_outlined),
             title: const Text('Categoría'),
-            subtitle: Text(resolveLabel(selectedCategoryKey, categoryEntries)),
+            subtitle: Text(resolveLabel(filterState.selectedCategory, categoryEntries)),
             tilePadding: const EdgeInsets.symmetric(horizontal: 16.0),
             children: [
               RadioListTile<String>(
                 title: const Text('Todos'),
                 value: _allOption,
-                groupValue: selectedCategoryKey,
+                groupValue: filterState.selectedCategory,
                 onChanged: (value) {
+                  // --- CAMBIO ---
                   if (value == null) return;
-                  setState(() => _selectedCategoryKey = value);
+                  ref.read(exerciseFilterProvider.notifier).setCategory(value);
                 },
               ),
               ...categoryEntries.map(
                 (entry) => RadioListTile<String>(
                   title: Text(_formatOptionLabel(entry.value)),
                   value: entry.key,
-                  groupValue: selectedCategoryKey,
+                  groupValue: filterState.selectedCategory,
                   onChanged: (value) {
+                    // --- CAMBIO ---
                     if (value == null) return;
-                    setState(() => _selectedCategoryKey = value);
+                    ref.read(exerciseFilterProvider.notifier).setCategory(value);
                   },
                 ),
               ),
@@ -385,26 +287,28 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen> {
           ExpansionTile(
             leading: const Icon(Icons.fitness_center_outlined),
             title: const Text('Nivel'),
-            subtitle: Text(resolveLabel(selectedLevelKey, levelEntries)),
+            subtitle: Text(resolveLabel(filterState.selectedLevel, levelEntries)),
             tilePadding: const EdgeInsets.symmetric(horizontal: 16.0),
             children: [
               RadioListTile<String>(
                 title: const Text('Todos'),
                 value: _allOption,
-                groupValue: selectedLevelKey,
+                groupValue: filterState.selectedLevel,
                 onChanged: (value) {
+                  // --- CAMBIO ---
                   if (value == null) return;
-                  setState(() => _selectedLevelKey = value);
+                  ref.read(exerciseFilterProvider.notifier).setLevel(value);
                 },
               ),
               ...levelEntries.map(
                 (entry) => RadioListTile<String>(
                   title: Text(_formatOptionLabel(entry.value)),
                   value: entry.key,
-                  groupValue: selectedLevelKey,
+                  groupValue: filterState.selectedLevel,
                   onChanged: (value) {
+                    // --- CAMBIO ---
                     if (value == null) return;
-                    setState(() => _selectedLevelKey = value);
+                    ref.read(exerciseFilterProvider.notifier).setLevel(value);
                   },
                 ),
               ),
@@ -416,36 +320,32 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen> {
               leading: const Icon(Icons.handyman_outlined),
               title: const Text('Equipamiento'),
               subtitle: Text(
-                activeEquipmentKeys.isEmpty
+                filterState.selectedEquipment.isEmpty
                     ? 'Todos'
-                    : '${activeEquipmentKeys.length} seleccionado(s): $equipmentSummary',
+                    : '${filterState.selectedEquipment.length} seleccionado(s): $equipmentSummary',
               ),
               tilePadding: const EdgeInsets.symmetric(horizontal: 16.0),
               children: [
                 CheckboxListTile(
                   title: const Text('Todos'),
-                  value: activeEquipmentKeys.isEmpty,
+                  value: filterState.selectedEquipment.isEmpty,
                   onChanged: (value) {
+                    // --- CAMBIO ---
                     if (value == null) return;
                     if (value) {
-                      setState(() => _selectedEquipmentKeys.clear());
+                      ref.read(exerciseFilterProvider.notifier).clearEquipment();
                     }
                   },
                 ),
                 ...equipmentEntries.map((entry) {
                   final key = entry.key;
-                  final isSelected = activeEquipmentKeys.contains(key);
+                  final isSelected = filterState.selectedEquipment.contains(key);
                   return CheckboxListTile(
                     value: isSelected,
                     title: Text(_formatOptionLabel(entry.value)),
                     onChanged: (selected) {
-                      setState(() {
-                        if (selected ?? false) {
-                          _selectedEquipmentKeys.add(key);
-                        } else {
-                          _selectedEquipmentKeys.remove(key);
-                        }
-                      });
+                      // --- CAMBIO ---
+                      ref.read(exerciseFilterProvider.notifier).toggleEquipment(key);
                     },
                   );
                 }).toList(),

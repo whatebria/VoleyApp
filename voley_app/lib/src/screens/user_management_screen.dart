@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
-import 'package:voley_app/src/screens/coach_player_profile.dart';
+import 'package:voley_app/src/screens/coach_player_profile.dart'; 
 import 'package:voley_app/src/screens/create_player_screen.dart';
 // --- CAMBIO ---
-// Importamos la nueva pantalla de perfil
-
 
 class UserManagementScreen extends ConsumerWidget {
   const UserManagementScreen({super.key});
@@ -42,7 +40,8 @@ class UserManagementScreen extends ConsumerWidget {
           }
 
           // El body es SOLO la lista de jugadores
-          return _buildPlayerList(theme, ref);
+          // --- CAMBIO: Pasa 'context' ---
+          return _buildPlayerList(context, theme, ref);
         },
       ),
       // --- MEJORA DE UX: FAB para la acción de "Crear" ---
@@ -60,8 +59,42 @@ class UserManagementScreen extends ConsumerWidget {
     );
   }
 
+  // --- AÑADIDO: Widget para la tarjeta de invitación ---
+  Widget _buildInviteCard(BuildContext context, ThemeData theme) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      elevation: 1,
+      // Usamos el color secundario para que destaque
+      color: theme.colorScheme.secondary.withOpacity(0.1), 
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        // Borde con el color secundario
+        side: BorderSide(color: theme.colorScheme.secondary) 
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        leading: Icon(Icons.person_add_alt_1, color: theme.colorScheme.secondary),
+        title: Text(
+          'Invitar Atleta',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.secondary
+          ),
+        ),
+        subtitle: Text('Generar código de invitación'),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () {
+          // Asumiendo que la ruta '/permiso' está definida en main.dart
+          // y lleva a PermissionManagementScreen
+          Navigator.pushNamed(context, '/permiso');
+        },
+      ),
+    );
+  }
+
   /// Widget separado para la lista de jugadores
-  Widget _buildPlayerList(ThemeData theme, WidgetRef ref) {
+  /// --- CAMBIO: Acepta 'context' ---
+  Widget _buildPlayerList(BuildContext context, ThemeData theme, WidgetRef ref) {
     // Observa el nuevo provider que tiene jugadores + perfiles
     final playersWithProfilesAsync = ref.watch(coachPlayersWithProfilesProvider);
 
@@ -79,6 +112,9 @@ class UserManagementScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // --- AÑADIDO: Tarjeta de invitación ---
+              _buildInviteCard(context, theme),
+              
               Padding(
                 padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
                 child: Text(

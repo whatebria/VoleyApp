@@ -5,7 +5,6 @@ import 'package:voley_app/src/models/player_profile/form_peak.dart';
 import 'package:voley_app/src/models/player_profile/player_event.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
-import 'package:voley_app/theme/app_theme.dart';
 
 // --- CAMBIO ---
 // Renombrado de 'CoachPlayerProfile' a 'CoachPlayerProfile' para

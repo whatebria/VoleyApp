@@ -7,10 +7,16 @@ import 'package:voley_app/src/auth/root_screen.dart';
 import 'package:voley_app/src/screens/create_player_screen.dart';
 import 'package:voley_app/src/screens/exercise_library_screen.dart';
 import 'package:voley_app/src/screens/generate_program_screen.dart';
+import 'package:voley_app/src/screens/player/config/edit_availability_screen.dart';
+import 'package:voley_app/src/screens/player/config/edit_basic_info_screen.dart';
+import 'package:voley_app/src/screens/player/config/edit_goals_screen.dart';
+import 'package:voley_app/src/screens/player/config/edit_key_events_screen.dart';
+import 'package:voley_app/src/screens/player/config/edit_tournaments_screen.dart';
 import 'package:voley_app/src/screens/player/new_evaluation_screen.dart';
 import 'package:voley_app/src/screens/permissions/permission_management_screen.dart';
 import 'package:voley_app/src/screens/player/player_evaluation_screen.dart';
 import 'package:voley_app/src/screens/player/player_link_code_screen.dart';
+import 'package:voley_app/src/screens/player/config/profile_settings_screen.dart';
 import 'package:voley_app/src/screens/program_view/program_explorer_screen.dart';
 import 'package:voley_app/src/screens/user_management_screen.dart';
 import 'package:voley_app/theme/app_theme.dart'; // Asegúrate de tener esta dependencia
@@ -56,7 +62,28 @@ class MyApp extends StatelessWidget {
         '/user_management': (c) => UserManagementScreen(),
         '/player_link_code': (c) => const PlayerLinkCodeScreen(),
         '/library': (c) => const ExerciseLibraryScreen(),
-      },
+        '/profile_settings': (c) => const ProfileSettingsScreen(),
+        '/player_evaluation': (context) => const PlayerEvaluationScreen(),
+        '/edit_basic_info': (context) => const EditBasicInfoScreen(),
+        '/edit_availability': (context) => const EditAvailabilityScreen(),
+        '/edit_goals': (context) => const EditGoalsScreen(),
+        '/edit_key_events': (context) => const EditKeyEventsScreen(),
+        '/edit_tournaments': (context) => const EditTournamentsScreen(),
+      });
+      }
+}
+
+class PlaceholderScreen extends StatelessWidget {
+  final String title;
+  const PlaceholderScreen({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(
+        child: Text('Pantalla de "$title"'),
+      ),
     );
   }
 }

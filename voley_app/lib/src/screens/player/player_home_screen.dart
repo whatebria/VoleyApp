@@ -5,7 +5,7 @@ import 'package:voley_app/providers/auth_provider.dart';
 // (Importa tus 3 pantallas de pestañas)
 import 'package:voley_app/src/screens/player/player_calendar_screen.dart';
 import 'package:voley_app/src/screens/exercise_library_screen.dart';
-import 'package:voley_app/src/screens/player/player_profile_screen.dart';
+import 'package:voley_app/src/screens/player/config/player_profile_screen.dart';
 
 // --- (CAMBIADO A ConsumerStatefulWidget) ---
 class PlayerHomeScreen extends ConsumerStatefulWidget {
