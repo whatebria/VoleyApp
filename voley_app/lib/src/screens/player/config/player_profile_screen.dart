@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:voley_app/providers/providers.dart'; // Asegúrate que esta ruta sea correcta
 import 'package:intl/intl.dart';
+
+import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/goal.dart';
 import 'package:voley_app/src/models/player_profile/injury.dart';
-import 'package:voley_app/src/models/player_profile/player_profile.dart'; 
-import 'package:voley_app/src/models/player_profile/player_event.dart'; 
-import 'package:voley_app/src/models/player_profile/form_peak.dart'; 
+import 'package:voley_app/src/models/player_profile/player_profile.dart';
+import 'package:voley_app/src/models/player_profile/player_event.dart';
+import 'package:voley_app/src/models/player_profile/form_peak.dart';
 import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
 
-
+/// PlayerProfileScreen v2
+///
+/// Principales mejoras UI/UX y de producto:
+/// - Estado de error con CTA de reintento.
+/// - Pull-to-refresh en cada pestaña (sincroniza con Riverpod).
+/// - KPI hero con acciones rápidas (conversión: evaluación, objetivo, lesión, coach).
+/// - Progreso de objetivos (barra + %).
+/// - Grid de tests responsive.
+/// - Varios detalles de accesibilidad (Semantics), consts, y pequeñas animaciones.
 class PlayerProfileScreen extends ConsumerWidget {
   const PlayerProfileScreen({super.key});
 
@@ -18,64 +27,81 @@ class PlayerProfileScreen extends ConsumerWidget {
     final profileAsync = ref.watch(playerProfileProvider);
     final theme = Theme.of(context);
 
-    // El manejo de estados .when() se mantiene, es una excelente práctica.
     return profileAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, s) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Text(
-            'Error al cargar el perfil. Intenta de nuevo. Detalles: $e',
-            textAlign: TextAlign.center,
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, s) => Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 56, color: theme.colorScheme.error),
+                const SizedBox(height: 16),
+                Text(
+                  'No pudimos cargar tu perfil',
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Inténtalo nuevamente. Si el problema persiste, revisa tu conexión.',
+                  style: theme.textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () => ref.invalidate(playerProfileProvider),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reintentar'),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Detalles: $e',
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
         ),
       ),
       data: (profile) {
-        if (profile == null) {
-          return _buildEmptyState(context, theme);
-        } else {
-          // REFACTOR: Pasamos al nuevo _buildProfileView con pestañas
-          return _buildProfileView(context, theme, profile);
-        }
+        if (profile == null) return _buildEmptyState(context, theme);
+        return _buildProfileView(context, theme, profile, ref);
       },
     );
   }
 
-  // --- 1. VISTA PRINCIPAL (AHORA UN HUB CON PESTAÑAS) ---
-
-  /// REFACTORIZADO: Ahora usa TabBar para segmentar la información.
+  // --- HUB con pestañas y acciones globales ---
   Widget _buildProfileView(
-      BuildContext context, ThemeData theme, PlayerProfile profile) {
-    // Asumimos que el perfil tiene una propiedad para saber si está vinculado.
-    // Si no la tiene, puedes chequear si `profile.coachId` es nulo, etc.
+    BuildContext context,
+    ThemeData theme,
+    PlayerProfile profile,
+    WidgetRef ref,
+  ) {
     final bool isLinkedToCoach = profile.assignedCoachId != null;
 
     return DefaultTabController(
-      length: 3, // 3 Pestañas: Resumen, Planificación, Historial
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Mi Perfil de Atleta'),
           actions: [
-            // ACCIÓN 1: Vínculo (menos intrusivo)
             if (!isLinkedToCoach)
               IconButton(
-                icon: const Icon(Icons.link),
                 tooltip: 'Conectar con entrenador',
-                onPressed: () {
-                  Navigator.pushNamed(context, '/player_link_code');
-                },
+                icon: const Icon(Icons.link),
+                onPressed: () => Navigator.pushNamed(context, '/player_link_code'),
               ),
-            // ACCIÓN 2: Configuración (El nuevo "Editar")
             IconButton(
-              icon: const Icon(Icons.settings_outlined),
               tooltip: 'Gestionar mi perfil',
-              onPressed: () {
-                // Navega al NUEVO hub de configuración
-                Navigator.pushNamed(context, '/profile_settings');
-              },
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () => Navigator.pushNamed(context, '/profile_settings'),
             ),
           ],
-          // NUEVO: TabBar para organizar el contenido
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.person_outline), text: 'Resumen'),
@@ -84,30 +110,33 @@ class PlayerProfileScreen extends ConsumerWidget {
             ],
           ),
         ),
-        // NUEVO: TabBarView para mostrar el contenido de cada pestaña
         body: TabBarView(
           children: [
-            // Pestaña 1: Resumen (Quién soy y Mis Números)
-            _buildOverviewTab(context, theme, profile, isLinkedToCoach),
-            // Pestaña 2: Planificación (Futuro: Objetivos, Estado, Fechas)
-            _buildPlanningTab(context, theme, profile),
-            // Pestaña 3: Historial (Pasado: Logros y Torneos)
-            _buildHistoryTab(context, theme, profile),
+            _Refreshable(
+              onRefresh: () async { ref.invalidate(playerProfileProvider); },
+              child: _buildOverviewTab(context, theme, profile, ref),
+            ),
+            _Refreshable(
+              onRefresh: () async { ref.invalidate(playerProfileProvider); },
+              child: _buildPlanningTab(context, theme, profile),
+            ),
+            _Refreshable(
+              onRefresh: () async { ref.invalidate(playerProfileProvider); },
+              child: _buildHistoryTab(context, theme, profile),
+            ),
           ],
         ),
-        // ELIMINADO: FloatingActionButton (reemplazado por el AppBar)
       ),
     );
   }
 
-  // --- 2. PESTAÑAS INDIVIDUALES ---
-
-  /// Pestaña 1: RESUMEN (Quién soy, métricas clave, prompt de coach)
-  Widget _buildOverviewTab(BuildContext context, ThemeData theme,
-      PlayerProfile profile, bool isLinkedToCoach) {
-    
-    // --- CAMBIO: Lógica de métricas actualizada ---
-    // Usa el getter 'latestEvaluation' del modelo PlayerProfile
+  // --- Pestaña 1: RESUMEN ---
+  Widget _buildOverviewTab(
+    BuildContext context,
+    ThemeData theme,
+    PlayerProfile profile,
+    WidgetRef ref,
+  ) {
     final latestEval = profile.latestEvaluation;
 
     final physicalMetrics = <MapEntry<String, String>>[];
@@ -115,151 +144,177 @@ class PlayerProfileScreen extends ConsumerWidget {
       physicalMetrics.add(MapEntry('Edad', '${profile.age} años'));
     }
     if (profile.heightCm != null) {
-      physicalMetrics
-          .add(MapEntry('Altura', '${_formatNumber(profile.heightCm!)} cm'));
+      physicalMetrics.add(MapEntry('Altura', '${_formatNumber(profile.heightCm!)} cm'));
     }
     if (profile.weightKg != null) {
-      physicalMetrics
-          .add(MapEntry('Peso', '${_formatNumber(profile.weightKg!)} kg'));
+      physicalMetrics.add(MapEntry('Peso', '${_formatNumber(profile.weightKg!)} kg'));
     }
     if (profile.wingspanCm != null) {
-      physicalMetrics.add(
-          MapEntry('Envergadura', '${_formatNumber(profile.wingspanCm!)} cm'));
+      physicalMetrics.add(MapEntry('Envergadura', '${_formatNumber(profile.wingspanCm!)} cm'));
     }
 
+    final completedGoals = profile.goals.where((g) => g.isCompleted).length;
+    final totalGoals = profile.goals.length;
+    final double goalsProgress = totalGoals == 0 ? 0 : completedGoals / totalGoals;
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 80.0),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
       children: [
-        // Tarjeta "Héroe" (Avatar, Nombre, Posición)
         _buildHeroCard(theme, profile),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
 
-        // Sección "Estadísticas Clave"
-        // --- CAMBIO: Pasa el 'latestEval' ---
-        _buildKeyStatsSection(
-            context, theme, physicalMetrics, latestEval),
-        const SizedBox(height: 24),
+        // Quick actions orientadas a conversión de valor
+        _QuickActions(
+          actions: [
+            _QuickAction(
+              icon: Icons.analytics_outlined,
+              label: 'Nueva evaluación',
+              onTap: () => Navigator.pushNamed(context, '/player_evaluation'),
+            ),
+            _QuickAction(
+              icon: Icons.add_task_outlined,
+              label: 'Añadir objetivo',
+              onTap: () => Navigator.pushNamed(context, '/profile_settings/goals'),
+            ),
+            _QuickAction(
+              icon: Icons.healing_outlined,
+              label: 'Registrar lesión',
+              onTap: () => Navigator.pushNamed(context, '/profile_settings/injuries'),
+            ),
+            _QuickAction(
+              icon: Icons.share_outlined,
+              label: 'Compartir perfil',
+              onTap: () => Navigator.pushNamed(context, '/profile_share'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
 
-        // REFACTORIZADO: El prompt de "Vincular Coach" ahora está al final
-        // de la pestaña principal y solo si NO está vinculado.
-        if (!isLinkedToCoach) _buildLinkCoachPrompt(context, theme),
+        // Bloque: Progreso de objetivos
+        _SectionHeader(theme: theme, title: 'Progreso de objetivos'),
+        const SizedBox(height: 8),
+        if (totalGoals == 0)
+          _buildEmptySection(
+            theme: theme,
+            icon: Icons.track_changes_outlined,
+            message: 'Define objetivos para visualizar tu progreso.',
+            buttonText: 'Añadir objetivos',
+            onPressed: () => Navigator.pushNamed(context, '/profile_settings/goals'),
+          )
+        else
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: LinearProgressIndicator(value: goalsProgress),
+                      ),
+                      const SizedBox(width: 12),
+                      Text('${(goalsProgress * 100).toStringAsFixed(0)}%'),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text('$completedGoals de $totalGoals objetivos completados',
+                      style: theme.textTheme.bodyMedium),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 16),
+
+        // Bloque: Estadísticas clave
+        _buildKeyStatsSection(context, theme, physicalMetrics, latestEval),
+
+        const SizedBox(height: 24),
+        if (profile.assignedCoachId == null) _buildLinkCoachPrompt(context, theme),
       ],
     );
   }
 
-  /// Pestaña 2: PLANIFICACIÓN (Objetivos, Estado, Fechas, Picos)
+  // --- Pestaña 2: PLANIFICACIÓN ---
   Widget _buildPlanningTab(
-      BuildContext context, ThemeData theme, PlayerProfile profile) {
-        
-    // --- AÑADIDO: Lógica para filtrar lesiones activas ---
-    final activeInjuries = profile.injuries
-        .where((i) => i.status == InjuryStatus.active)
-        .toList();
-        
+    BuildContext context,
+    ThemeData theme,
+    PlayerProfile profile,
+  ) {
+    final activeInjuries = profile.injuries.where((i) => i.status == InjuryStatus.active).toList();
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 80.0),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
       children: [
-        // --- Objetivos personales ---
-        Text(
-          'Objetivos',
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-        ),
+        Text('Objetivos', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
         const Divider(height: 16),
         if (profile.goals.isEmpty)
-          // NUEVO: Estado vacío accionable
           _buildEmptySection(
             theme: theme,
             icon: Icons.track_changes_outlined,
             message: 'Define objetivos para personalizar tu progreso.',
-            buttonText: 'Añadir Objetivos',
-            onPressed: () {
-              // TODO: Asegúrate que esta ruta exista en tu main.dart
-              Navigator.pushNamed(context, '/profile_settings/goals');
-            },
+            buttonText: 'Añadir objetivos',
+            onPressed: () => Navigator.pushNamed(context, '/profile_settings/goals'),
           )
         else
           Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: profile.goals
-                // --- CAMBIO: 'goal' ahora es un objeto Goal ---
-                .map((goal) => _buildGoalRow(theme, goal)) 
-                .toList(),
+            children: profile.goals.map((goal) => _buildGoalRow(theme, goal)).toList(),
           ),
         const SizedBox(height: 24),
 
-        // --- Estado Actual (Logística) ---
-        Text(
-          'Mi Estado',
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-        ),
+        Text('Mi Estado', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
         const Divider(height: 16),
         _InfoRow(
           theme,
           icon: Icons.healing_outlined,
           title: 'Lesiones',
-          // --- CAMBIO: Muestra solo lesiones activas ---
-          value: activeInjuries.isEmpty 
-              ? 'Ninguna' 
-              : activeInjuries.map((i) => i.description).join(', '),
+          value: activeInjuries.isEmpty ? 'Ninguna' : activeInjuries.map((i) => i.description).join(', '),
         ),
         _InfoRow(
           theme,
           icon: Icons.calendar_today_outlined,
           title: 'Días Disponibles',
-          value: profile.availability.trainingDays.isEmpty // 'days' en lugar de 'trainingDays'
+          value: (profile.availability.trainingDays.isEmpty)
               ? 'No especificado'
               : profile.availability.trainingDays.join(', '),
         ),
         _InfoRow(
           theme,
           icon: Icons.timer_outlined,
-          title: 'Duración de Sesión',
-          // --- CAMBIO: 'sessionMinutes' en lugar de 'sessionDuration' ---
+          title: 'Duración de sesión',
           value: '${profile.availability.sessionMinutes} minutos',
         ),
         const SizedBox(height: 24),
 
-        // --- Fechas Clave ---
         if (profile.keyEvents.isNotEmpty) ...[
-          Text(
-            'Fechas Clave',
-            style: theme.textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
+          Text('Fechas clave', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           const Divider(height: 16),
           ...profile.keyEvents.map(
             (PlayerEvent event) => ListTile(
               leading: Icon(Icons.flag_outlined, color: theme.colorScheme.secondary),
               title: Text(
-                '${_eventLabel(event.type)} - ${DateFormat('dd/MM/yyyy').format(event.date)}',
+                '${_eventLabel(event.type)} • ${DateFormat('dd/MM/yyyy').format(event.date)}',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              subtitle:
-                  event.description != null ? Text(event.description!) : null,
+              subtitle: event.description != null ? Text(event.description!) : null,
             ),
           ),
           const SizedBox(height: 24),
         ],
 
-        // --- Picos de Forma ---
         if (profile.formPeaks.isNotEmpty) ...[
-          Text(
-            'Picos de Forma Planificados',
-            style: theme.textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
+          Text('Picos de forma planificados', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           const Divider(height: 16),
           Wrap(
-            spacing: 8.0,
-            runSpacing: 4.0,
+            spacing: 8,
+            runSpacing: 4,
             children: profile.formPeaks
-                .map(
-                  (FormPeak peak) => Chip(
-                    label: Text(
-                      '${DateFormat('dd/MM/yy').format(peak.date)}${peak.note != null ? ' • ${peak.note}' : ''}',
-                    ),
-                  ),
-                )
+                .map((FormPeak peak) => Chip(
+                      label: Text(
+                        '${DateFormat('dd/MM/yy').format(peak.date)}${peak.note != null ? ' • ${peak.note}' : ''}',
+                      ),
+                    ))
                 .toList(),
           ),
           const SizedBox(height: 24),
@@ -268,35 +323,29 @@ class PlayerProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// Pestaña 3: HISTORIAL (Torneos y Logros)
+  // --- Pestaña 3: HISTORIAL ---
   Widget _buildHistoryTab(
-      BuildContext context, ThemeData theme, PlayerProfile profile) {
+    BuildContext context,
+    ThemeData theme,
+    PlayerProfile profile,
+  ) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 80.0),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
       children: [
-        // --- Historial de Torneos ---
-        Text(
-          'Historial de Torneos',
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-        ),
+        Text('Historial de Torneos', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
         const Divider(height: 16),
         if (profile.tournaments.isEmpty)
-          // NUEVO: Estado vacío accionable
           _buildEmptySection(
             theme: theme,
             icon: Icons.emoji_events_outlined,
             message: 'Registra tus torneos pasados para ver tu progreso.',
-            buttonText: 'Añadir Torneo',
-            onPressed: () {
-              // TODO: Asegúrate que esta ruta exista
-              Navigator.pushNamed(context, '/profile_settings/tournaments');
-            },
+            buttonText: 'Añadir torneo',
+            onPressed: () => Navigator.pushNamed(context, '/profile_settings/tournaments'),
           )
         else
           ...profile.tournaments.map(
             (t) => ListTile(
-              leading: Icon(Icons.emoji_events_outlined,
-                  color: theme.colorScheme.secondary),
+              leading: Icon(Icons.emoji_events_outlined, color: theme.colorScheme.secondary),
               title: Text(t.name, style: const TextStyle(fontWeight: FontWeight.w600)),
               subtitle: Text(DateFormat('dd/MM/yyyy').format(t.date)),
             ),
@@ -305,9 +354,49 @@ class PlayerProfileScreen extends ConsumerWidget {
     );
   }
 
-  // --- 3. WIDGETS REUTILIZABLES (Componentes de UI) ---
+  // --- Componentes reutilizables ---
 
-  /// NUEVO: Estado vacío genérico con un CTA.
+  Widget _buildEmptyState(BuildContext context, ThemeData theme) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.assessment_outlined, size: 80, color: theme.colorScheme.primary),
+              const SizedBox(height: 24),
+              Text(
+                '¡Tu viaje comienza ahora!',
+                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Completa tu evaluación inicial para desbloquear tu perfil, descubrir tus estadísticas y recibir tu plan de entrenamiento.',
+                style: theme.textTheme.bodyLarge?.copyWith(color: theme.textTheme.bodySmall?.color),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              FilledButton.icon(
+                icon: const Icon(Icons.arrow_forward),
+                label: const Text('Completar evaluación'),
+                onPressed: () => Navigator.pushNamed(context, '/player_evaluation'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.link),
+                label: const Text('Vincular con mi entrenador'),
+                onPressed: () => Navigator.pushNamed(context, '/player_link_code'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Estado vacío genérico con CTA reutilizable
   Widget _buildEmptySection({
     required ThemeData theme,
     required IconData icon,
@@ -326,14 +415,13 @@ class PlayerProfileScreen extends ConsumerWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge
-                  ?.copyWith(color: theme.textTheme.bodySmall?.color),
+              style: theme.textTheme.bodyLarge?.copyWith(color: theme.textTheme.bodySmall?.color),
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
+            FilledButton.icon(
+              onPressed: onPressed,
               icon: const Icon(Icons.add_circle_outline),
               label: Text(buttonText),
-              onPressed: onPressed,
             ),
           ],
         ),
@@ -341,95 +429,37 @@ class PlayerProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// (Sin cambios) Estado vacío para cuando el perfil NO existe.
-  Widget _buildEmptyState(BuildContext context, ThemeData theme) {
-    return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.assessment_outlined,
-                size: 80,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                '¡Tu viaje comienza ahora!',
-                style: theme.textTheme.headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Completa tu evaluación inicial para desbloquear tu perfil, descubrir tus estadísticas y recibir tu plan de entrenamiento.',
-                style: theme.textTheme.bodyLarge
-                    ?.copyWith(color: theme.textTheme.bodySmall?.color),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.arrow_forward),
-                label: const Text('Completar Evaluación'),
-                style: ElevatedButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-                onPressed: () {
-                  Navigator.pushNamed(context, '/player_evaluation');
-                },
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.link),
-                label: const Text('Vincular con mi entrenador'),
-                onPressed: () {
-                  Navigator.pushNamed(context, '/player_link_code');
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// REFACTORIZADO: Extraído a su propio widget para limpieza.
   Widget _buildHeroCard(ThemeData theme, PlayerProfile profile) {
     return Card(
-      elevation: 2,
+      elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
             CircleAvatar(
-              radius: 45,
+              radius: 44,
               backgroundColor: theme.colorScheme.primary,
               child: Text(
-                profile.name.isNotEmpty
-                    ? profile.name.substring(0, 2).toUpperCase()
-                    : '??',
+                profile.name.isNotEmpty ? profile.name.substring(0, 2).toUpperCase() : '??',
                 style: theme.textTheme.headlineLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: theme.colorScheme.onPrimary,
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Text(
               profile.name,
-              style:
-                  theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
-              '${profile.position} | ${profile.level.isNotEmpty ? profile.level[0].toUpperCase() + profile.level.substring(1) : ""}',
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(color: theme.colorScheme.secondary),
+              '${profile.position} • ${profile.level.isNotEmpty ? profile.level[0].toUpperCase() + profile.level.substring(1) : ''}',
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.secondary),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -437,34 +467,26 @@ class PlayerProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// REFACTORIZADO: Extraído a su propio widget para limpieza.
-  /// --- CAMBIO: Acepta EvaluationResult? en lugar de una lista de MapEntry ---
   Widget _buildKeyStatsSection(
     BuildContext context,
     ThemeData theme,
     List<MapEntry<String, String>> physicalMetrics,
-    EvaluationResult? latestEval, // <-- CAMBIO
+    EvaluationResult? latestEval,
   ) {
-    // --- CAMBIO: Extrae los test scores del latestEval ---
     final testScores = latestEval?.testScores ?? [];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Mis Estadísticas Clave',
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-        ),
+        _SectionHeader(theme: theme, title: 'Mis estadísticas clave'),
         const Divider(height: 16),
-        // --- CAMBIO: Lógica de estado vacío actualizada ---
         if (physicalMetrics.isEmpty && testScores.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24.0),
             child: Center(
               child: Text(
                 'Completa tu evaluación para ver tus métricas.',
-                style: theme.textTheme.bodyLarge
-                    ?.copyWith(color: theme.textTheme.bodySmall?.color),
+                style: theme.textTheme.bodyLarge?.copyWith(color: theme.textTheme.bodySmall?.color),
               ),
             ),
           )
@@ -476,9 +498,7 @@ class PlayerProfileScreen extends ConsumerWidget {
               children: physicalMetrics
                   .map(
                     (metric) => SizedBox(
-                      width: MediaQuery.of(context).size.width < 360
-                          ? double.infinity
-                          : 160,
+                      width: MediaQuery.of(context).size.width < 360 ? double.infinity : 160,
                       child: _buildStatCard(
                         theme,
                         title: metric.key,
@@ -490,29 +510,38 @@ class PlayerProfileScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
           ],
-          // --- CAMBIO: Lógica actualizada para List<TestScore> ---
           if (testScores.isNotEmpty) ...[
-            Text(
-              'Tests físicos',
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
+            Text('Tests físicos', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.5,
-              children: testScores.map((test) {
-                return _buildStatCard(
-                  theme,
-                  title: _formatTestId(test.testId), // <-- CAMBIO
-                  value: test.value.toStringAsFixed(1),
-                  unit: test.unit, // <-- CAMBIO
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final crossAxisCount = width >= 720
+                    ? 3
+                    : width >= 520
+                        ? 2
+                        : 2;
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 1.7,
+                  ),
+                  itemCount: testScores.length,
+                  itemBuilder: (context, index) {
+                    final test = testScores[index];
+                    return _buildStatCard(
+                      theme,
+                      title: _formatTestId(test.testId),
+                      value: test.value.toStringAsFixed(1),
+                      unit: test.unit,
+                    );
+                  },
                 );
-              }).toList(),
+              },
             ),
           ],
         ],
@@ -520,10 +549,9 @@ class PlayerProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// (Sin cambios) Prompt para vincular, ahora llamado desde la Pestaña 1.
   Widget _buildLinkCoachPrompt(BuildContext context, ThemeData theme) {
     return Card(
-      elevation: 2,
+      elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: theme.colorScheme.surfaceVariant.withOpacity(0.7),
       child: Padding(
@@ -538,24 +566,21 @@ class PlayerProfileScreen extends ConsumerWidget {
                 Expanded(
                   child: Text(
                     'Conecta con tu entrenador',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
-              'Comparte tu código o ingresa el de tu entrenador para sincronizar tus programas.',
+              'Sincroniza tus programas y recibe feedback directo. Mejora 3x más rápido.',
               style: theme.textTheme.bodyMedium,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerRight,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/player_link_code');
-                },
+              child: FilledButton.icon(
+                onPressed: () => Navigator.pushNamed(context, '/player_link_code'),
                 icon: const Icon(Icons.qr_code_2),
                 label: const Text('Abrir códigos'),
               ),
@@ -566,13 +591,16 @@ class PlayerProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// (Sin cambios) Tarjeta de Estadística para el Grid.
-  Widget _buildStatCard(ThemeData theme,
-      {required String title, required String value, String? unit}) {
+  Widget _buildStatCard(
+    ThemeData theme, {
+    required String title,
+    required String value,
+    String? unit,
+  }) {
     return Card(
       elevation: 0,
-      color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Column(
@@ -583,12 +611,12 @@ class PlayerProfileScreen extends ConsumerWidget {
               title,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.textTheme.bodySmall?.color,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
@@ -608,7 +636,7 @@ class PlayerProfileScreen extends ConsumerWidget {
                       color: theme.colorScheme.primary.withOpacity(0.8),
                     ),
                   ),
-                ]
+                ],
               ],
             ),
           ],
@@ -616,10 +644,13 @@ class PlayerProfileScreen extends ConsumerWidget {
       ),
     );
   }
-  
-  /// (Sin cambios) Fila de Información (Lesiones, Disponibilidad).
-  Widget _InfoRow(ThemeData theme,
-      {required IconData icon, required String title, required String value}) {
+
+  Widget _InfoRow(
+    ThemeData theme, {
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
@@ -631,8 +662,7 @@ class PlayerProfileScreen extends ConsumerWidget {
             flex: 2,
             child: Text(
               title,
-              style: theme.textTheme.bodyLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(width: 16),
@@ -641,8 +671,7 @@ class PlayerProfileScreen extends ConsumerWidget {
             child: Text(
               value,
               textAlign: TextAlign.end,
-              style: theme.textTheme.bodyLarge
-                  ?.copyWith(color: theme.textTheme.bodySmall?.color),
+              style: theme.textTheme.bodyLarge?.copyWith(color: theme.textTheme.bodySmall?.color),
             ),
           ),
         ],
@@ -650,34 +679,23 @@ class PlayerProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// --- CAMBIO: Fila de objetivo actualizada para usar el objeto Goal ---
   Widget _buildGoalRow(ThemeData theme, Goal goal) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         children: [
           Icon(
-            // --- CAMBIO: Icono dinámico basado en goal.isCompleted ---
-            goal.isCompleted 
-              ? Icons.check_circle 
-              : Icons.check_circle_outline,
-            color: goal.isCompleted 
-              ? theme.colorScheme.primary // voltNeon
-              : theme.colorScheme.secondary, // azulPro
-            size: 20
+            goal.isCompleted ? Icons.check_circle : Icons.check_circle_outline,
+            color: goal.isCompleted ? theme.colorScheme.primary : theme.colorScheme.secondary,
+            size: 20,
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              // --- CAMBIO: Usa goal.description ---
               goal.description,
               style: theme.textTheme.bodyLarge?.copyWith(
-                decoration: goal.isCompleted 
-                  ? TextDecoration.lineThrough 
-                  : TextDecoration.none,
-                color: goal.isCompleted
-                  ? theme.colorScheme.onSurface.withOpacity(0.5)
-                  : theme.colorScheme.onSurface
+                decoration: goal.isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
+                color: goal.isCompleted ? theme.colorScheme.onSurface.withOpacity(0.5) : theme.colorScheme.onSurface,
               ),
             ),
           ),
@@ -686,9 +704,6 @@ class PlayerProfileScreen extends ConsumerWidget {
     );
   }
 
-  // --- 4. FUNCIONES DE FORMATO (Helpers) ---
-  
-  /// (Sin cambios) Helper para etiquetas de eventos.
   String _eventLabel(String type) {
     switch (type) {
       case 'cup':
@@ -705,18 +720,122 @@ class PlayerProfileScreen extends ConsumerWidget {
     }
   }
 
-  /// (Sin cambios) Helper para formatear números.
   String _formatNumber(double value) {
     final isInt = value % 1 == 0;
     return isInt ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
   }
 
-  // --- AÑADIDO: Helper para formatear IDs de tests ---
   String _formatTestId(String testId) {
     if (testId.isEmpty) return 'Test';
-    // Convierte 'vertical_jump' en 'Vertical Jump'
-    return testId.split('_')
-      .map((word) => word[0].toUpperCase() + word.substring(1))
-      .join(' ');
+    return testId
+        .split('_')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
+  }
+}
+
+// --- Widgets auxiliares ---
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.theme, required this.title});
+  final ThemeData theme;
+  final String title;
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(width: 4, height: 20, decoration: BoxDecoration(color: theme.colorScheme.primary, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 8),
+        Text(title, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+}
+
+class _Refreshable extends StatelessWidget {
+  const _Refreshable({required this.child, required this.onRefresh});
+  final Widget child;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: child,
+    );
+  }
+}
+
+class _QuickAction {
+  const _QuickAction({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+}
+
+class _QuickActions extends StatelessWidget {
+  const _QuickActions({required this.actions});
+  final List<_QuickAction> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 520;
+        return Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8),
+            child: isWide
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: actions
+                        .map((a) => _QuickActionButton(icon: a.icon, label: a.label, onTap: a.onTap))
+                        .toList(),
+                  )
+                : Wrap(
+                    alignment: WrapAlignment.spaceEvenly,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: actions
+                        .map((a) => _QuickActionButton(icon: a.icon, label: a.label, onTap: a.onTap))
+                        .toList(),
+                  ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _QuickActionButton extends StatelessWidget {
+  const _QuickActionButton({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: theme.colorScheme.primary),
+              const SizedBox(height: 6),
+              Text(label, style: theme.textTheme.bodySmall),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

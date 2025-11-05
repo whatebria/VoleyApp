@@ -20,7 +20,7 @@ class _PlayerHomeScreenState extends ConsumerState<PlayerHomeScreen> {
   static const List<Widget> _widgetOptions = <Widget>[
     PlayerCalendarScreen(), // Pestaña 0
     ProgressDashboardScreen(), // Pestaña 1 (¡NUEVA!)
-    PlayerProfileScreen(), // Pestaña 2
+    PlayerProfileScreen(), // Pestaña 2s
   ];
 
   void _onItemTapped(int index) {

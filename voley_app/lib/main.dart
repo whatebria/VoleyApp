@@ -7,6 +7,7 @@ import 'package:voley_app/src/auth/root_screen.dart';
 import 'package:voley_app/src/screens/create_player_screen.dart';
 import 'package:voley_app/src/screens/exercise_library_screen.dart';
 import 'package:voley_app/src/screens/generate_program_screen.dart';
+import 'package:voley_app/src/screens/player/config/add_tournament_screen.dart';
 import 'package:voley_app/src/screens/player/config/edit_availability_screen.dart';
 import 'package:voley_app/src/screens/player/config/edit_basic_info_screen.dart';
 import 'package:voley_app/src/screens/player/config/edit_goals_screen.dart';
@@ -39,6 +40,7 @@ void main() async {
   runApp(const ProviderScope(child: MyApp()));
 }
 
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -68,6 +70,7 @@ class MyApp extends StatelessWidget {
         '/edit_goals': (context) => const EditGoalsScreen(),
         '/edit_key_events': (context) => const EditKeyEventsScreen(),
         '/edit_tournaments': (context) => const EditTournamentsScreen(),
+        '/profile_settings/tournaments': (context) => AddTournamentScreen()
       },
     );
   }

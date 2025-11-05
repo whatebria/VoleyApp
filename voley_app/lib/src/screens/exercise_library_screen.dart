@@ -346,8 +346,6 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                     onChanged: (selected) {
                       // --- CAMBIO ---
                       void toggleEquipment(String equipmentId) => toggleEquipment(equipmentId);
-
-
                     },
                   );
                 }).toList(),

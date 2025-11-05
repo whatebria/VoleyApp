@@ -527,6 +527,29 @@ final playerProgramProvider = StreamProvider<Program?>((ref) {
     error: (e, s) => Stream.error(e, s), // Error de perfil -> Error de programa
   );
 });
+Future<void> upsertPlayerProfile(
+    PlayerProfile profile, {
+    bool preferUserIdAsDocId = false,
+  }) async {
+    // 1) Determinar docId
+    String? docId;
+    if (preferUserIdAsDocId && profile.userId != null && profile.userId!.isNotEmpty) {
+      docId = profile.userId!;
+    } else if (profile.id.isNotEmpty) {
+      docId = profile.id;
+    } else if (profile.userId != null && profile.userId!.isNotEmpty) {
+      // fallback razonable si id viene vacío
+      docId = profile.userId!;
+    } else {
+      throw Exception('upsertPlayerProfile: se requiere profile.id o profile.userId');
+    }
+
+    // 2) Asegurar que el campo 'id' coincida con el docId que usaremos
+    final data = profile.copyWith(id: docId).toJson();
+
+    // 3) Guardar con merge
+    await _db.collection('players').doc(docId).set(data, SetOptions(merge: true));
+  }
 }
 
 
