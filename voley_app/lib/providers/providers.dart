@@ -1,7 +1,7 @@
 // lib/providers.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:voley_app/providers/auth_provider.dart';
+import 'package:voley_app/src/auth/auth_provider.dart';
 import 'package:voley_app/providers/program_editor_notifier.dart';
 import 'package:voley_app/providers/program_generator.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';

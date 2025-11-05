@@ -3,42 +3,53 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/exercise_filter_provider.dart';
 import 'package:voley_app/providers/providers.dart';
 
-// --- CAMBIO: Convertido a ConsumerWidget ---
 class ExerciseLibraryScreen extends ConsumerWidget {
   const ExerciseLibraryScreen({super.key});
 
   static const String _allOption = ExerciseFilterState.allOptionId;
 
-
-  // --- CAMBIO: _clearFilters ahora llama al provider ---
+  // Limpia filtros vía provider
   void _clearFilters(WidgetRef ref) {
     ref.read(exerciseFilterProvider.notifier).clearFilters();
   }
 
-  // --- CAMBIO: _formatOptionLabel se mantiene como helper ---
+  // Formatea "snake/camel" -> "Bonito"
   String _formatOptionLabel(String value) {
-    final words = value.split(' ');
-    return words
-        .map((word) {
-          if (word.isEmpty) return word;
-          final lower = word.toLowerCase();
-          return lower[0].toUpperCase() + lower.substring(1);
-        })
+    final v = value
+        .replaceAll('_', ' ')
+        .replaceAllMapped(RegExp(r'([a-z])([A-Z])'), (m) => '${m[1]} ${m[2]}')
+        .toLowerCase();
+    return v
+        .split(' ')
+        .where((w) => w.isNotEmpty)
+        .map((w) => w[0].toUpperCase() + w.substring(1))
         .join(' ');
+  }
+
+  // Mapea lista de enums a chips
+  List<Widget> _enumListToChips<T>(Iterable<T> enums) {
+    return enums
+        .map((e) => Chip(label: Text(_formatOptionLabel(e.toString().split('.').last))))
+        .toList();
+  }
+
+  // Un solo chip
+  Widget _enumToChip<T>(T e) {
+    return Chip(label: Text(_formatOptionLabel(e.toString().split('.').last)));
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 1. Observa la lista de ejercicios YA FILTRADA
-    final exercisesAsync = ref.watch(exercisesProvider);
-    final filteredList = ref.watch(filteredExercisesProvider);
-    
-    // 2. Observa el estado del filtro para la UI
+    // 1) Datos
+    final exercisesAsync = ref.watch(exercisesProvider);            // carga remota
+    final filteredList = ref.watch(filteredExercisesProvider);      // lista filtrada
+
+    // 2) Estado de filtros
     final filterState = ref.watch(exerciseFilterProvider);
     final theme = Theme.of(context);
-    
-    // 3. Observa los providers de opciones de filtros
-    final categoryEntries = ref.watch(exerciseCategoriesProvider);
+
+    // 3) Opciones de filtros (claves String = enum.name)
+    final categoryEntries = ref.watch(exerciseCategoriesProvider);  // List<MapEntry<key,value>>
     final levelEntries = ref.watch(exerciseLevelsProvider);
     final equipmentEntries = ref.watch(exerciseEquipmentProvider);
 
@@ -46,13 +57,12 @@ class ExerciseLibraryScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Biblioteca de Ejercicios')),
       body: Column(
         children: [
-          // 2. Barra de Búsqueda
+          // Búsqueda
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
-              // --- CAMBIO: Se usa onChanged para notificar al provider ---
               decoration: InputDecoration(
-                labelText: 'Buscar por nombre o tag...',
+                labelText: 'Buscar por nombre o palabra clave...',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -61,7 +71,6 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                     ? IconButton(
                         icon: const Icon(Icons.clear),
                         onPressed: () {
-                          // Llama al provider para limpiar la búsqueda
                           ref.read(exerciseFilterProvider.notifier).setSearchQuery('');
                         },
                       )
@@ -73,18 +82,13 @@ class ExerciseLibraryScreen extends ConsumerWidget {
             ),
           ),
 
-          // 3. Lista de Ejercicios (manejada por el provider)
+          // Lista
           Expanded(
-            // --- CAMBIO: Se usa exercisesAsync solo para el wrapper .when ---
-            // La lista real (filteredList) viene del provider filtrado.
             child: exercisesAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, s) =>
-                  Center(child: Text('Error al cargar ejercicios: $e')),
+              error: (e, s) => Center(child: Text('Error al cargar ejercicios: $e')),
               data: (allExercises) {
-                // --- CAMBIO: Toda la lógica de filtrado se ha movido ---
-                
-                // Resetea los filtros si los datos cambian (ej. por un refresh)
+                // Si cambian opciones (por ejemplo, primera carga), asegura IDs válidos
                 final selectedCategoryIdKey = filterState.selectedCategoryId;
                 if (selectedCategoryIdKey != _allOption &&
                     !categoryEntries.any((e) => e.key == selectedCategoryIdKey)) {
@@ -92,9 +96,15 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                     ref.read(exerciseFilterProvider.notifier).setCategoryId(_allOption);
                   });
                 }
-                
-                // (Lógica similar para level y equipment)
-                
+                final selectedLevelIdKey = filterState.selectedLevelId;
+                if (selectedLevelIdKey != _allOption &&
+                    !levelEntries.any((e) => e.key == selectedLevelIdKey)) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    ref.read(exerciseFilterProvider.notifier).setLevelId(_allOption);
+                  });
+                }
+                // (Opcional) validar equipamiento seleccionado contra entries
+
                 return Column(
                   children: [
                     Padding(
@@ -122,11 +132,17 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                               itemCount: filteredList.length,
                               itemBuilder: (context, index) {
                                 final exercise = filteredList[index];
+
+                                // NOTA: exercise es V4 con enums (en tu código se llama Exercise)
+                                final levelLabel = _formatOptionLabel(exercise.levelId.name);
+                                final categoryLabel = _formatOptionLabel(exercise.categoryId.name);
+
+                                final equipmentLabels = exercise.equipmentIds
+                                    .map((e) => _formatOptionLabel(e.name))
+                                    .toList();
+
                                 return Card(
-                                  margin: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 6,
-                                  ),
+                                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                                   elevation: 2,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -134,22 +150,15 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                                   child: ExpansionTile(
                                     title: Text(
                                       exercise.name,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
                                     ),
-                                    subtitle: Text(exercise.categoryId),
+                                    subtitle: Text(categoryLabel),
                                     leading: CircleAvatar(
-                                      backgroundColor:
-                                          theme.colorScheme.primaryContainer,
+                                      backgroundColor: theme.colorScheme.primaryContainer,
                                       child: Text(
-                                        exercise.levelId
-                                            .substring(0, 1)
-                                            .toUpperCase(),
+                                        levelLabel.characters.first.toUpperCase(),
                                         style: TextStyle(
-                                          color: theme
-                                              .colorScheme
-                                              .onPrimaryContainer,
+                                          color: theme.colorScheme.onPrimaryContainer,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -158,24 +167,27 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                                       Padding(
                                         padding: const EdgeInsets.all(16.0),
                                         child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(exercise.description),
                                             const SizedBox(height: 12),
+
+                                            // Chips informativos (V4)
                                             Wrap(
                                               spacing: 8.0,
                                               runSpacing: 4.0,
-                                              children: exercise.tagIds
-                                                  .map(
-                                                    (tag) =>
-                                                        Chip(label: Text(tag)),
-                                                  )
-                                                  .toList(),
+                                              children: [
+                                                _enumToChip(exercise.movementPatternId),
+                                                ..._enumListToChips(exercise.qualityIds),
+                                                ..._enumListToChips(exercise.vbTransferIds),
+                                              ],
                                             ),
+
                                             const Divider(height: 20),
                                             Text(
-                                              'Equipamiento: ${exercise.equipmentIds.join(', ')}',
+                                              equipmentLabels.isEmpty
+                                                  ? 'Equipamiento: —'
+                                                  : 'Equipamiento: ${equipmentLabels.join(', ')}',
                                               style: theme.textTheme.bodySmall,
                                             ),
                                           ],
@@ -197,7 +209,7 @@ class ExerciseLibraryScreen extends ConsumerWidget {
     );
   }
 
-  // --- CAMBIO: El widget de filtros ahora recibe 'ref' y 'filterState' ---
+  // Tarjeta de filtros
   Widget _buildFiltersCard(
     BuildContext context,
     WidgetRef ref,
@@ -223,12 +235,11 @@ class ExerciseLibraryScreen extends ConsumerWidget {
       );
       return _formatOptionLabel(entry.value);
     }).toList();
+
     final truncatedEquipment = selectedEquipmentLabels.take(3).toList();
-    final extraEquipment =
-        selectedEquipmentLabels.length - truncatedEquipment.length;
+    final extraEquipment = selectedEquipmentLabels.length - truncatedEquipment.length;
     final equipmentSummary =
-        truncatedEquipment.join(', ') +
-        (extraEquipment > 0 ? ' +$extraEquipment' : '');
+        truncatedEquipment.join(', ') + (extraEquipment > 0 ? ' +$extraEquipment' : '');
 
     return Card(
       elevation: 1,
@@ -239,20 +250,19 @@ class ExerciseLibraryScreen extends ConsumerWidget {
           ListTile(
             title: Text(
               'Filtros',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             trailing: TextButton.icon(
-              onPressed:
-                  (filterState == const ExerciseFilterState())
+              onPressed: (filterState == const ExerciseFilterState())
                   ? null
-                  : () => _clearFilters(ref), // --- CAMBIO ---
+                  : () => _clearFilters(ref),
               icon: const Icon(Icons.refresh),
               label: const Text('Limpiar'),
             ),
           ),
           const Divider(height: 1),
+
+          // Categoría
           ExpansionTile(
             leading: const Icon(Icons.category_outlined),
             title: const Text('Categoría'),
@@ -264,7 +274,6 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                 value: _allOption,
                 groupValue: filterState.selectedCategoryId,
                 onChanged: (value) {
-                  // --- CAMBIO ---
                   if (value == null) return;
                   ref.read(exerciseFilterProvider.notifier).setCategoryId(value);
                 },
@@ -275,7 +284,6 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                   value: entry.key,
                   groupValue: filterState.selectedCategoryId,
                   onChanged: (value) {
-                    // --- CAMBIO ---
                     if (value == null) return;
                     ref.read(exerciseFilterProvider.notifier).setCategoryId(value);
                   },
@@ -284,6 +292,8 @@ class ExerciseLibraryScreen extends ConsumerWidget {
             ],
           ),
           const Divider(height: 1),
+
+          // Nivel
           ExpansionTile(
             leading: const Icon(Icons.fitness_center_outlined),
             title: const Text('Nivel'),
@@ -295,7 +305,6 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                 value: _allOption,
                 groupValue: filterState.selectedLevelId,
                 onChanged: (value) {
-                  // --- CAMBIO ---
                   if (value == null) return;
                   ref.read(exerciseFilterProvider.notifier).setLevelId(value);
                 },
@@ -306,7 +315,6 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                   value: entry.key,
                   groupValue: filterState.selectedLevelId,
                   onChanged: (value) {
-                    // --- CAMBIO ---
                     if (value == null) return;
                     ref.read(exerciseFilterProvider.notifier).setLevelId(value);
                   },
@@ -314,6 +322,8 @@ class ExerciseLibraryScreen extends ConsumerWidget {
               ),
             ],
           ),
+
+          // Equipamiento (opcional)
           if (equipmentEntries.isNotEmpty) ...[
             const Divider(height: 1),
             ExpansionTile(
@@ -330,7 +340,6 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                   title: const Text('Todos'),
                   value: filterState.selectedEquipment.isEmpty,
                   onChanged: (value) {
-                    // --- CAMBIO ---
                     if (value == null) return;
                     if (value) {
                       ref.read(exerciseFilterProvider.notifier).clearEquipment();
@@ -338,14 +347,14 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                   },
                 ),
                 ...equipmentEntries.map((entry) {
-                  final key = entry.key;
+                  final key = entry.key; // string: enum.name
                   final isSelected = filterState.selectedEquipment.contains(key);
                   return CheckboxListTile(
                     value: isSelected,
                     title: Text(_formatOptionLabel(entry.value)),
                     onChanged: (selected) {
-                      // --- CAMBIO ---
-                      void toggleEquipment(String equipmentId) => toggleEquipment(equipmentId);
+                      if (selected == null) return;
+                      ref.read(exerciseFilterProvider.notifier).toggleEquipment(key);
                     },
                   );
                 }).toList(),

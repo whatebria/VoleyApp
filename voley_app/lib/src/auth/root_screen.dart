@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:voley_app/providers/auth_provider.dart'; // Tu StreamProvider de Auth
+import 'package:voley_app/src/auth/auth_provider.dart'; // Tu StreamProvider de Auth
 import 'package:voley_app/src/auth/auth_wrapper.dart'; // Importamos el AuthWrapper
 import 'package:voley_app/src/auth/login_screen.dart';
 

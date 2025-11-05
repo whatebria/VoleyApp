@@ -3,15 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
 import 'package:voley_app/src/models/bd/exercise.dart';
 import 'package:voley_app/providers/providers.dart';
-// ^ Debe exponer: exercisesProvider (AsyncValue<List<Exercise>>)
+// Debe exponer: exercisesProvider (AsyncValue<List<Exercise>>)
 // y los mapas de etiquetas (id -> label) opcionales:
-//   exerciseCategoryLabelsProvider: Provider<Map<String, String>>
-//   exerciseLevelLabelsProvider:    Provider<Map<String, String>>
-//   exerciseEquipmentLabelsProvider:Provider<Map<String, String>>
-//   exerciseTagLabelsProvider:      Provider<Map<String, String>>
+//   exerciseCategoryLabelsProvider:  Provider<Map<String, String>>
+//   exerciseLevelLabelsProvider:     Provider<Map<String, String>>
+//   exerciseEquipmentLabelsProvider: Provider<Map<String, String>>
 
 // =====================================================
-// 1) Estado del Filtro (ahora con IDs)
+// 1) Estado del Filtro (usa enum.name como ID de string)
 // =====================================================
 
 @immutable
@@ -19,11 +18,10 @@ class ExerciseFilterState {
   // Usamos un sentinel para "Todos"
   static const String allOptionId = '__all__';
 
-  final String searchQuery; // texto libre
-  final String selectedCategoryId; // categoryId o allOptionId
-  final String selectedLevelId; // levelId    o allOptionId
-  final Set<String>
-  selectedEquipmentIds; // equipmentIds requeridos (conjunción)
+  final String searchQuery;           // texto libre, lowercase
+  final String selectedCategoryId;    // categoryId.name o allOptionId
+  final String selectedLevelId;       // levelId.name o allOptionId
+  final Set<String> selectedEquipmentIds; // equipmentIds.name requeridos (conjunción)
 
   const ExerciseFilterState({
     this.searchQuery = '',
@@ -66,7 +64,8 @@ class ExerciseFilterState {
       selectedLevelId.hashCode ^
       const SetEquality<String>().hash(selectedEquipmentIds);
 
-  get selectedEquipment => null;
+  // Compat: algunos widgets antiguos leen selectedEquipment
+  Set<String> get selectedEquipment => selectedEquipmentIds;
 }
 
 // =====================================================
@@ -88,7 +87,7 @@ class ExerciseFilterNotifier extends StateNotifier<ExerciseFilterState> {
     state = state.copyWith(selectedLevelId: levelId);
   }
 
-  // ✅ Método principal que trabaja con IDs
+  // ✅ Trabaja con enum.name
   void toggleEquipmentId(String equipmentId) {
     final next = Set<String>.from(state.selectedEquipmentIds);
     if (next.contains(equipmentId)) {
@@ -99,7 +98,7 @@ class ExerciseFilterNotifier extends StateNotifier<ExerciseFilterState> {
     state = state.copyWith(selectedEquipmentIds: next);
   }
 
-  // ✅ Alias para compatibilidad con el nombre anterior
+  // Alias para compatibilidad con nombre anterior
   void toggleEquipment(String equipmentId) => toggleEquipmentId(equipmentId);
 
   void clearEquipment() {
@@ -117,8 +116,8 @@ class ExerciseFilterNotifier extends StateNotifier<ExerciseFilterState> {
 
 final exerciseFilterProvider =
     StateNotifierProvider<ExerciseFilterNotifier, ExerciseFilterState>(
-      (ref) => ExerciseFilterNotifier(),
-    );
+  (ref) => ExerciseFilterNotifier(),
+);
 
 // =====================================================
 // 4) Helpers para opciones (id -> label)
@@ -142,45 +141,37 @@ List<MapEntry<String, String>> _entriesFromIds(
 // =====================================================
 // 5) Providers Derivados para opciones del filtro
 //    (se basan en ejercicios disponibles + mapas de etiquetas)
+//    IMPORTANTE: usamos enum.name como id (string)
 // =====================================================
 
-final exerciseCategoriesProvider = Provider<List<MapEntry<String, String>>>((
-  ref,
-) {
+final exerciseCategoriesProvider = Provider<List<MapEntry<String, String>>>((ref) {
   final exercises = ref.watch(exercisesProvider).valueOrNull ?? [];
-  final labels = ref.watch(
-    exerciseCategoryLabelsProvider,
-  ); // Map<String, String>
-  final ids = exercises.map((e) => e.categoryId);
+  final labels = ref.watch(exerciseCategoryLabelsProvider);
+  final ids = exercises.map((e) => e.categoryId.name);
   return _entriesFromIds(ids, labels);
 });
 
 final exerciseLevelsProvider = Provider<List<MapEntry<String, String>>>((ref) {
   final exercises = ref.watch(exercisesProvider).valueOrNull ?? [];
-  final labels = ref.watch(exerciseLevelLabelsProvider); // Map<String, String>
-  final ids = exercises.map((e) => e.levelId);
+  final labels = ref.watch(exerciseLevelLabelsProvider);
+  final ids = exercises.map((e) => e.levelId.name);
   return _entriesFromIds(ids, labels);
 });
 
-final exerciseEquipmentProvider = Provider<List<MapEntry<String, String>>>((
-  ref,
-) {
+final exerciseEquipmentProvider = Provider<List<MapEntry<String, String>>>((ref) {
   final exercises = ref.watch(exercisesProvider).valueOrNull ?? [];
-  final labels = ref.watch(
-    exerciseEquipmentLabelsProvider,
-  ); // Map<String, String>
-  final ids = exercises.expand((e) => e.equipmentIds);
+  final labels = ref.watch(exerciseEquipmentLabelsProvider);
+  final ids = exercises.expand((e) => e.equipmentIds.map((eq) => eq.name));
   return _entriesFromIds(ids, labels);
 });
 
 // =====================================================
-// 6) Lista filtrada
+// 6) Lista filtrada (compatible con Exercise V4/enums)
 // =====================================================
 
 final filteredExercisesProvider = Provider<List<Exercise>>((ref) {
   final allExercises = ref.watch(exercisesProvider).valueOrNull ?? [];
   final filters = ref.watch(exerciseFilterProvider);
-  final tagLabels = ref.watch(exerciseTagLabelsProvider); // Map<String, String>
 
   // Si está en estado por defecto -> retorna todo
   if (filters == const ExerciseFilterState()) {
@@ -190,34 +181,41 @@ final filteredExercisesProvider = Provider<List<Exercise>>((ref) {
   final q = filters.searchQuery;
   final hasQuery = q.isNotEmpty;
 
+  bool matchesSearch(Exercise ex) {
+    if (!hasQuery) return true;
+    final fields = <String>[
+      ex.name,
+      ex.slug,
+      ex.categoryId.name,
+      ex.levelId.name,
+      ex.movementPatternId.name,
+      ...ex.qualityIds.map((e) => e.name),
+      ...ex.vbTransferIds.map((e) => e.name),
+      ...ex.equipmentIds.map((e) => e.name),
+    ];
+    return fields.any((f) => f.toLowerCase().contains(q));
+  }
+
   return allExercises.where((ex) {
-    // 1) Búsqueda por nombre y tags (usando labels si existen)
-    final nameMatch = !hasQuery ? true : ex.name.toLowerCase().contains(q);
+    // 1) Búsqueda
+    final matches = matchesSearch(ex);
 
-    final tagTexts = ex.tagIds
-        .map((id) => _labelOrId(tagLabels, id).toLowerCase())
-        .toList();
-
-    final tagMatch = !hasQuery ? true : tagTexts.any((t) => t.contains(q));
-
-    final matchesSearch = nameMatch || tagMatch;
-
-    // 2) Categoría (por ID)
+    // 2) Categoría (por enum.name)
     final matchesCategory =
         filters.selectedCategoryId == ExerciseFilterState.allOptionId ||
-        ex.categoryId == filters.selectedCategoryId;
+        ex.categoryId.name == filters.selectedCategoryId;
 
-    // 3) Nivel (por ID)
+    // 3) Nivel (por enum.name)
     final matchesLevel =
         filters.selectedLevelId == ExerciseFilterState.allOptionId ||
-        ex.levelId == filters.selectedLevelId;
+        ex.levelId.name == filters.selectedLevelId;
 
-    // 4) Equipamiento: todos los seleccionados deben estar presentes
-    final exerciseEquip = ex.equipmentIds.toSet();
+    // 4) Equipamiento: todos los seleccionados deben estar presentes (por enum.name)
+    final exerciseEquip = ex.equipmentIds.map((e) => e.name).toSet();
     final requiredEquip = filters.selectedEquipmentIds;
     final matchesEquipment =
         requiredEquip.isEmpty || exerciseEquip.containsAll(requiredEquip);
 
-    return matchesSearch && matchesCategory && matchesLevel && matchesEquipment;
+    return matches && matchesCategory && matchesLevel && matchesEquipment;
   }).toList();
 });

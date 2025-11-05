@@ -1,7 +1,7 @@
 // lib/src/screens/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:voley_app/providers/auth_provider.dart';
+import 'package:voley_app/src/auth/auth_provider.dart';
 import 'package:voley_app/providers/providers.dart';
 
 class HomeScreen extends ConsumerWidget {

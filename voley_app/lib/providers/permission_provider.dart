@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:voley_app/providers/auth_provider.dart'; // Para currentUserProvider
+import 'package:voley_app/src/auth/auth_provider.dart'; // Para currentUserProvider
 import 'package:voley_app/src/models/coach_player_permission.dart';
 import 'package:voley_app/src/models/user.dart' as app_user;
 import 'package:voley_app/src/services/firestore_service.dart';
