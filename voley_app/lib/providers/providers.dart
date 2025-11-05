@@ -224,3 +224,82 @@ final programEditorProvider =
     StateNotifierProvider<ProgramEditorNotifier, Program?>((ref) {
       return ProgramEditorNotifier(ref);
     });
+
+// --- SECCIÓN 6: MAPAS DE ETIQUETAS (IDs -> textos legibles) ---
+
+/// Etiquetas de Categorías (categoryId -> label)
+final exerciseCategoryLabelsProvider = Provider<Map<String, String>>((ref) {
+  // 🚩 Ajusta estos ids a los que realmente uses en tu catálogo.
+  return const {
+    'strength': 'Fuerza',
+    'power': 'Potencia',
+    'plyo': 'Pliometría',
+    'mobility': 'Movilidad',
+    'stability': 'Estabilidad',
+    'conditioning': 'Resistencia',
+    'speed': 'Velocidad',
+    'agility': 'Agilidad',
+    'balance': 'Balance',
+    'core': 'Core',
+    'rehab': 'Rehabilitación',
+    'general': 'General',
+  };
+});
+
+/// Etiquetas de Niveles (levelId -> label)
+final exerciseLevelLabelsProvider = Provider<Map<String, String>>((ref) {
+  return const {
+    'beginner': 'Principiante',
+    'intermediate': 'Intermedio',
+    'advanced': 'Avanzado',
+  };
+});
+
+/// Etiquetas de Equipamiento (equipmentId -> label)
+final exerciseEquipmentLabelsProvider = Provider<Map<String, String>>((ref) {
+  return const {
+    'bodyweight': 'Peso Corporal',
+    'dumbbell': 'Mancuerna',
+    'barbell': 'Barra',
+    'kettlebell': 'Kettlebell',
+    'resistance_band': 'Banda Elástica',
+    'medicine_ball': 'Balón Medicinal',
+    'box': 'Caja/Plyo Box',
+    'cone': 'Cono',
+    'mat': 'Colchoneta',
+    'foam_roller': 'Foam Roller',
+    'trx': 'TRX/Suspensión',
+    'machines': 'Máquinas',
+    'none': 'Sin equipamiento',
+  };
+});
+
+/// Etiquetas de Tags (tagId -> label)
+final exerciseTagLabelsProvider = Provider<Map<String, String>>((ref) {
+  return const {
+    'lower_body': 'Tren Inferior',
+    'upper_body': 'Tren Superior',
+    'full_body': 'Cuerpo Completo',
+    'explosive': 'Explosivo',
+    'push': 'Empuje',
+    'pull': 'Jalón',
+    'hinge': 'Bisagra',
+    'squat': 'Sentadilla',
+    'unilateral': 'Unilateral',
+    'bilateral': 'Bilateral',
+    'rotation': 'Rotación',
+    'anti_rotation': 'Anti-rotación',
+    'isometric': 'Isométrico',
+    'plyo': 'Pliometría',
+    'endurance': 'Resistencia',
+    'hypertrophy': 'Hipertrofia',
+    'strength': 'Fuerza',
+    'power': 'Potencia',
+    'mobility': 'Movilidad',
+    'stability': 'Estabilidad',
+    'balance': 'Balance',
+    'warmup': 'Calentamiento',
+    'cooldown': 'Vuelta a la calma',
+    'core': 'Core',
+  };
+});

@@ -1,8 +1,11 @@
 import 'package:voley_app/src/models/player_profile/availability.dart';
 import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
 import 'package:voley_app/src/models/player_profile/form_peak.dart';
+import 'package:voley_app/src/models/player_profile/goal.dart';
+import 'package:voley_app/src/models/player_profile/injury.dart';
 import 'package:voley_app/src/models/player_profile/player_event.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
+// --- AÑADIDO: Imports para los nuevos modelos ---
 
 class PlayerProfile {
   final String id;
@@ -10,13 +13,15 @@ class PlayerProfile {
   final String name;
   final String position;
   final String level; // "recreativo", "competitivo", "semiprofesional"
-  final List<String> goals;
-  final List<String> injuries;
+  // --- CAMBIO: Actualizado de List<String> a List<Goal> ---
+  final List<Goal> goals;
+  // --- CAMBIO: Actualizado de List<String> a List<Injury> ---
+  final List<Injury> injuries;
   final Availability availability;
-  final EvaluationResult evaluation;
+  final List<EvaluationResult> evaluationHistory;
   final List<Tournament> tournaments;
   final String? assignedCoachId; // UID del entrenador asignado
-  final List<String> equipment; // Equipamiento disponible
+  final List<String> equipmentIds; // Equipamiento disponible
   final int? age;
   final double? heightCm;
   final double? weightKg;
@@ -30,19 +35,20 @@ class PlayerProfile {
     required this.name,
     required this.position,
     required this.level,
-    required this.goals,
-    required this.injuries,
+    // --- CAMBIO: Valor por defecto const [] ---
+    this.goals = const [],
+    this.injuries = const [],
     required this.availability,
-    required this.evaluation,
+    this.evaluationHistory = const [],
     required this.tournaments,
     this.assignedCoachId,
-    this.equipment = const [],
+    this.equipmentIds = const [],
     this.age,
     this.heightCm,
     this.weightKg,
     this.wingspanCm,
     this.keyEvents = const [],
-    this.formPeaks = const [],
+    this.formPeaks = const [], 
   });
 
   Map<String, dynamic> toJson() => {
@@ -51,13 +57,15 @@ class PlayerProfile {
         'name': name,
         'position': position,
         'level': level,
-        'goals': goals,
-        'injuries': injuries,
+        // --- CAMBIO: Mapea los objetos Goal a JSON ---
+        'goals': goals.map((g) => g.toJson()).toList(),
+        // --- CAMBIO: Mapea los objetos Injury a JSON ---
+        'injuries': injuries.map((i) => i.toJson()).toList(),
         'availability': availability.toJson(),
-        'evaluation': evaluation.toJson(),
+        'evaluationHistory': evaluationHistory.map((e) => e.toJson()).toList(),
         'tournaments': tournaments.map((t) => t.toJson()).toList(),
         'assignedCoachId': assignedCoachId,
-        'equipment': equipment,
+        'equipmentIds': equipmentIds,
         'age': age,
         'heightCm': heightCm,
         'weightKg': weightKg,
@@ -72,15 +80,23 @@ class PlayerProfile {
         name: json['name'] as String? ?? 'Jugador',
         position: json['position'] as String? ?? 'Sin posición',
         level: json['level'] as String? ?? 'recreativo',
-        goals: List<String>.from(json['goals'] ?? []),
-        injuries: List<String>.from(json['injuries'] ?? []),
+        // --- CAMBIO: Parsea la lista de JSON a objetos Goal ---
+        goals: (json['goals'] as List<dynamic>? ?? [])
+            .map((g) => Goal.fromJson(Map<String, dynamic>.from(g)))
+            .toList(),
+        // --- CAMBIO: Parsea la lista de JSON a objetos Injury ---
+        injuries: (json['injuries'] as List<dynamic>? ?? [])
+            .map((i) => Injury.fromJson(Map<String, dynamic>.from(i)))
+            .toList(),
         availability: Availability.fromJson(Map<String, dynamic>.from(json['availability'] ?? {})),
-        evaluation: EvaluationResult.fromJson(Map<String, dynamic>.from(json['evaluation'] ?? {})),
+        evaluationHistory: (json['evaluationHistory'] as List<dynamic>? ?? [])
+            .map((e) => EvaluationResult.fromJson(Map<String, dynamic>.from(e)))
+            .toList(),
         tournaments: (json['tournaments'] as List<dynamic>? ?? [])
             .map((t) => Tournament.fromJson(Map<String, dynamic>.from(t)))
             .toList(),
         assignedCoachId: json['assignedCoachId'] as String?,
-        equipment: List<String>.from(json['equipment'] ?? []),
+        equipmentIds: List<String>.from(json['equipmentIds'] ?? []),
         age: json['age'] as int?,
         heightCm: (json['heightCm'] as num?)?.toDouble(),
         weightKg: (json['weightKg'] as num?)?.toDouble(),
@@ -92,7 +108,7 @@ class PlayerProfile {
             .map((peak) => FormPeak.fromJson(Map<String, dynamic>.from(peak)))
             .toList(),
       );
-// --- AÑADE ESTE MÉTODO COMPLETO ---
+
   PlayerProfile copyWith({
     String? id,
     String? userId,
@@ -100,12 +116,14 @@ class PlayerProfile {
     String? name,
     String? position,
     String? level,
-    List<String>? goals,
-    List<String>? injuries,
+    // --- CAMBIO: Tipo actualizado a List<Goal> ---
+    List<Goal>? goals,
+    // --- CAMBIO: Tipo actualizado a List<Injury> ---
+    List<Injury>? injuries,
     Availability? availability,
-    EvaluationResult? evaluation,
+    List<EvaluationResult>? evaluationHistory,
     List<Tournament>? tournaments,
-    List<String>? equipment,
+    List<String>? equipmentIds,
     int? age,
     double? heightCm,
     double? weightKg,
@@ -120,12 +138,14 @@ class PlayerProfile {
       name: name ?? this.name,
       position: position ?? this.position,
       level: level ?? this.level,
+      // --- CAMBIO: Actualizado ---
       goals: goals ?? this.goals,
+      // --- CAMBIO: Actualizado ---
       injuries: injuries ?? this.injuries,
       availability: availability ?? this.availability,
-      evaluation: evaluation ?? this.evaluation,
+      evaluationHistory: evaluationHistory ?? this.evaluationHistory,
       tournaments: tournaments ?? this.tournaments,
-      equipment: equipment ?? this.equipment,
+      equipmentIds: equipmentIds ?? this.equipmentIds,
       age: age ?? this.age,
       heightCm: heightCm ?? this.heightCm,
       weightKg: weightKg ?? this.weightKg,
@@ -133,5 +153,14 @@ class PlayerProfile {
       keyEvents: keyEvents ?? this.keyEvents,
       formPeaks: formPeaks ?? this.formPeaks,
     );
+  }
+  
+  EvaluationResult? get latestEvaluation {
+    if (evaluationHistory.isEmpty) return null;
+    // Asume que la lista puede no estar ordenada, así que la ordenamos
+    // (Idealmente, tu provider la ordena una vez al cargarla)
+    final sortedHistory = List<EvaluationResult>.from(evaluationHistory)
+      ..sort((a, b) => b.date.compareTo(a.date));
+    return sortedHistory.first;
   }
 }

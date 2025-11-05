@@ -1,74 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:voley_app/providers/evaluation_editor_provider.dart';
 import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
-import 'package:voley_app/src/models/player_profile/tournament.dart';
-// Importamos los modelos necesarios para crear un perfil por defecto
-import 'package:voley_app/src/models/player_profile/availability.dart';
-import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
+import 'package:voley_app/src/models/player_profile/test_score.dart';
+import 'package:voley_app/src/models/user.dart';
 
-class NewEvaluationScreen extends ConsumerStatefulWidget {
+// --- CAMBIO: Convertido a ConsumerWidget ---
+class NewEvaluationScreen extends ConsumerWidget {
   const NewEvaluationScreen({super.key});
 
-  @override
-  _NewEvaluationScreenState createState() => _NewEvaluationScreenState();
-}
-
-class _NewEvaluationScreenState extends ConsumerState<NewEvaluationScreen> {
-  // Estado local para los campos editables
-  Map<String, double> _testScores = {};
-  List<Tournament> _selectedTournaments = [];
-  PlayerProfile? _currentLoadedProfile;
-  bool _isLoadingProfile = true; // Empezamos cargando por defecto
-  bool _isSubmitting = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Comprobación inicial
-    _checkInitialProfile();
-  }
-
-  /// Comprueba el perfil al cargar la pantalla
-  void _checkInitialProfile() {
-    // Usamos 'read' aquí porque es una acción de una sola vez en initState
-    final profile = ref.read(selectedPlayerProfileProvider);
-    _loadProfileData(profile);
-  }
-
-  /// Carga el perfil del jugador y sus tests/torneos al estado local
-  void _loadProfileData(PlayerProfile? profile) {
-    if (!mounted) return;
-
-    setState(() {
-      _currentLoadedProfile = profile;
-      if (profile == null) {
-        _testScores = {};
-        _selectedTournaments = [];
-      } else {
-        _testScores = Map.from(profile.evaluation.testScores);
-        _selectedTournaments = List.from(profile.tournaments);
-      }
-      _isLoadingProfile = false; // Terminamos de cargar/sincronizar
-    });
-  }
-
-  /// [NUEVO DISEÑO] Muestra un BottomSheet para añadir un test
-  Future<void> _showAddTestBottomSheet() async {
+  Future<void> _showAddTestBottomSheet(BuildContext context, WidgetRef ref) async {
     final theme = Theme.of(context);
-    final nameController = TextEditingController();
-    final scoreController = TextEditingController();
+    // --- CAMBIO: Controladores para el nuevo modelo TestScore ---
+    final idController = TextEditingController();
+    final valueController = TextEditingController();
+    final unitController = TextEditingController();
 
     await showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // Para que el teclado no tape el sheet
-      backgroundColor: theme.colorScheme.surface, // grisPro
+      isScrollControlled: true,
+      backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
         return Padding(
-          // Padding para el teclado
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom,
             left: 24,
@@ -86,26 +43,59 @@ class _NewEvaluationScreenState extends ConsumerState<NewEvaluationScreen> {
               ),
               const SizedBox(height: 24),
               TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Nombre del Test'),
+                controller: idController,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre/ID del Test',
+                  helperText: 'Ej: Salto Vertical (ID: vertical_jump)',
+                ),
                 autofocus: true,
               ),
               const SizedBox(height: 16),
-              TextField(
-                controller: scoreController,
-                decoration: const InputDecoration(
-                    labelText: 'Puntuación (Ej: 55.5)'),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: valueController,
+                      decoration: const InputDecoration(
+                        labelText: 'Resultado',
+                        helperText: 'Ej: 55.5',
+                      ),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 1,
+                    child: TextField(
+                      controller: unitController,
+                      decoration: const InputDecoration(
+                        labelText: 'Unidad',
+                        helperText: 'Ej: cm',
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                // Usa el estilo 'voltNeon' por defecto del tema
                 onPressed: () {
-                  final score = double.tryParse(scoreController.text);
-                  if (nameController.text.isNotEmpty && score != null) {
-                    setState(() => _testScores[nameController.text] = score);
-                    Navigator.of(context, rootNavigator: true).maybePop(); // Cierra el bottom sheet
+                  final value = double.tryParse(valueController.text);
+                  final testId = idController.text.trim().toLowerCase().replaceAll(' ', '_');
+                  final unit = unitController.text.trim();
+
+                  if (testId.isNotEmpty && value != null && unit.isNotEmpty) {
+                    // --- CAMBIO: Crea un objeto TestScore ---
+                    final newTest = TestScore(
+                      testId: testId,
+                      value: value,
+                      unit: unit,
+                    );
+                    // --- CAMBIO: Llama al provider para añadir el test ---
+                    ref.read(evaluationEditorProvider.notifier).addTest(newTest);
+                    Navigator.of(context, rootNavigator: true).maybePop();
                   } else {
                     // Opcional: Mostrar error en el sheet
                   }
@@ -118,129 +108,85 @@ class _NewEvaluationScreenState extends ConsumerState<NewEvaluationScreen> {
         );
       },
     );
-  }
-
-  void _showError(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
-      );
-    }
-  }
-
-  /// [REFACTOR] Envía la actualización (o creación) del perfil
-  Future<void> _handleSubmit() async {
-    final selectedPlayerCombo = ref.read(explorerSelectedPlayerProvider);
     
-    // Debería ser imposible llegar aquí sin un jugador, pero comprobamos
+    // Dispose controllers
+    idController.dispose();
+    valueController.dispose();
+    unitController.dispose();
+  }
+
+  void _showError(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
+  /// [REFACTORIZADO] Llama al provider para guardar
+Future<void> _handleSubmit(BuildContext context, WidgetRef ref) async {
+  try {
+    final selectedPlayerCombo = ref.read(explorerSelectedPlayerProvider);
     if (selectedPlayerCombo == null) {
-      _showError("Error fatal: No hay ningún jugador seleccionado.");
+      _showError(context, 'Debes seleccionar un jugador.');
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    final User player = selectedPlayerCombo.player; // ajusta si tu tipo no es FirebaseAuth.User
+    final PlayerProfile? currentProfile = ref.read(selectedPlayerProfileProvider);
 
-    try {
-      final PlayerProfile profileToSave;
-      final player = selectedPlayerCombo.player;
+    await ref
+        .read(evaluationEditorProvider.notifier)
+        .saveEvaluation(player, currentProfile);
 
-      if (_currentLoadedProfile == null) {
-        // --- MODO CREACIÓN ---
-        // Creamos un perfil nuevo con los datos mínimos
-        profileToSave = PlayerProfile(
-          id: player.id, // Asumimos que el ID del perfil es el UID del jugador
-          userId: player.id,
-          name: player.name,
-          position: 'Sin definir',
-          level: 'recreativo',
-          goals: [],
-          injuries: [],
-          // Rellenamos con valores por defecto
-          availability: Availability(trainingDays: [], sessionMinutes: 0), 
-          evaluation: EvaluationResult(
-            testScores: _testScores, // Las puntuaciones que acabamos de añadir
-            strengths: [],
-            weaknesses: []
-          ),
-          tournaments: _selectedTournaments,
-          equipment: [],
-          keyEvents: [],
-          formPeaks: [],
-        );
-      } else {
-        // --- MODO EDICIÓN ---
-        // Actualizamos solo los campos que esta pantalla maneja
-        profileToSave = _currentLoadedProfile!.copyWith(
-          evaluation: _currentLoadedProfile!.evaluation.copyWith(
-            testScores: _testScores,
-          ),
-          tournaments: _selectedTournaments,
-        );
-      }
-
-      // Guardamos en la base de datos
-      final firestore = ref.read(firestoreProvider);
-      await firestore.savePlayerProfile(profileToSave);
-
-      // Invalidamos los providers para que toda la app se actualice
-      ref.invalidate(selectedPlayerProfileProvider);
-      ref.invalidate(coachPlayersWithProfilesProvider);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Evaluación guardada con éxito'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        // Opcional: navegar atrás después de guardar
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) {
-        _showError('Error al guardar: $e');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Evaluación guardada con éxito'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.pop(context);
     }
+  } catch (e) {
+    _showError(context, 'Error al guardar: $e');
   }
+}
+
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
-    // --- [REFACTOR] Lógica de Sincronización ---
-    // Escuchamos el provider global. Si cambia (ej: por un 'invalidate'),
-    // volvemos a cargar los datos en nuestro estado local.
-    ref.listen<PlayerProfile?>(selectedPlayerProfileProvider, (_, nextProfile) {
-      _loadProfileData(nextProfile);
+    // --- CAMBIO: Escucha el provider 'selectedPlayerProfileProvider' ---
+    // Esto asegura que el editor se inicialice/actualice si el jugador cambia.
+    ref.listen<PlayerProfile?>(selectedPlayerProfileProvider, (prev, next) {
+      // (Opcional) Si el jugador cambia, reinicia el estado del editor
+      // ref.invalidate(evaluationEditorProvider);
+      // O, para una edición en vivo:
+      // final newScores = next?.latestEvaluation?.testScores ?? [];
+      // ref.read(evaluationEditorProvider.notifier).state = newScores;
     });
 
-    // Leemos el jugador seleccionado (sabemos que no es nulo si llegamos aquí)
+    // Observa el jugador seleccionado
     final selectedPlayerCombo = ref.watch(explorerSelectedPlayerProvider);
     final playerName = selectedPlayerCombo?.player.name ?? 'Jugador';
+    
+    // Observa el estado de carga
+    final isSubmitting = ref.watch(evaluationIsSavingProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Gestión de Evaluación')),
+      appBar: AppBar(title: const Text('Registrar Evaluación')),
       body: Stack(
         children: [
-          // --- [REFACTOR] Contenido principal ---
-          // Ya no usamos .when() aquí, el 'ref.listen' maneja la carga
-          // y `_isLoadingProfile` nos dice si estamos listos.
-          if (_isLoadingProfile)
-            const Center(child: CircularProgressIndicator())
-          else if (selectedPlayerCombo == null)
+          // --- CAMBIO: Simplificado ---
+          if (selectedPlayerCombo == null)
             const Center(
               child: Text('Por favor, selecciona un jugador primero.'),
             )
           else
-            // [NUEVO WIDGET] El formulario real
-            _buildEvaluationForm(context, theme, playerName),
+            _buildEvaluationForm(context, ref, theme, playerName),
 
           // --- Overlay de Carga ---
-          if (_isSubmitting)
+          if (isSubmitting)
             Container(
               color: Colors.black.withOpacity(0.5),
               child: const Center(child: CircularProgressIndicator()),
@@ -250,9 +196,12 @@ class _NewEvaluationScreenState extends ConsumerState<NewEvaluationScreen> {
     );
   }
 
-  /// [NUEVO WIDGET] Construye solo el formulario
-  Widget _buildEvaluationForm(BuildContext context, ThemeData theme, String playerName) {
-    final isCreating = (_currentLoadedProfile == null);
+  /// [REFACTORIZADO] Construye el formulario
+  Widget _buildEvaluationForm(BuildContext context, WidgetRef ref, ThemeData theme, String playerName) {
+    
+    // --- CAMBIO: Lee el estado del provider ---
+    final currentTestScores = ref.watch(evaluationEditorProvider);
+    final isCreating = ref.watch(selectedPlayerProfileProvider) == null;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -261,7 +210,7 @@ class _NewEvaluationScreenState extends ConsumerState<NewEvaluationScreen> {
         children: [
           // 1. Título
           Text(
-            isCreating ? 'Creando Evaluación para' : 'Editando Evaluación de',
+            isCreating ? 'Creando Evaluación para' : 'Añadiendo Evaluación para',
             style: theme.textTheme.headlineMedium,
           ),
           Text(
@@ -292,7 +241,8 @@ class _NewEvaluationScreenState extends ConsumerState<NewEvaluationScreen> {
           const SizedBox(height: 8),
 
           // [NUEVO DISEÑO] Lista de Chips
-          _buildTestList(context),
+          // --- CAMBIO: Pasa la lista desde el provider ---
+          _buildTestList(context, ref, theme, currentTestScores),
           const SizedBox(height: 16),
 
           // [NUEVO DISEÑO] Botón de añadir
@@ -300,28 +250,28 @@ class _NewEvaluationScreenState extends ConsumerState<NewEvaluationScreen> {
             child: OutlinedButton.icon(
               icon: const Icon(Icons.add_circle_outline),
               label: const Text('Añadir Test'),
-              onPressed: _showAddTestBottomSheet,
+              onPressed: () => _showAddTestBottomSheet(context, ref),
               style: OutlinedButton.styleFrom(
                 foregroundColor: theme.colorScheme.onSurface.withOpacity(0.8)
               ),
             ),
           ),
-
-          // TODO: Añadir la lógica para _selectedTournaments si es necesario
-          // ... (puedes seguir el mismo patrón que los tests)
-
+          
           const SizedBox(height: 32),
 
           // 3. Botón de Enviar
           ElevatedButton(
-            onPressed: _isSubmitting ? null : _handleSubmit,
+            // --- CAMBIO: Observa el provider de carga ---
+            onPressed: ref.watch(evaluationIsSavingProvider) 
+              ? null 
+              : () => _handleSubmit(context, ref),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
-            child: _isSubmitting
+            child: ref.watch(evaluationIsSavingProvider)
                 ? const CircularProgressIndicator(strokeWidth: 2)
                 : Text(
-                    isCreating ? 'Crear y Guardar' : 'Actualizar Evaluación',
+                    isCreating ? 'Crear Perfil y Guardar' : 'Añadir Evaluación',
                   ),
           ),
         ],
@@ -329,20 +279,20 @@ class _NewEvaluationScreenState extends ConsumerState<NewEvaluationScreen> {
     );
   }
 
-  /// [NUEVO WIDGET] Construye la lista de tests como Chips
-  Widget _buildTestList(BuildContext context) {
-    final theme = Theme.of(context);
+  /// [REFACTORIZADO] Construye la lista de tests
+  Widget _buildTestList(BuildContext context, WidgetRef ref, ThemeData theme, List<TestScore> testScores) {
 
-    if (_testScores.isEmpty) {
+    if (testScores.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 8.0),
         child: Center(
           child: Text(
-            'No hay tests registrados.',
+            'No hay tests registrados para esta nueva evaluación.',
             style: theme.textTheme.bodyMedium?.copyWith(
               fontStyle: FontStyle.italic,
               color: theme.colorScheme.onSurface.withOpacity(0.6),
             ),
+            textAlign: TextAlign.center,
           ),
         ),
       );
@@ -352,18 +302,20 @@ class _NewEvaluationScreenState extends ConsumerState<NewEvaluationScreen> {
     return Wrap(
       spacing: 8.0, // Espacio horizontal entre chips
       runSpacing: 8.0, // Espacio vertical entre filas
-      children: _testScores.entries.map((entry) {
+      children: testScores.map((test) {
         return Chip(
           backgroundColor: theme.colorScheme.secondary.withOpacity(0.8), // azulPro
           label: Text(
-            '${entry.key}: ${entry.value.toStringAsFixed(1)}',
+            // --- CAMBIO: Muestra el TestScore ---
+            '${test.testId}: ${test.value.toStringAsFixed(1)} ${test.unit}',
             style: TextStyle(
               color: theme.colorScheme.onSecondary, // blancoNeutro
               fontWeight: FontWeight.w600,
             ),
           ),
           onDeleted: () {
-            setState(() => _testScores.remove(entry.key));
+            // --- CAMBIO: Llama al provider para eliminar ---
+            ref.read(evaluationEditorProvider.notifier).removeTest(test);
           },
           deleteIcon: const Icon(Icons.close, size: 18),
           deleteIconColor: theme.colorScheme.onSecondary.withOpacity(0.8),

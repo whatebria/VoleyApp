@@ -7,7 +7,7 @@ import 'package:voley_app/providers/providers.dart';
 class ExerciseLibraryScreen extends ConsumerWidget {
   const ExerciseLibraryScreen({super.key});
 
-  static const String _allOption = ExerciseFilterState.allOption;
+  static const String _allOption = ExerciseFilterState.allOptionId;
 
 
   // --- CAMBIO: _clearFilters ahora llama al provider ---
@@ -85,11 +85,11 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                 // --- CAMBIO: Toda la lógica de filtrado se ha movido ---
                 
                 // Resetea los filtros si los datos cambian (ej. por un refresh)
-                final selectedCategoryKey = filterState.selectedCategory;
-                if (selectedCategoryKey != _allOption &&
-                    !categoryEntries.any((e) => e.key == selectedCategoryKey)) {
+                final selectedCategoryIdKey = filterState.selectedCategoryId;
+                if (selectedCategoryIdKey != _allOption &&
+                    !categoryEntries.any((e) => e.key == selectedCategoryIdKey)) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    ref.read(exerciseFilterProvider.notifier).setCategory(_allOption);
+                    ref.read(exerciseFilterProvider.notifier).setCategoryId(_allOption);
                   });
                 }
                 
@@ -138,12 +138,12 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    subtitle: Text(exercise.category),
+                                    subtitle: Text(exercise.categoryId),
                                     leading: CircleAvatar(
                                       backgroundColor:
                                           theme.colorScheme.primaryContainer,
                                       child: Text(
-                                        exercise.level
+                                        exercise.levelId
                                             .substring(0, 1)
                                             .toUpperCase(),
                                         style: TextStyle(
@@ -166,7 +166,7 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                                             Wrap(
                                               spacing: 8.0,
                                               runSpacing: 4.0,
-                                              children: exercise.tags
+                                              children: exercise.tagIds
                                                   .map(
                                                     (tag) =>
                                                         Chip(label: Text(tag)),
@@ -175,7 +175,7 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                                             ),
                                             const Divider(height: 20),
                                             Text(
-                                              'Equipamiento: ${exercise.equipment.join(', ')}',
+                                              'Equipamiento: ${exercise.equipmentIds.join(', ')}',
                                               style: theme.textTheme.bodySmall,
                                             ),
                                           ],
@@ -256,28 +256,28 @@ class ExerciseLibraryScreen extends ConsumerWidget {
           ExpansionTile(
             leading: const Icon(Icons.category_outlined),
             title: const Text('Categoría'),
-            subtitle: Text(resolveLabel(filterState.selectedCategory, categoryEntries)),
+            subtitle: Text(resolveLabel(filterState.selectedCategoryId, categoryEntries)),
             tilePadding: const EdgeInsets.symmetric(horizontal: 16.0),
             children: [
               RadioListTile<String>(
                 title: const Text('Todos'),
                 value: _allOption,
-                groupValue: filterState.selectedCategory,
+                groupValue: filterState.selectedCategoryId,
                 onChanged: (value) {
                   // --- CAMBIO ---
                   if (value == null) return;
-                  ref.read(exerciseFilterProvider.notifier).setCategory(value);
+                  ref.read(exerciseFilterProvider.notifier).setCategoryId(value);
                 },
               ),
               ...categoryEntries.map(
                 (entry) => RadioListTile<String>(
                   title: Text(_formatOptionLabel(entry.value)),
                   value: entry.key,
-                  groupValue: filterState.selectedCategory,
+                  groupValue: filterState.selectedCategoryId,
                   onChanged: (value) {
                     // --- CAMBIO ---
                     if (value == null) return;
-                    ref.read(exerciseFilterProvider.notifier).setCategory(value);
+                    ref.read(exerciseFilterProvider.notifier).setCategoryId(value);
                   },
                 ),
               ),
@@ -287,28 +287,28 @@ class ExerciseLibraryScreen extends ConsumerWidget {
           ExpansionTile(
             leading: const Icon(Icons.fitness_center_outlined),
             title: const Text('Nivel'),
-            subtitle: Text(resolveLabel(filterState.selectedLevel, levelEntries)),
+            subtitle: Text(resolveLabel(filterState.selectedLevelId, levelEntries)),
             tilePadding: const EdgeInsets.symmetric(horizontal: 16.0),
             children: [
               RadioListTile<String>(
                 title: const Text('Todos'),
                 value: _allOption,
-                groupValue: filterState.selectedLevel,
+                groupValue: filterState.selectedLevelId,
                 onChanged: (value) {
                   // --- CAMBIO ---
                   if (value == null) return;
-                  ref.read(exerciseFilterProvider.notifier).setLevel(value);
+                  ref.read(exerciseFilterProvider.notifier).setLevelId(value);
                 },
               ),
               ...levelEntries.map(
                 (entry) => RadioListTile<String>(
                   title: Text(_formatOptionLabel(entry.value)),
                   value: entry.key,
-                  groupValue: filterState.selectedLevel,
+                  groupValue: filterState.selectedLevelId,
                   onChanged: (value) {
                     // --- CAMBIO ---
                     if (value == null) return;
-                    ref.read(exerciseFilterProvider.notifier).setLevel(value);
+                    ref.read(exerciseFilterProvider.notifier).setLevelId(value);
                   },
                 ),
               ),
@@ -345,7 +345,9 @@ class ExerciseLibraryScreen extends ConsumerWidget {
                     title: Text(_formatOptionLabel(entry.value)),
                     onChanged: (selected) {
                       // --- CAMBIO ---
-                      ref.read(exerciseFilterProvider.notifier).toggleEquipment(key);
+                      void toggleEquipment(String equipmentId) => toggleEquipment(equipmentId);
+
+
                     },
                   );
                 }).toList(),

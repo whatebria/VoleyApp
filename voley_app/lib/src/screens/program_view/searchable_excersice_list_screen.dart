@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/bd/exercise.dart';
+import 'package:voley_app/src/models/player_profile/injury.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
+// --- AÑADIDO: Imports para los nuevos modelos ---
+import 'package:voley_app/src/models/program/intensity.dart';
 
 /// Nueva pantalla para buscar y seleccionar un ejercicio de la biblioteca.
 class SearchableExerciseListScreen extends ConsumerStatefulWidget {
@@ -11,6 +14,7 @@ class SearchableExerciseListScreen extends ConsumerStatefulWidget {
   const SearchableExerciseListScreen({super.key, required this.profile});
 
   @override
+  // ignore: library_private_types_in_public_api
   _SearchableExerciseListScreenState createState() =>
       _SearchableExerciseListScreenState();
 }
@@ -41,7 +45,8 @@ class _SearchableExerciseListScreenState
   Future<void> _showAddExerciseDialog(Exercise exercise) async {
     final theme = Theme.of(context);
     final setsCtrl = TextEditingController(text: '3');
-    final repsCtrl = TextEditingController(text: '10');
+    // --- CAMBIO: Reps e Intensity ahora son Strings simples ---
+    final repsCtrl = TextEditingController(text: '8-10');
     final intensityCtrl = TextEditingController(text: 'RPE 7');
 
     final result = await showDialog<WorkoutExercise>(
@@ -60,12 +65,12 @@ class _SearchableExerciseListScreenState
               ),
               TextField(
                 controller: repsCtrl,
-                decoration: const InputDecoration(labelText: 'Repeticiones'),
+                decoration: const InputDecoration(labelText: 'Repeticiones (Ej: 10 o 8-10)'),
               ),
               TextField(
                 controller: intensityCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Intensidad (RPE, %...)',
+                  labelText: 'Intensidad (Ej: RPE 7, 80%, 100kg)',
                 ),
               ),
             ],
@@ -78,13 +83,36 @@ class _SearchableExerciseListScreenState
             ),
             ElevatedButton(
               onPressed: () {
+                // --- CAMBIO: Lógica de creación de WorkoutExercise actualizada ---
+                
+                // 1. Parsear Reps (lógica copiada de workout_exercise.dart)
+                final String oldReps = repsCtrl.text.trim();
+                int repsMin = 0;
+                int repsMax = 0;
+                if (oldReps.contains('-')) {
+                  final parts = oldReps.split('-');
+                  repsMin = int.tryParse(parts.first.trim()) ?? 0;
+                  repsMax = int.tryParse(parts.last.trim()) ?? 0;
+                } else {
+                  repsMin = int.tryParse(oldReps.trim()) ?? 0;
+                  repsMax = repsMin;
+                }
+
+                // 2. Parsear Intensidad (usando el helper público)
+                final Intensity prescription = 
+                  WorkoutExercise.migrateIntensity(intensityCtrl.text);
+
+                // 3. Crear el objeto
                 final workoutExercise = WorkoutExercise(
                   exerciseId: exercise.id,
                   name: exercise.name,
                   sets: int.tryParse(setsCtrl.text) ?? 3,
-                  reps: repsCtrl.text,
-                  intensity: intensityCtrl.text,
+                  repsMin: repsMin,
+                  repsMax: repsMax,
+                  prescription: prescription,
                 );
+                // --- FIN DEL CAMBIO ---
+                
                 // Devuelve el objeto al presionar "Añadir"
                 Navigator.of(context, rootNavigator: true).pop(workoutExercise);
               },
@@ -114,7 +142,7 @@ class _SearchableExerciseListScreenState
           controller: _searchController,
           autofocus: true,
           decoration: InputDecoration(
-            hintText: 'Buscar por nombre...',
+            hintText: 'Buscar por nombre o tag...',
             border: InputBorder.none,
             hintStyle: TextStyle(
               color: theme.colorScheme.onSurface.withOpacity(0.6)
@@ -138,19 +166,32 @@ class _SearchableExerciseListScreenState
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, s) => Center(child: Text('Error al cargar: $e')),
               data: (allExercises) {
-                final profileInjuries = widget.profile.injuries;
+                
+                // --- CAMBIO: Lógica de filtro de lesiones actualizada ---
+                final activeInjuryIds = widget.profile.injuries
+                    .where((i) => i.status == InjuryStatus.active)
+                    .map((i) => i.id) // Asumiendo que Injury tiene un .id
+                    .toSet();
 
                 final filteredList = allExercises.where((ex) {
                   final nameMatch = ex.name.toLowerCase().contains(
                         _searchQuery,
                       );
+                  
+                  // --- CAMBIO: Filtra por tagIds ---
+                  final tagMatch = _searchQuery.isEmpty
+                      ? false // No busques en tags si el query está vacío
+                      : ex.tagIds.any((tag) => tag.toLowerCase().contains(_searchQuery));
 
-                  // Filtra si el ejercicio está contraindicado
-                  final notContra = !ex.contraindicatedFor.any(
-                    (c) => profileInjuries.contains(c),
+                  final matchesSearch = nameMatch || tagMatch;
+
+                  // --- CAMBIO: Filtra por contraindicationIds ---
+                  final notContra = !ex.contraindicationIds.any(
+                    (cId) => activeInjuryIds.contains(cId),
                   );
+                  // --- FIN DEL CAMBIO ---
 
-                  return nameMatch && notContra;
+                  return matchesSearch && notContra;
                 }).toList();
 
                 if (filteredList.isEmpty) {
@@ -165,7 +206,8 @@ class _SearchableExerciseListScreenState
                     final exercise = filteredList[index];
                     return ListTile(
                       title: Text(exercise.name),
-                      subtitle: Text(exercise.category),
+                      // --- CAMBIO: Muestra categoryId ---
+                      subtitle: Text(exercise.categoryId),
                       trailing: const Icon(Icons.add_circle_outline),
                       onTap: () {
                         _showAddExerciseDialog(exercise);

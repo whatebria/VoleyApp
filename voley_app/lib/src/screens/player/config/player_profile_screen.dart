@@ -1,11 +1,14 @@
-// lib/screens/player_profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart'; // Asegúrate que esta ruta sea correcta
 import 'package:intl/intl.dart';
-import 'package:voley_app/src/models/player_profile/player_profile.dart'; // (Usando mock)
-import 'package:voley_app/src/models/player_profile/player_event.dart'; // (Usando mock)
-import 'package:voley_app/src/models/player_profile/form_peak.dart'; // (Usando mock)
+import 'package:voley_app/src/models/player_profile/goal.dart';
+import 'package:voley_app/src/models/player_profile/injury.dart';
+import 'package:voley_app/src/models/player_profile/player_profile.dart'; 
+import 'package:voley_app/src/models/player_profile/player_event.dart'; 
+import 'package:voley_app/src/models/player_profile/form_peak.dart'; 
+import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
+
 
 class PlayerProfileScreen extends ConsumerWidget {
   const PlayerProfileScreen({super.key});
@@ -102,8 +105,11 @@ class PlayerProfileScreen extends ConsumerWidget {
   /// Pestaña 1: RESUMEN (Quién soy, métricas clave, prompt de coach)
   Widget _buildOverviewTab(BuildContext context, ThemeData theme,
       PlayerProfile profile, bool isLinkedToCoach) {
-    // Lógica de métricas (movida aquí desde el widget principal)
-    final keyStats = profile.evaluation.testScores;
+    
+    // --- CAMBIO: Lógica de métricas actualizada ---
+    // Usa el getter 'latestEvaluation' del modelo PlayerProfile
+    final latestEval = profile.latestEvaluation;
+
     final physicalMetrics = <MapEntry<String, String>>[];
     if (profile.age != null) {
       physicalMetrics.add(MapEntry('Edad', '${profile.age} años'));
@@ -129,8 +135,9 @@ class PlayerProfileScreen extends ConsumerWidget {
         const SizedBox(height: 24),
 
         // Sección "Estadísticas Clave"
+        // --- CAMBIO: Pasa el 'latestEval' ---
         _buildKeyStatsSection(
-            context, theme, physicalMetrics, keyStats.entries.toList()),
+            context, theme, physicalMetrics, latestEval),
         const SizedBox(height: 24),
 
         // REFACTORIZADO: El prompt de "Vincular Coach" ahora está al final
@@ -143,6 +150,12 @@ class PlayerProfileScreen extends ConsumerWidget {
   /// Pestaña 2: PLANIFICACIÓN (Objetivos, Estado, Fechas, Picos)
   Widget _buildPlanningTab(
       BuildContext context, ThemeData theme, PlayerProfile profile) {
+        
+    // --- AÑADIDO: Lógica para filtrar lesiones activas ---
+    final activeInjuries = profile.injuries
+        .where((i) => i.status == InjuryStatus.active)
+        .toList();
+        
     return ListView(
       padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 80.0),
       children: [
@@ -160,6 +173,7 @@ class PlayerProfileScreen extends ConsumerWidget {
             message: 'Define objetivos para personalizar tu progreso.',
             buttonText: 'Añadir Objetivos',
             onPressed: () {
+              // TODO: Asegúrate que esta ruta exista en tu main.dart
               Navigator.pushNamed(context, '/profile_settings/goals');
             },
           )
@@ -167,7 +181,8 @@ class PlayerProfileScreen extends ConsumerWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: profile.goals
-                .map((goal) => _buildGoalRow(theme, goal))
+                // --- CAMBIO: 'goal' ahora es un objeto Goal ---
+                .map((goal) => _buildGoalRow(theme, goal)) 
                 .toList(),
           ),
         const SizedBox(height: 24),
@@ -182,13 +197,16 @@ class PlayerProfileScreen extends ConsumerWidget {
           theme,
           icon: Icons.healing_outlined,
           title: 'Lesiones',
-          value: profile.injuries.isEmpty ? 'Ninguna' : profile.injuries.join(', '),
+          // --- CAMBIO: Muestra solo lesiones activas ---
+          value: activeInjuries.isEmpty 
+              ? 'Ninguna' 
+              : activeInjuries.map((i) => i.description).join(', '),
         ),
         _InfoRow(
           theme,
           icon: Icons.calendar_today_outlined,
           title: 'Días Disponibles',
-          value: profile.availability.trainingDays.isEmpty
+          value: profile.availability.trainingDays.isEmpty // 'days' en lugar de 'trainingDays'
               ? 'No especificado'
               : profile.availability.trainingDays.join(', '),
         ),
@@ -196,6 +214,7 @@ class PlayerProfileScreen extends ConsumerWidget {
           theme,
           icon: Icons.timer_outlined,
           title: 'Duración de Sesión',
+          // --- CAMBIO: 'sessionMinutes' en lugar de 'sessionDuration' ---
           value: '${profile.availability.sessionMinutes} minutos',
         ),
         const SizedBox(height: 24),
@@ -269,7 +288,8 @@ class PlayerProfileScreen extends ConsumerWidget {
             message: 'Registra tus torneos pasados para ver tu progreso.',
             buttonText: 'Añadir Torneo',
             onPressed: () {
-              Navigator.pushNamed(context, '/edit_tournaments');
+              // TODO: Asegúrate que esta ruta exista
+              Navigator.pushNamed(context, '/profile_settings/tournaments');
             },
           )
         else
@@ -418,11 +438,16 @@ class PlayerProfileScreen extends ConsumerWidget {
   }
 
   /// REFACTORIZADO: Extraído a su propio widget para limpieza.
+  /// --- CAMBIO: Acepta EvaluationResult? en lugar de una lista de MapEntry ---
   Widget _buildKeyStatsSection(
-      BuildContext context,
-      ThemeData theme,
-      List<MapEntry<String, String>> physicalMetrics,
-      List<MapEntry<String, double>> keyStats) {
+    BuildContext context,
+    ThemeData theme,
+    List<MapEntry<String, String>> physicalMetrics,
+    EvaluationResult? latestEval, // <-- CAMBIO
+  ) {
+    // --- CAMBIO: Extrae los test scores del latestEval ---
+    final testScores = latestEval?.testScores ?? [];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -431,7 +456,8 @@ class PlayerProfileScreen extends ConsumerWidget {
           style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
         const Divider(height: 16),
-        if (physicalMetrics.isEmpty && keyStats.isEmpty)
+        // --- CAMBIO: Lógica de estado vacío actualizada ---
+        if (physicalMetrics.isEmpty && testScores.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24.0),
             child: Center(
@@ -464,7 +490,8 @@ class PlayerProfileScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
           ],
-          if (keyStats.isNotEmpty) ...[
+          // --- CAMBIO: Lógica actualizada para List<TestScore> ---
+          if (testScores.isNotEmpty) ...[
             Text(
               'Tests físicos',
               style: theme.textTheme.titleMedium
@@ -478,12 +505,12 @@ class PlayerProfileScreen extends ConsumerWidget {
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
               childAspectRatio: 1.5,
-              children: keyStats.map((test) {
+              children: testScores.map((test) {
                 return _buildStatCard(
                   theme,
-                  title: test.key,
+                  title: _formatTestId(test.testId), // <-- CAMBIO
                   value: test.value.toStringAsFixed(1),
-                  unit: 'pts',
+                  unit: test.unit, // <-- CAMBIO
                 );
               }).toList(),
             ),
@@ -623,19 +650,35 @@ class PlayerProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// (Sin cambios) Fila para un objetivo.
-  Widget _buildGoalRow(ThemeData theme, String goal) {
+  /// --- CAMBIO: Fila de objetivo actualizada para usar el objeto Goal ---
+  Widget _buildGoalRow(ThemeData theme, Goal goal) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         children: [
-          Icon(Icons.check_circle_outline,
-              color: theme.colorScheme.secondary, size: 20),
+          Icon(
+            // --- CAMBIO: Icono dinámico basado en goal.isCompleted ---
+            goal.isCompleted 
+              ? Icons.check_circle 
+              : Icons.check_circle_outline,
+            color: goal.isCompleted 
+              ? theme.colorScheme.primary // voltNeon
+              : theme.colorScheme.secondary, // azulPro
+            size: 20
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              goal,
-              style: theme.textTheme.bodyLarge,
+              // --- CAMBIO: Usa goal.description ---
+              goal.description,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                decoration: goal.isCompleted 
+                  ? TextDecoration.lineThrough 
+                  : TextDecoration.none,
+                color: goal.isCompleted
+                  ? theme.colorScheme.onSurface.withOpacity(0.5)
+                  : theme.colorScheme.onSurface
+              ),
             ),
           ),
         ],
@@ -666,5 +709,14 @@ class PlayerProfileScreen extends ConsumerWidget {
   String _formatNumber(double value) {
     final isInt = value % 1 == 0;
     return isInt ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+  }
+
+  // --- AÑADIDO: Helper para formatear IDs de tests ---
+  String _formatTestId(String testId) {
+    if (testId.isEmpty) return 'Test';
+    // Convierte 'vertical_jump' en 'Vertical Jump'
+    return testId.split('_')
+      .map((word) => word[0].toUpperCase() + word.substring(1))
+      .join(' ');
   }
 }

@@ -1,13 +1,11 @@
 // lib/src/screens/player_home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:voley_app/providers/auth_provider.dart';
-// (Importa tus 3 pantallas de pestañas)
-import 'package:voley_app/src/screens/player/player_calendar_screen.dart';
-import 'package:voley_app/src/screens/exercise_library_screen.dart';
-import 'package:voley_app/src/screens/player/config/player_profile_screen.dart';
 
-// --- (CAMBIADO A ConsumerStatefulWidget) ---
+import 'package:voley_app/src/screens/player/player_calendar_screen.dart';
+import 'package:voley_app/src/screens/player/config/player_profile_screen.dart';
+import 'package:voley_app/src/screens/player/progress_dashboard_screen.dart';
+
 class PlayerHomeScreen extends ConsumerStatefulWidget {
   const PlayerHomeScreen({Key? key}) : super(key: key);
 
@@ -18,18 +16,11 @@ class PlayerHomeScreen extends ConsumerStatefulWidget {
 class _PlayerHomeScreenState extends ConsumerState<PlayerHomeScreen> {
   int _selectedIndex = 0;
 
-  // 1. Define las pantallas para tu navbar
+  // 1. Lista de widgets actualizada con la pantalla de Progreso
   static const List<Widget> _widgetOptions = <Widget>[
     PlayerCalendarScreen(), // Pestaña 0
-    ExerciseLibraryScreen(), // Pestaña 1
+    ProgressDashboardScreen(), // Pestaña 1 (¡NUEVA!)
     PlayerProfileScreen(), // Pestaña 2
-  ];
-
-  // 2. Define los títulos para la AppBar
-  static const List<String> _widgetTitles = <String>[
-    'Mi Programa',
-    'Biblioteca de Ejercicios',
-    'Mi Perfil',
   ];
 
   void _onItemTapped(int index) {
@@ -40,38 +31,34 @@ class _PlayerHomeScreenState extends ConsumerState<PlayerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final showOuterAppBar = _selectedIndex != 1;
     return Scaffold(
-      appBar: showOuterAppBar
-          ? AppBar(
-              title: Text(_widgetTitles[_selectedIndex]),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.logout),
-                  tooltip: 'Cerrar Sesión',
-                  onPressed: () {
-                    ref.read(authServiceProvider).logout();
-                  },
-                ),
-              ],
-            )
-          : null,
+      // (AppBar eliminado, como acordamos, para que cada hijo lo maneje)
       body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today),
+      bottomNavigationBar: NavigationBar(
+        onDestinationSelected: _onItemTapped,
+        selectedIndex: _selectedIndex,
+        destinations: const <Widget>[
+          // Pestaña 0: Programa
+          NavigationDestination(
+            icon: Icon(Icons.calendar_today_outlined),
+            selectedIcon: Icon(Icons.calendar_today),
             label: 'Programa',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.video_library),
-            label: 'Biblioteca',
+
+          // --- Pestaña 1 (NUEVA): Progreso ---
+          NavigationDestination(
+            icon: Icon(Icons.show_chart_outlined), // Icono de gráfico
+            selectedIcon: Icon(Icons.show_chart),
+            label: 'Progreso',
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
+
+          // Pestaña 2: Perfil
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Perfil',
+          ),
         ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        onTap: _onItemTapped,
       ),
     );
   }

@@ -3,7 +3,56 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
+// --- CAMBIO: Imports para los nuevos modelos ---
+import 'package:voley_app/src/models/program/intensity.dart';
 import 'package:voley_app/src/screens/program_view/searchable_excersice_list_screen.dart';
+
+// --- WIDGETS HELPER DE FORMATO ---
+// Se añaden al archivo para mantener la pantalla limpia.
+
+/// Helper para formatear reps (Ej: 8-10)
+String _formatReps(WorkoutExercise ex) {
+  if (ex.repsMin == ex.repsMax) return '${ex.repsMax}';
+  if (ex.repsMax == 0 || ex.repsMax == ex.repsMin) return '${ex.repsMin}';
+  return '${ex.repsMin}-${ex.repsMax}';
+}
+
+/// Helper para formatear intensidad para la vista (Ej: RPE 8)
+String _formatPrescription(Intensity p) {
+  switch (p.type) {
+    case IntensityType.rpe:
+      return 'RPE ${p.value.toInt()}';
+    case IntensityType.percent_1rm:
+      return '${(p.value * 100).toInt()}% 1RM';
+    case IntensityType.fixed_weight:
+      final weight = p.value % 1 == 0 ? p.value.toInt() : p.value.toStringAsFixed(1);
+      return '$weight kg';
+    case IntensityType.rpe_range:
+      return 'RPE ${p.value.toInt()}-${p.valueMax?.toInt()}';
+    case IntensityType.open:
+    default:
+      return p.label ?? 'N/A';
+  }
+}
+
+/// Helper para pre-llenar el diálogo de edición (Ej: 'RPE 8' o '80%')
+String _formatPrescriptionForEdit(Intensity p) {
+   switch (p.type) {
+    case IntensityType.rpe:
+      return 'RPE ${p.value.toInt()}';
+    case IntensityType.percent_1rm:
+      return '${(p.value * 100).toInt()}%';
+    case IntensityType.fixed_weight:
+      final weight = p.value % 1 == 0 ? p.value.toInt() : p.value.toStringAsFixed(1);
+      return '$weight kg';
+    case IntensityType.rpe_range:
+      return 'RPE ${p.value.toInt()}-${p.valueMax?.toInt()}';
+    case IntensityType.open:
+    default:
+      return p.label ?? '';
+  }
+}
+
 
 /// Nueva pantalla para editar una sesión (nombre y lista de ejercicios).
 class EditSessionScreen extends ConsumerStatefulWidget {
@@ -51,20 +100,24 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
 
     if (newExercise != null && mounted) {
       setState(() {
-        _exercises.add(newExercise);
+        final newExercises = List<WorkoutExercise>.from(_exercises);
+        newExercises.add(newExercise);
+        _exercises = newExercises; // Actualiza el estado
       });
     }
   }
 
   /// Muestra el diálogo para editar Reps/Sets/Intensidad
+  /// --- CAMBIO: Lógica interna actualizada para el nuevo modelo ---
   Future<void> _showEditExerciseDialog(
     WorkoutExercise exercise,
     int index,
   ) async {
     final theme = Theme.of(context);
+    // Pre-llenar con los valores actuales del objeto WorkoutExercise
     final setsCtrl = TextEditingController(text: exercise.sets.toString());
-    final repsCtrl = TextEditingController(text: exercise.reps);
-    final intensityCtrl = TextEditingController(text: exercise.intensity);
+    final repsCtrl = TextEditingController(text: _formatReps(exercise));
+    final intensityCtrl = TextEditingController(text: _formatPrescriptionForEdit(exercise.prescription));
 
     final updatedExercise = await showDialog<WorkoutExercise>(
       context: context,
@@ -83,12 +136,12 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
               ),
               TextField(
                 controller: repsCtrl,
-                decoration: const InputDecoration(labelText: 'Repeticiones'),
+                decoration: const InputDecoration(labelText: 'Repeticiones (Ej: 10 o 8-10)'),
                 keyboardType: TextInputType.text,
               ),
               TextField(
                 controller: intensityCtrl,
-                decoration: const InputDecoration(labelText: 'Intensidad (RPE)'),
+                decoration: const InputDecoration(labelText: 'Intensidad (Ej: RPE 7, 80%, 100kg)'),
                 keyboardType: TextInputType.text,
               ),
             ],
@@ -101,11 +154,31 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
             ),
             ElevatedButton(
               onPressed: () {
+                // --- LÓGICA DE PARSEO DE VUELTA AL MODELO ---
+                final String rawReps = repsCtrl.text.trim();
+                int repsMin = 0;
+                int repsMax = 0;
+                if (rawReps.contains('-')) {
+                  final parts = rawReps.split('-');
+                  repsMin = int.tryParse(parts.first.trim()) ?? 0;
+                  repsMax = int.tryParse(parts.last.trim()) ?? 0;
+                } else {
+                  repsMin = int.tryParse(rawReps) ?? 0;
+                  repsMax = repsMin;
+                }
+
+                // Usamos el helper del modelo para parsear la intensidad
+                final Intensity prescription = 
+                  WorkoutExercise.migrateIntensity(intensityCtrl.text);
+
                 final updated = exercise.copyWith(
                   sets: int.tryParse(setsCtrl.text) ?? exercise.sets,
-                  reps: repsCtrl.text,
-                  intensity: intensityCtrl.text,
+                  repsMin: repsMin,
+                  repsMax: repsMax,
+                  prescription: prescription,
                 );
+                // --- FIN LÓGICA ---
+                
                 Navigator.of(dialogContext, rootNavigator: true).pop(updated);
               },
               child: const Text('Guardar'),
@@ -117,7 +190,8 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
 
     if (updatedExercise != null) {
       setState(() {
-        _exercises[index] = updatedExercise;
+        // Actualiza la lista inmutablemente
+        _exercises[index] = updatedExercise; 
       });
     }
 
@@ -128,10 +202,12 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
 
   /// Guarda la sesión actualizada y la devuelve a la pantalla anterior
   void _handleSave() {
+    // Crea una nueva sesión con el nombre de sesión y la lista de ejercicios actualizada
     final updatedSession = widget.session.copyWith(
       day: _sessionNameCtrl.text,
       exercises: _exercises,
     );
+    // Devuelve el objeto inmutable actualizado
     Navigator.pop(context, updatedSession);
   }
 
@@ -141,7 +217,7 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Editar Sesión'),
+        title: Text(widget.session.day),
         actions: [
           // Botón de Añadir Ejercicio
           IconButton(
@@ -195,6 +271,11 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
               itemCount: _exercises.length,
               itemBuilder: (context, index) {
                 final ex = _exercises[index];
+                
+                // --- CAMBIO: Formatea el subtítulo ---
+                final repsLabel = _formatReps(ex);
+                final intensityLabel = _formatPrescription(ex.prescription);
+
                 return Card(
                   margin: const EdgeInsets.only(bottom: 8),
                   color: theme.colorScheme.surface,
@@ -204,7 +285,8 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
                       child: Text('${index + 1}'),
                     ),
                     title: Text(ex.name),
-                    subtitle: Text('${ex.sets}x${ex.reps} @ ${ex.intensity}'),
+                    // --- CAMBIO: Subtítulo actualizado ---
+                    subtitle: Text('${ex.sets}x$repsLabel @ $intensityLabel'),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -220,7 +302,9 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
                           tooltip: 'Eliminar ejercicio',
                           onPressed: () {
                             setState(() {
-                              _exercises.removeAt(index);
+                              final newList = List<WorkoutExercise>.from(_exercises);
+                              newList.removeAt(index);
+                              _exercises = newList;
                             });
                           },
                         ),
@@ -235,4 +319,3 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
     );
   }
 }
-

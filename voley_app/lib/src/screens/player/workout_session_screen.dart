@@ -1,12 +1,16 @@
-// lib/src/screens/workout_session_screen.dart
 import 'dart:async'; // Importa 'Timer'
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
+import 'package:voley_app/src/models/program/logged_excercise.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
 import 'package:voley_app/src/models/program/session_log.dart';
+// --- AÑADIDO: Imports para los nuevos modelos ---
+import 'package:voley_app/src/models/program/intensity.dart';
+import 'package:collection/collection.dart'; // Para .firstWhereOrNull
+// --- FIN AÑADIDO ---
 import 'package:uuid/uuid.dart';
 
 final isSubmittingWorkoutProvider = StateProvider<bool>((ref) => false);
@@ -133,20 +137,28 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
       return;
     }
 
-    final Map<String, List<SetLog>> finalWorkoutData = {};
-    _workoutData.forEach((key, value) {
-      final loggedSets = value.whereType<SetLog>().toList();
+    // --- CAMBIO: Convertir el Map a List<LoggedExercise> ---
+    final List<LoggedExercise> finalLoggedExercises = [];
+    _workoutData.forEach((exerciseId, sets) {
+      // Filtra solo los sets que fueron completados (no nulos)
+      final loggedSets = sets.whereType<SetLog>().toList();
       if (loggedSets.isNotEmpty) {
-        finalWorkoutData[key] = loggedSets;
+        // Añade un nuevo LoggedExercise a la lista
+        finalLoggedExercises.add(LoggedExercise(
+          exerciseId: exerciseId,
+          sets: loggedSets,
+        ));
       }
     });
+    // --- FIN DEL CAMBIO ---
 
     final log = SessionLog(
       id: const Uuid().v4(),
       profileId: profile.id,
       sessionId: widget.session.id,
       completedAt: DateTime.now(),
-      exercises: finalWorkoutData,
+      // --- CAMBIO: Pasa la List<LoggedExercise> ---
+      loggedExercises: finalLoggedExercises,
       rpe: feedback['rpe'] as int,
       notes: feedback['notes'] as String,
     );
@@ -524,6 +536,33 @@ class _WorkoutExerciseCard extends ConsumerWidget {
     required this.onSetLogged,
   });
 
+  // --- AÑADIDO: Helper para formatear reps ---
+  String _formatReps(WorkoutExercise ex) {
+    if (ex.repsMin == ex.repsMax) return '${ex.repsMax}';
+    // Si no hay max, o es igual al min, muestra solo uno
+    if (ex.repsMax == 0 || ex.repsMax == ex.repsMin) return '${ex.repsMin}';
+    return '${ex.repsMin}-${ex.repsMax}';
+  }
+
+  // --- AÑADIDO: Helper para formatear intensidad ---
+  String _formatPrescription(Intensity p) {
+    switch (p.type) {
+      case IntensityType.rpe:
+        return 'RPE ${p.value.toInt()}';
+      case IntensityType.percent_1rm:
+        return '${(p.value * 100).toInt()}% 1RM';
+      case IntensityType.fixed_weight:
+        // Quita el .0 si es un número entero
+        final weight = p.value % 1 == 0 ? p.value.toInt() : p.value.toStringAsFixed(1);
+        return '$weight kg'; // Asume kg
+      case IntensityType.rpe_range:
+        return 'RPE ${p.value.toInt()}-${p.valueMax?.toInt()}';
+      case IntensityType.open:
+      default:
+        return p.label ?? 'N/A';
+    }
+  }
+
   /// Widget para "Última vez"
   Widget _buildLastTime(BuildContext context, WidgetRef ref, ThemeData theme) {
     final historyAsync = ref.watch(sessionLogHistoryProvider);
@@ -540,18 +579,26 @@ class _WorkoutExerciseCard extends ConsumerWidget {
       data: (history) {
         String lastTimeText = "¡A por un récord!";
 
+        // --- CAMBIO: Lógica actualizada para List<LoggedExercise> ---
         for (final log in history) {
-          if (log.exercises.containsKey(exercise.exerciseId)) {
-            final sets = log.exercises[exercise.exerciseId]!;
+          // 1. Busca el ejercicio logueado por su ID
+          final loggedEx = log.loggedExercises.firstWhereOrNull(
+            (ex) => ex.exerciseId == exercise.exerciseId
+          );
+
+          // 2. Si existe y tiene series, encuentra la mejor
+          if (loggedEx != null) {
+            final sets = loggedEx.sets; // Es List<SetLog>
             if (sets.isNotEmpty) {
               final bestSet = sets.reduce(
                 (a, b) => a.weight > b.weight ? a : b,
               );
               lastTimeText = "${bestSet.weight} kg x ${bestSet.reps} reps";
-              break;
+              break; // Rompe el bucle 'for'
             }
           }
         }
+        // --- FIN DEL CAMBIO ---
 
         return Row(
           children: [
@@ -577,6 +624,19 @@ class _WorkoutExerciseCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    
+    // --- CAMBIO: Formatea los nuevos valores ---
+    final String repsLabel = _formatReps(exercise);
+    final String intensityLabel = _formatPrescription(exercise.prescription);
+    
+    // Determina los valores iniciales para _SetRow
+    final double initialWeight = 
+      exercise.prescription.type == IntensityType.fixed_weight 
+      ? exercise.prescription.value 
+      : 0.0;
+    final int initialReps = exercise.repsMin;
+    // --- FIN DEL CAMBIO ---
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final bool isCompact = constraints.maxWidth < 420;
@@ -593,8 +653,9 @@ class _WorkoutExerciseCard extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               Chip(
+                // --- CAMBIO: Usa los labels formateados ---
                 label: Text(
-                  'OBJETIVO: ${exercise.sets} series x ${exercise.reps} @ ${exercise.intensity}',
+                  'OBJETIVO: ${exercise.sets} series x $repsLabel @ $intensityLabel',
                   style: TextStyle(
                     color: theme.colorScheme.onSecondaryContainer,
                   ),
@@ -657,8 +718,12 @@ class _WorkoutExerciseCard extends ConsumerWidget {
                   return _SetRow(
                     key: ValueKey('${exercise.exerciseId}_$setIndex'),
                     setIndex: setIndex,
-                    targetReps: exercise.reps,
-                    targetIntensity: exercise.intensity,
+                    // --- CAMBIO: Pasa los nuevos props ---
+                    targetRepsLabel: repsLabel,
+                    targetIntensityLabel: intensityLabel,
+                    initialReps: initialReps,
+                    initialWeight: initialWeight,
+                    // --- FIN DEL CAMBIO ---
                     completedLog: loggedSets[setIndex],
                     isCompact: isCompact,
                     onSetLogged: (log) {
@@ -679,8 +744,13 @@ class _WorkoutExerciseCard extends ConsumerWidget {
 /// --- MEJORA: Fila de Set ahora es StatefulWidget (no necesita Consumer) ---
 class _SetRow extends StatefulWidget {
   final int setIndex;
-  final String targetReps;
-  final String targetIntensity;
+  // --- CAMBIO: Propiedades de String actualizadas ---
+  final String targetRepsLabel;
+  final String targetIntensityLabel;
+  // --- AÑADIDO: Propiedades para pre-llenar ---
+  final int initialReps;
+  final double initialWeight;
+  // --- FIN DE CAMBIOS ---
   final SetLog? completedLog;
   final bool isCompact;
   final Function(SetLog) onSetLogged;
@@ -688,8 +758,12 @@ class _SetRow extends StatefulWidget {
   const _SetRow({
     Key? key,
     required this.setIndex,
-    required this.targetReps,
-    required this.targetIntensity,
+    // --- CAMBIO: Constructor actualizado ---
+    required this.targetRepsLabel,
+    required this.targetIntensityLabel,
+    required this.initialReps,
+    required this.initialWeight,
+    // --- FIN DE CAMBIOS ---
     this.completedLog,
     required this.isCompact,
     required this.onSetLogged,
@@ -716,12 +790,9 @@ class __SetRowState extends State<_SetRow> {
       _currentWeight = widget.completedLog!.weight;
       _currentReps = widget.completedLog!.reps;
     } else {
-      _currentWeight =
-          (double.tryParse(
-            widget.targetIntensity.replaceAll(RegExp(r'[^0-9.]'), ''),
-          ) ??
-          0);
-      _currentReps = int.tryParse(widget.targetReps) ?? 0;
+      // --- CAMBIO: Usar los nuevos props para inicializar ---
+      _currentWeight = widget.initialWeight;
+      _currentReps = widget.initialReps;
     }
   }
 

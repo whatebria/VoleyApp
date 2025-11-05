@@ -1,13 +1,15 @@
-// lib/src/screens/create_player_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/availability.dart';
+import 'package:voley_app/src/models/player_profile/goal.dart';
+import 'package:voley_app/src/models/player_profile/injury.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
 import 'package:voley_app/src/models/player_profile/player_event.dart';
 import 'package:voley_app/src/models/player_profile/form_peak.dart';
+import 'package:voley_app/src/models/player_profile/test_score.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 
@@ -41,14 +43,17 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
   final goalCtrl = TextEditingController();
   final uuid = Uuid();
 
-  // Estado del formulario (Efímero, se queda en la UI)
+  // --- CAMBIO: Estado del formulario actualizado ---
   String selectedPosition = 'Central';
   String selectedLevel = 'Competitivo';
   List<Tournament> _selectedTournaments = [];
-  List<String> selectedInjuries = [];
+  // --- CAMBIO: Actualizado a List<Injury> ---
+  List<Injury> selectedInjuries = [];
   List<String> selectedDays = [];
-  List<String> _goals = [];
-  Map<String, double> _testScores = {};
+  // --- CAMBIO: Actualizado a List<Goal> ---
+  List<Goal> _goals = [];
+  // --- CAMBIO: Actualizado a List<TestScore> ---
+  List<TestScore> _testScores = [];
   List<PlayerEvent> _keyEvents = [];
   List<FormPeak> _formPeaks = [];
   final List<String> _allDays = [
@@ -134,7 +139,7 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
 
       // 2. Preparar el Perfil de Jugador
       final availability = Availability(
-        trainingDays: selectedDays,
+        trainingDays: selectedDays, // 'days' es el nombre correcto en tu modelo Availability
         sessionMinutes: _selectedDurationMinutes,
       );
 
@@ -150,21 +155,25 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
         return double.tryParse(trimmed.replaceAll(',', '.'));
       }
 
+      // --- CAMBIO: Creación del PlayerProfile actualizada ---
       final profileToSave = PlayerProfile(
-        id: uuid.v4(),
-        userId: userId,
+        id: uuid.v4(), // El ID del perfil
+        userId: userId, // El ID del usuario de Auth
         assignedCoachId: coachId,
         name: nameCtrl.text.trim(),
         position: selectedPosition,
         level: selectedLevel.toLowerCase(),
+        // --- CAMBIO: Pasa las listas de objetos ---
         goals: _goals,
-        injuries: selectedInjuries.contains('Ninguna') ? [] : selectedInjuries,
+        injuries: selectedInjuries,
         availability: availability,
-        evaluation: EvaluationResult(
-          testScores: _testScores,
-          strengths: [],
-          weaknesses: [],
-        ),
+        // --- CAMBIO: Crea la primera evaluación en el historial ---
+        evaluationHistory: [
+          EvaluationResult(
+            date: DateTime.now(),
+            testScores: _testScores,
+          )
+        ],
         tournaments: _selectedTournaments,
         age: parseAge(ageCtrl.text),
         heightCm: parseDouble(heightCtrl.text),
@@ -302,9 +311,10 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
     nameCtrl.dispose();
   }
 
+  // --- CAMBIO: _showAddGoalDialog ahora devuelve un objeto Goal ---
   Future<void> _showAddGoalDialog() async {
     goalCtrl.clear();
-    final result = await showDialog<String>(
+    final result = await showDialog<Goal>(
       context: context,
       builder: (context) {
         return AlertDialog(
@@ -329,7 +339,11 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                   Navigator.of(
                     context,
                     rootNavigator: true,
-                  ).pop(goalCtrl.text.trim());
+                  ).pop(Goal(
+                    id: uuid.v4(),
+                    description: goalCtrl.text.trim(),
+                    isCompleted: false, // Por defecto no está completado
+                  ));
                 }
               },
               child: const Text('Guardar'),
@@ -344,12 +358,14 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
     }
   }
 
+  // --- CAMBIO: _showAddTestDialog ahora devuelve un objeto TestScore ---
   Future<void> _showAddTestDialog() async {
     final nameCtrl = TextEditingController();
     final valueCtrl = TextEditingController();
+    final unitCtrl = TextEditingController(); // <-- AÑADIDO
     final formKey = GlobalKey<FormState>();
 
-    final result = await showDialog<MapEntry<String, double>>(
+    final result = await showDialog<TestScore>(
       context: context,
       builder: (context) {
         return AlertDialog(
@@ -388,6 +404,18 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                         : null;
                   },
                 ),
+                const SizedBox(height: 12),
+                // --- AÑADIDO: Campo de Unidad ---
+                TextFormField(
+                  controller: unitCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Unidad *',
+                    helperText: 'Ej: cm, seg, kg',
+                  ),
+                  validator: (value) => (value == null || value.trim().isEmpty)
+                      ? 'Ingresa una unidad'
+                      : null,
+                ),
               ],
             ),
           ),
@@ -406,7 +434,12 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                   Navigator.of(
                     context,
                     rootNavigator: true,
-                  ).pop(MapEntry(nameCtrl.text.trim(), value));
+                  ).pop(TestScore(
+                    // Crea un ID simple basado en el nombre
+                    testId: nameCtrl.text.trim().toLowerCase().replaceAll(' ', '_'),
+                    value: value,
+                    unit: unitCtrl.text.trim(),
+                  ));
                 }
               },
               child: const Text('Añadir'),
@@ -417,11 +450,94 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
     );
 
     if (result != null) {
-      setState(() => _testScores[result.key] = result.value);
+      setState(() => _testScores.add(result));
     }
     nameCtrl.dispose();
     valueCtrl.dispose();
+    unitCtrl.dispose();
   }
+  
+  // --- AÑADIDO: Diálogo para Lesiones ---
+  Future<void> _showAddInjuryDialog() async {
+    final descriptionCtrl = TextEditingController();
+    InjuryStatus status = InjuryStatus.active; // Por defecto
+    final formKey = GlobalKey<FormState>();
+
+    final result = await showDialog<Injury>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Registrar Lesión'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: descriptionCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Descripción de la Lesión *',
+                        helperText: 'Ej: Esguince de tobillo',
+                      ),
+                      autofocus: true,
+                      validator: (v) =>
+                          (v?.isEmpty ?? true) ? 'La descripción es requerida' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<InjuryStatus>(
+                      value: status,
+                      decoration: const InputDecoration(labelText: 'Estado'),
+                      items: InjuryStatus.values.map((s) {
+                        return DropdownMenuItem(
+                          value: s,
+                          child: Text(s.toString()),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() => status = val);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () =>
+                      Navigator.of(context, rootNavigator: true).maybePop(),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (formKey.currentState!.validate()) {
+                      Navigator.of(
+                        context,
+                        rootNavigator: true,
+                      ).pop(Injury(
+                        id: uuid.v4(),
+                        description: descriptionCtrl.text.trim(),
+                        status: status,
+                      ));
+                    }
+                  },
+                  child: const Text('Guardar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() => selectedInjuries.add(result));
+    }
+    descriptionCtrl.dispose();
+  }
+
 
   Future<void> _showAddEventDialog() async {
     const eventOptions = {
@@ -603,6 +719,15 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
       setState(() => _formPeaks.add(result));
     }
     noteCtrl.dispose();
+  }
+  
+  // --- AÑADIDO: Helper para formatear IDs de tests ---
+  String _formatTestId(String testId) {
+    if (testId.isEmpty) return 'Test';
+    // Convierte 'salto_vertical' en 'Salto Vertical'
+    return testId.split('_')
+      .map((word) => word[0].toUpperCase() + word.substring(1))
+      .join(' ');
   }
 
   @override
@@ -888,13 +1013,14 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                         style: TextStyle(color: Colors.grey),
                       ),
                     )
+                  // --- CAMBIO: Muestra la descripción del objeto Goal ---
                   : Wrap(
                       spacing: 8.0,
                       runSpacing: 4.0,
                       children: _goals
                           .map(
                             (goal) => Chip(
-                              label: Text(goal),
+                              label: Text(goal.toString()), // <-- CAMBIO
                               deleteIcon: const Icon(Icons.cancel, size: 18),
                               onDeleted: () =>
                                   setState(() => _goals.remove(goal)),
@@ -927,76 +1053,76 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                 ),
               )
             else
+              // --- CAMBIO: Muestra la lista de TestScore ---
               Column(
-                children: _testScores.entries
+                children: _testScores
                     .map(
-                      (entry) => ListTile(
+                      (test) => ListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
-                        title: Text(entry.key),
+                        title: Text(_formatTestId(test.testId)), // <-- CAMBIO
                         trailing: Text(
-                          entry.value.toStringAsFixed(2),
+                          '${test.value.toStringAsFixed(1)} ${test.unit}', // <-- CAMBIO
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         leading: IconButton(
                           icon: const Icon(Icons.delete_outline),
                           onPressed: () =>
-                              setState(() => _testScores.remove(entry.key)),
+                              setState(() => _testScores.remove(test)), // <-- CAMBIO
                         ),
                       ),
                     )
                     .toList(),
               ),
             const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Lesiones (opcional)',
-                style: theme.textTheme.titleSmall,
-              ),
+            
+            // --- CAMBIO: Lógica de Lesiones actualizada ---
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Lesiones (opcional)', style: theme.textTheme.titleSmall),
+                IconButton(
+                  tooltip: 'Agregar lesión',
+                  onPressed: _showAddInjuryDialog, // <-- CAMBIO
+                  icon: const Icon(Icons.add_circle_outline),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
-            // --- MEJORA DE DISEÑO: FilterChip con tema ---
-            Wrap(
-              spacing: 8.0,
-              runSpacing: 4.0,
-              children:
-                  [
-                    'Rodilla',
-                    'Tobillo',
-                    'Hombro',
-                    'Espalda',
-                    'Muñeca',
-                    'Dedo',
-                    'Ninguna',
-                  ].map((injury) {
-                    final isSelected = selectedInjuries.contains(injury);
-                    return FilterChip(
-                      label: Text(injury),
-                      selected: isSelected,
-                      // --- MEJORA DE DISEÑO: Colores del tema ---
-                      selectedColor: theme.colorScheme.primary,
-                      labelStyle: TextStyle(
-                        color: isSelected
-                            ? theme.colorScheme.onPrimary
-                            : theme.colorScheme.onSurface,
+            // --- CAMBIO: Reemplaza FilterChip por Wrap de Chips ---
+            Align(
+              alignment: Alignment.centerLeft,
+              child: selectedInjuries.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.only(bottom: 8.0),
+                      child: Text(
+                        'Registra lesiones activas o pasadas.',
+                        style: TextStyle(color: Colors.grey),
                       ),
-                      onSelected: (bool selected) {
-                        setState(() {
-                          if (injury == 'Ninguna') {
-                            selectedInjuries.clear();
-                            if (selected) selectedInjuries.add('Ninguna');
-                          } else {
-                            selectedInjuries.remove('Ninguna');
-                            if (selected)
-                              selectedInjuries.add(injury);
-                            else
-                              selectedInjuries.remove(injury);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
+                    )
+                  : Wrap(
+                      spacing: 8.0,
+                      runSpacing: 4.0,
+                      children: selectedInjuries
+                          .map(
+                            (injury) => Chip(
+                              label: Text(injury.description), // <-- CAMBIO
+                              avatar: Icon(
+                                injury.status == InjuryStatus.active
+                                    ? Icons.warning_amber_rounded
+                                    : Icons.check_circle_outline,
+                                size: 16,
+                                color: injury.status == InjuryStatus.active
+                                    ? Colors.red
+                                    : Colors.green,
+                              ),
+                              deleteIcon: const Icon(Icons.cancel, size: 18),
+                              onDeleted: () =>
+                                  setState(() => selectedInjuries.remove(injury)),
+                            ),
+                          )
+                          .toList(),
+                    ),
             ),
           ],
         ),

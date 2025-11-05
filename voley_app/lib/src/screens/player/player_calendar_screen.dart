@@ -9,6 +9,7 @@ import 'package:voley_app/src/models/program/session_log.dart';
 import 'package:voley_app/src/screens/player/workout_session_screen.dart';
 import 'package:collection/collection.dart';
 
+
 class PlayerCalendarScreen extends ConsumerStatefulWidget {
   const PlayerCalendarScreen({super.key});
 
@@ -28,167 +29,151 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
     super.initState();
     _selectedDay = _focusedDay;
   }
+  
+  // --- CAMBIO: _getEventsForDay ahora usa el provider ---
+  List<TrainingSession> _getEventsForDay(DateTime day, Map<DateTime, List<TrainingSession>> events) {
+    final normalizedDay = DateTime(day.year, day.month, day.day);
+    return events[normalizedDay] ?? [];
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // --- Observa los providers ---
-    
-    // ¡CAMBIO CLAVE! Ahora observa el provider del JUGADOR, no el del EXPLORADOR.
-    final allProgramsAsync = ref.watch(playerProgramsProvider); 
-    
-    final selectedProgram = ref.watch(selectedProgramProvider);
-    final events = ref.watch(calendarEventsProvider);
+    // --- CORRECCIÓN: Iniciar la cadena de dependencias ---
+    // 1. Observa primero al usuario.
+    final userAsync = ref.watch(currentUserAppUserProvider);
 
-    return allProgramsAsync.when(
+    return userAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, s) => Center(child: Text('Error al cargar programa: $e')),
-      data: (programs) {
-        // --- LÓGICA DE SINCRONIZACIÓN DE PROVIDERS ---
-
-        // CASO 1: No hay programas.
-        if (programs.isEmpty) {
-          // Si el provider de selección aún cree que hay uno, límpialo.
-          if (selectedProgram != null) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                ref.read(selectedProgramProvider.notifier).state = null;
-              }
-            });
-          }
-          // Muestra la pantalla de "Sin programa"
-          return _buildNoProgramWidget(theme);
-        }
-
-        // CASO 2: Hay programas, pero ninguno está seleccionado
-        // (p.ej. al cargar la app por primera vez).
-        if (programs.isNotEmpty && selectedProgram == null) {
-          // Actualiza el provider para que seleccione el primer programa.
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              ref.read(selectedProgramProvider.notifier).state = programs.first;
-            }
-          });
-          // Muestra un loader mientras el provider se actualiza.
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        // CASO 3: El programa seleccionado fue borrado o ya no existe.
-        // Sincroniza el provider para que seleccione el primero de la lista.
-        if (selectedProgram != null && !programs.contains(selectedProgram)) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              ref.read(selectedProgramProvider.notifier).state = programs.first;
-            }
-          });
-          return const Center(child: CircularProgressIndicator());
-        }
+      error: (e, s) => Center(child: Text('Error al cargar usuario: $e')),
+      data: (user) {
         
-        // CASO 4: El estado está "cargando" brevemente
-        // (p.ej. justo después del CASO 1 o 2, antes de que el build se rehaga).
-        if (selectedProgram == null) {
-          return const Center(child: CircularProgressIndicator());
+        // 2. Si no hay usuario, o es un coach, muestra error
+        // (ya que esta pantalla es solo para jugadores)
+        if (user == null || user.isCoach) {
+          return const Center(
+            child: Text('Acceso denegado. Esta pantalla es solo para jugadores.'),
+          );
         }
 
-        // --- ESTADO PRINCIPAL (READY) ---
-        // Si llegamos aquí, 'programs' no está vacío y 'selectedProgram' es válido.
+        // 3. AHORA que sabemos que hay un jugador, observamos sus providers
+        final allProgramsAsync = ref.watch(playerProgramsProvider); 
+        final selectedProgram = ref.watch(selectedProgramProvider);
+        final events = ref.watch(calendarEventsProvider);
 
-        return Column(
-          children: [
-            // El selector ahora lee y escribe en el provider
-            _buildProgramSelector(theme, programs, selectedProgram),
+        // 4. Construye la UI del calendario
+        return allProgramsAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Center(child: Text('Error al cargar programa: $e')),
+          data: (programs) {
+            
+            // --- CAMBIO: Toda la lógica de sincronización ha sido ELIMINADA ---
+            // (Ahora vive en el 'selectedProgramProvider')
 
-            TableCalendar<TrainingSession>(
-              firstDay:
-                  selectedProgram.startDate.subtract(const Duration(days: 30)),
-              lastDay: selectedProgram.endDate.add(const Duration(days: 30)),
-              focusedDay: _focusedDay,
-              calendarFormat: _calendarFormat,
-              onFormatChanged: (format) {
-                setState(() {
-                  _calendarFormat = format;
-                });
-              },
-              availableCalendarFormats: const {
-                CalendarFormat.month: 'Mes',
-                CalendarFormat.week: 'Semana',
-              },
-              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-              
-              // El eventLoader ahora consume el provider 'events'
-              eventLoader: (day) {
-                final normalizedDay = DateTime(day.year, day.month, day.day);
-                return events[normalizedDay] ?? [];
-              },
-              
-              onDaySelected: (selectedDay, focusedDay) {
-                setState(() {
-                  _selectedDay = selectedDay;
-                  _focusedDay = focusedDay;
-                });
-              },
-              headerStyle: HeaderStyle(
-                titleCentered: true,
-                formatButtonDecoration: BoxDecoration(
-                  border: Border.all(
-                      color: theme.colorScheme.onSurface.withOpacity(0.5)),
-                  borderRadius: BorderRadius.circular(20.0),
-                ),
-                formatButtonTextStyle:
-                    TextStyle(color: theme.colorScheme.onSurface),
-                leftChevronIcon: Icon(Icons.chevron_left,
-                    color: theme.colorScheme.onSurface),
-                rightChevronIcon: Icon(Icons.chevron_right,
-                    color: theme.colorScheme.onSurface),
-              ),
-              calendarStyle: CalendarStyle(
-                todayDecoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.4),
-                  shape: BoxShape.circle,
-                ),
-                todayTextStyle: TextStyle(color: theme.colorScheme.onPrimary),
-                selectedDecoration: BoxDecoration(
-                  color: theme.colorScheme.primary,
-                  shape: BoxShape.circle,
-                ),
-                selectedTextStyle:
-                    TextStyle(color: theme.colorScheme.onPrimary),
-                markerDecoration: BoxDecoration(
-                  color: theme.colorScheme.secondary,
-                  shape: BoxShape.circle,
-                ),
-                defaultTextStyle:
-                    TextStyle(color: theme.colorScheme.onSurface),
-                weekendTextStyle:
-                    TextStyle(color: theme.colorScheme.secondary),
-                outsideTextStyle: TextStyle(
-                    color: theme.colorScheme.onSurface.withOpacity(0.4)),
-              ),
-            ),
-            const Divider(height: 1, thickness: 1),
-            Expanded(
-              child: ref.watch(sessionLogHistoryProvider).when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, s) =>
-                    Center(child: Text('Error al cargar historial: $e')),
-                data: (historyList) {
-                  // Obtenemos los eventos para el día seleccionado desde el provider 'events'
-                  final normalizedDay = _selectedDay != null
-                      ? DateTime(
-                          _selectedDay!.year, _selectedDay!.month, _selectedDay!.day)
-                      : null;
-                  final selectedEvents = (normalizedDay != null &&
-                          events.containsKey(normalizedDay))
-                      ? events[normalizedDay]!
-                      : <TrainingSession>[];
+            // CASO 1: No hay programas (o el provider de selección aún no se inicializa).
+            // El 'selectedProgramProvider' se pondrá 'null' automáticamente.
+            if (selectedProgram == null) {
+              return _buildNoProgramWidget(theme);
+            }
+            
+            // --- ESTADO PRINCIPAL (READY) ---
+            // Si llegamos aquí, 'programs' no está vacío y 'selectedProgram' es válido.
 
-                  return _buildEventList(
-                      context, theme, historyList, selectedEvents);
-                },
-              ),
-            ),
-          ],
+            return Column(
+              children: [
+                // El selector ahora lee y escribe en el provider
+                _buildProgramSelector(theme, programs, selectedProgram),
+
+                TableCalendar<TrainingSession>(
+                  firstDay:
+                      selectedProgram.startDate.subtract(const Duration(days: 30)),
+                  lastDay: selectedProgram.endDate.add(const Duration(days: 30)),
+                  focusedDay: _focusedDay,
+                  calendarFormat: _calendarFormat,
+                  onFormatChanged: (format) {
+                    setState(() {
+                      _calendarFormat = format;
+                    });
+                  },
+                  availableCalendarFormats: const {
+                    CalendarFormat.month: 'Mes',
+                    CalendarFormat.week: 'Semana',
+                  },
+                  selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                  
+                  // El eventLoader ahora consume el provider 'events'
+                  eventLoader: (day) => _getEventsForDay(day, events),
+                  
+                  onDaySelected: (selectedDay, focusedDay) {
+                    setState(() {
+                      _selectedDay = selectedDay;
+                      _focusedDay = focusedDay;
+                    });
+                  },
+                  headerStyle: HeaderStyle(
+                    titleCentered: true,
+                    formatButtonDecoration: BoxDecoration(
+                      border: Border.all(
+                          color: theme.colorScheme.onSurface.withOpacity(0.5)),
+                      borderRadius: BorderRadius.circular(20.0),
+                    ),
+                    formatButtonTextStyle:
+                        TextStyle(color: theme.colorScheme.onSurface),
+                    leftChevronIcon: Icon(Icons.chevron_left,
+                        color: theme.colorScheme.onSurface),
+                    rightChevronIcon: Icon(Icons.chevron_right,
+                        color: theme.colorScheme.onSurface),
+                  ),
+                  calendarStyle: CalendarStyle(
+                    todayDecoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withOpacity(0.4),
+                      shape: BoxShape.circle,
+                    ),
+                    todayTextStyle: TextStyle(color: theme.colorScheme.onPrimary),
+                    selectedDecoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    selectedTextStyle:
+                        TextStyle(color: theme.colorScheme.onPrimary),
+                    markerDecoration: BoxDecoration(
+                      color: theme.colorScheme.secondary,
+                      shape: BoxShape.circle,
+                    ),
+                    defaultTextStyle:
+                        TextStyle(color: theme.colorScheme.onSurface),
+                    weekendTextStyle:
+                        TextStyle(color: theme.colorScheme.secondary),
+                    outsideTextStyle: TextStyle(
+                        color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                  ),
+                ),
+                const Divider(height: 1, thickness: 1),
+                Expanded(
+                  child: ref.watch(sessionLogHistoryProvider).when(
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (e, s) =>
+                        Center(child: Text('Error al cargar historial: $e')),
+                    data: (historyList) {
+                      // Obtenemos los eventos para el día seleccionado desde el provider 'events'
+                      final normalizedDay = _selectedDay != null
+                          ? DateTime(
+                              _selectedDay!.year, _selectedDay!.month, _selectedDay!.day)
+                          : null;
+                      final selectedEvents = (normalizedDay != null &&
+                              events.containsKey(normalizedDay))
+                          ? events[normalizedDay]!
+                          : <TrainingSession>[];
+
+                      return _buildEventList(
+                          context, theme, historyList, selectedEvents);
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -227,47 +212,51 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
   }
 
   /// El selector ahora lee y escribe en el [selectedProgramProvider]
-  Widget _buildProgramSelector(
-      ThemeData theme, List<Program> programs, Program currentSelectedProgram) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
-      color: theme.colorScheme.surface.withOpacity(0.5), // grisPro transparente
-      child: DropdownButtonFormField<Program>(
-        value: currentSelectedProgram,
-        items: programs.map((program) {
-          return DropdownMenuItem<Program>(
-            value: program,
-            child: Text(
-              program.title,
-              overflow: TextOverflow.ellipsis,
-            ),
-          );
-        }).toList(),
-        onChanged: (Program? newProgram) {
-          if (newProgram != null) {
-            // 1. Actualiza el provider con la nueva selección
-            ref.read(selectedProgramProvider.notifier).state = newProgram;
+ Widget _buildProgramSelector(
+  ThemeData theme,
+  List<Program> programs,
+  Program currentSelectedProgram,
+) {
+  return Container(
+    padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+    color: theme.colorScheme.surface.withOpacity(0.5),
+    child: DropdownButtonFormField<Program>(
+      value: currentSelectedProgram, // viene del ref.watch(selectedProgramProvider)
+      items: programs.map((program) {
+        return DropdownMenuItem<Program>(
+          value: program,
+          child: Text(
+            program.title,
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+      }).toList(),
+      onChanged: (Program? newProgram) {
+        if (newProgram != null) {
+          // ✅ Con StateProvider asignas directamente el estado:
+          ref.read(selectedProgramProvider.notifier).state = newProgram;
 
-            // 2. Resetea el estado local de la UI del calendario
-            setState(() {
-              _focusedDay = DateTime.now(); // Resetea el foco
-              _selectedDay =
-                  DateTime(_focusedDay.year, _focusedDay.month, _focusedDay.day);
-            });
-          }
-        },
-        decoration: InputDecoration(
-            labelText: 'Programa Seleccionado',
-            filled: true,
-            fillColor: theme.colorScheme.background,
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none),
-            contentPadding:
-                const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0)),
+          // Reset UI local del calendario (igual que antes)
+          setState(() {
+            _focusedDay = DateTime.now();
+            _selectedDay = DateTime(_focusedDay.year, _focusedDay.month, _focusedDay.day);
+          });
+        }
+      },
+      decoration: InputDecoration(
+        labelText: 'Programa Seleccionado',
+        filled: true,
+        fillColor: theme.colorScheme.background,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   /// La lista de eventos ahora recibe los eventos como parámetro.
   Widget _buildEventList(
@@ -327,7 +316,7 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
                   .withOpacity(0.6), // Fondo oscuro
 
           child: isCompleted
-              ? _buildLogSummary(theme, session, completedLog)
+              ? _buildLogSummary(theme, session, completedLog!) // Añadido !
               : _buildPlannedSession(context, theme, session),
         );
       },
@@ -406,13 +395,16 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
   Widget _buildLogSummary(
       ThemeData theme, TrainingSession session, SessionLog log) {
     String bestLift = "N/A";
-    if (log.exercises.isNotEmpty) {
-      final allSets = log.exercises.values.expand((sets) => sets).toList();
+    
+    // --- CAMBIO: Lógica para List<LoggedExercise> ---
+    if (log.loggedExercises.isNotEmpty) {
+      final allSets = log.loggedExercises.expand((loggedEx) => loggedEx.sets).toList();
       if (allSets.isNotEmpty) {
         final bestSet = allSets.reduce((a, b) => a.weight > b.weight ? a : b);
         bestLift = "${bestSet.weight}kg x ${bestSet.reps} reps";
       }
     }
+    // --- FIN DEL CAMBIO ---
 
     return ExpansionTile(
       title: Text(
@@ -471,18 +463,19 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
                     ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              if (log.exercises.isEmpty)
+              // --- CAMBIO: Iterar sobre List<LoggedExercise> ---
+              if (log.loggedExercises.isEmpty)
                 const Text('No se registraron series.',
                     style: TextStyle(fontStyle: FontStyle.italic))
               else
-                ...log.exercises.entries.map((entry) {
-                  final String exerciseId = entry.key;
-                  final List<SetLog> sets = entry.value;
-
+                ...log.loggedExercises.map((loggedEx) {
+                  // Encuentra el nombre del ejercicio original
                   final exerciseName = session.exercises
-                          .firstWhereOrNull((ex) => ex.exerciseId == exerciseId)
+                          .firstWhereOrNull((ex) => ex.exerciseId == loggedEx.exerciseId)
                           ?.name ??
                       'Ejercicio Borrado';
+
+                  final sets = loggedEx.sets;
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8.0),
@@ -528,4 +521,3 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
     );
   }
 }
-

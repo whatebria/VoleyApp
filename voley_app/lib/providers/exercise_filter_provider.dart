@@ -1,71 +1,109 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:collection/collection.dart';
 import 'package:voley_app/src/models/bd/exercise.dart';
-import 'package:voley_app/providers/providers.dart'; // Para exercisesProvider
+import 'package:voley_app/providers/providers.dart';
+// ^ Debe exponer: exercisesProvider (AsyncValue<List<Exercise>>)
+// y los mapas de etiquetas (id -> label) opcionales:
+//   exerciseCategoryLabelsProvider: Provider<Map<String, String>>
+//   exerciseLevelLabelsProvider:    Provider<Map<String, String>>
+//   exerciseEquipmentLabelsProvider:Provider<Map<String, String>>
+//   exerciseTagLabelsProvider:      Provider<Map<String, String>>
 
-// --- 1. Definición del Estado del Filtro ---
+// =====================================================
+// 1) Estado del Filtro (ahora con IDs)
+// =====================================================
 
 @immutable
 class ExerciseFilterState {
-  static const String allOption = 'Todos';
+  // Usamos un sentinel para "Todos"
+  static const String allOptionId = '__all__';
 
-  final String searchQuery;
-  final String selectedCategory;
-  final String selectedLevel;
-  final Set<String> selectedEquipment;
+  final String searchQuery; // texto libre
+  final String selectedCategoryId; // categoryId o allOptionId
+  final String selectedLevelId; // levelId    o allOptionId
+  final Set<String>
+  selectedEquipmentIds; // equipmentIds requeridos (conjunción)
 
   const ExerciseFilterState({
     this.searchQuery = '',
-    this.selectedCategory = allOption,
-    this.selectedLevel = allOption,
-    this.selectedEquipment = const {},
+    this.selectedCategoryId = allOptionId,
+    this.selectedLevelId = allOptionId,
+    this.selectedEquipmentIds = const {},
   });
 
   ExerciseFilterState copyWith({
     String? searchQuery,
-    String? selectedCategory,
-    String? selectedLevel,
-    Set<String>? selectedEquipment,
+    String? selectedCategoryId,
+    String? selectedLevelId,
+    Set<String>? selectedEquipmentIds,
   }) {
     return ExerciseFilterState(
       searchQuery: searchQuery ?? this.searchQuery,
-      selectedCategory: selectedCategory ?? this.selectedCategory,
-      selectedLevel: selectedLevel ?? this.selectedLevel,
-      selectedEquipment: selectedEquipment ?? this.selectedEquipment,
+      selectedCategoryId: selectedCategoryId ?? this.selectedCategoryId,
+      selectedLevelId: selectedLevelId ?? this.selectedLevelId,
+      selectedEquipmentIds: selectedEquipmentIds ?? this.selectedEquipmentIds,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is ExerciseFilterState &&
+        other.searchQuery == searchQuery &&
+        other.selectedCategoryId == selectedCategoryId &&
+        other.selectedLevelId == selectedLevelId &&
+        const SetEquality<String>().equals(
+          other.selectedEquipmentIds,
+          selectedEquipmentIds,
+        );
+  }
+
+  @override
+  int get hashCode =>
+      searchQuery.hashCode ^
+      selectedCategoryId.hashCode ^
+      selectedLevelId.hashCode ^
+      const SetEquality<String>().hash(selectedEquipmentIds);
+
+  get selectedEquipment => null;
 }
 
-// --- 2. El StateNotifier ---
+// =====================================================
+// 2) StateNotifier
+// =====================================================
 
 class ExerciseFilterNotifier extends StateNotifier<ExerciseFilterState> {
-  // Inicializa el estado
   ExerciseFilterNotifier() : super(const ExerciseFilterState());
 
   void setSearchQuery(String query) {
-    state = state.copyWith(searchQuery: query.toLowerCase());
+    state = state.copyWith(searchQuery: query.trim().toLowerCase());
   }
 
-  void setCategory(String categoryKey) {
-    state = state.copyWith(selectedCategory: categoryKey);
+  void setCategoryId(String categoryId) {
+    state = state.copyWith(selectedCategoryId: categoryId);
   }
 
-  void setLevel(String levelKey) {
-    state = state.copyWith(selectedLevel: levelKey);
+  void setLevelId(String levelId) {
+    state = state.copyWith(selectedLevelId: levelId);
   }
 
-  void toggleEquipment(String equipmentKey) {
-    final newSet = Set<String>.from(state.selectedEquipment);
-    if (newSet.contains(equipmentKey)) {
-      newSet.remove(equipmentKey);
+  // ✅ Método principal que trabaja con IDs
+  void toggleEquipmentId(String equipmentId) {
+    final next = Set<String>.from(state.selectedEquipmentIds);
+    if (next.contains(equipmentId)) {
+      next.remove(equipmentId);
     } else {
-      newSet.add(equipmentKey);
+      next.add(equipmentId);
     }
-    state = state.copyWith(selectedEquipment: newSet);
+    state = state.copyWith(selectedEquipmentIds: next);
   }
+
+  // ✅ Alias para compatibilidad con el nombre anterior
+  void toggleEquipment(String equipmentId) => toggleEquipmentId(equipmentId);
 
   void clearEquipment() {
-    state = state.copyWith(selectedEquipment: {});
+    state = state.copyWith(selectedEquipmentIds: {});
   }
 
   void clearFilters() {
@@ -73,108 +111,113 @@ class ExerciseFilterNotifier extends StateNotifier<ExerciseFilterState> {
   }
 }
 
-// --- 3. El Provider ---
+// =====================================================
+// 3) Provider del filtro
+// =====================================================
 
 final exerciseFilterProvider =
     StateNotifierProvider<ExerciseFilterNotifier, ExerciseFilterState>(
-  (ref) => ExerciseFilterNotifier(),
-);
+      (ref) => ExerciseFilterNotifier(),
+    );
 
-// --- 4. Providers Derivados (para las opciones del filtro) ---
+// =====================================================
+// 4) Helpers para opciones (id -> label)
+// =====================================================
 
-// Un helper para formatear y ordenar
-List<MapEntry<String, String>> _createFilterMap(
-    List<Exercise> exercises, String Function(Exercise) getKey, String Function(Exercise) getValue) {
-  final map = <String, String>{};
-  for (final exercise in exercises) {
-    final key = getKey(exercise).trim().toLowerCase();
-    final value = getValue(exercise).trim();
-    if (key.isNotEmpty && value.isNotEmpty) {
-      map.putIfAbsent(key, () => value);
-    }
-  }
-  final entries = map.entries.toList();
-  entries.sort((a, b) => a.value.compareTo(b.value));
-  return entries;
+String _labelOrId(Map<String, String> labels, String id) {
+  final lbl = labels[id];
+  if (lbl == null || lbl.trim().isEmpty) return id;
+  return lbl;
 }
 
-final exerciseCategoriesProvider = Provider<List<MapEntry<String, String>>>((ref) {
+List<MapEntry<String, String>> _entriesFromIds(
+  Iterable<String> ids,
+  Map<String, String> labels,
+) {
+  final unique = ids.toSet().toList();
+  unique.sort((a, b) => _labelOrId(labels, a).compareTo(_labelOrId(labels, b)));
+  return unique.map((id) => MapEntry(id, _labelOrId(labels, id))).toList();
+}
+
+// =====================================================
+// 5) Providers Derivados para opciones del filtro
+//    (se basan en ejercicios disponibles + mapas de etiquetas)
+// =====================================================
+
+final exerciseCategoriesProvider = Provider<List<MapEntry<String, String>>>((
+  ref,
+) {
   final exercises = ref.watch(exercisesProvider).valueOrNull ?? [];
-  return _createFilterMap(exercises, (e) => e.category, (e) => e.category);
+  final labels = ref.watch(
+    exerciseCategoryLabelsProvider,
+  ); // Map<String, String>
+  final ids = exercises.map((e) => e.categoryId);
+  return _entriesFromIds(ids, labels);
 });
 
 final exerciseLevelsProvider = Provider<List<MapEntry<String, String>>>((ref) {
   final exercises = ref.watch(exercisesProvider).valueOrNull ?? [];
-  return _createFilterMap(exercises, (e) => e.level, (e) => e.level);
+  final labels = ref.watch(exerciseLevelLabelsProvider); // Map<String, String>
+  final ids = exercises.map((e) => e.levelId);
+  return _entriesFromIds(ids, labels);
 });
 
-final exerciseEquipmentProvider = Provider<List<MapEntry<String, String>>>((ref) {
+final exerciseEquipmentProvider = Provider<List<MapEntry<String, String>>>((
+  ref,
+) {
   final exercises = ref.watch(exercisesProvider).valueOrNull ?? [];
-  final map = <String, String>{};
-  for (final exercise in exercises) {
-    for (final eq in exercise.equipment) {
-      final key = eq.trim().toLowerCase();
-      final value = eq.trim();
-      if (key.isNotEmpty && value.isNotEmpty) {
-        map.putIfAbsent(key, () => value);
-      }
-    }
-  }
-  final entries = map.entries.toList();
-  entries.sort((a, b) => a.value.compareTo(b.value));
-  return entries;
+  final labels = ref.watch(
+    exerciseEquipmentLabelsProvider,
+  ); // Map<String, String>
+  final ids = exercises.expand((e) => e.equipmentIds);
+  return _entriesFromIds(ids, labels);
 });
 
-
-// --- 5. El Provider de la Lista Filtrada ---
+// =====================================================
+// 6) Lista filtrada
+// =====================================================
 
 final filteredExercisesProvider = Provider<List<Exercise>>((ref) {
-  // Observa la lista completa de ejercicios
   final allExercises = ref.watch(exercisesProvider).valueOrNull ?? [];
-  // Observa el estado actual de los filtros
   final filters = ref.watch(exerciseFilterProvider);
+  final tagLabels = ref.watch(exerciseTagLabelsProvider); // Map<String, String>
 
-  // Si no hay filtros, devuelve la lista completa
+  // Si está en estado por defecto -> retorna todo
   if (filters == const ExerciseFilterState()) {
     return allExercises;
   }
 
-  // Aplica la lógica de filtrado
+  final q = filters.searchQuery;
+  final hasQuery = q.isNotEmpty;
+
   return allExercises.where((ex) {
-    // 1. Filtrar por Búsqueda (Nombre o Tag)
-    final query = filters.searchQuery;
-    final nameMatch = query.isEmpty 
-      ? true 
-      : ex.name.toLowerCase().contains(query);
-    final tagMatch = query.isEmpty 
-      ? true 
-      : ex.tags.any((tag) => tag.toLowerCase().contains(query));
+    // 1) Búsqueda por nombre y tags (usando labels si existen)
+    final nameMatch = !hasQuery ? true : ex.name.toLowerCase().contains(q);
+
+    final tagTexts = ex.tagIds
+        .map((id) => _labelOrId(tagLabels, id).toLowerCase())
+        .toList();
+
+    final tagMatch = !hasQuery ? true : tagTexts.any((t) => t.contains(q));
+
     final matchesSearch = nameMatch || tagMatch;
 
-    // 2. Filtrar por Categoría
-    final categoryKey = ex.category.trim().toLowerCase();
+    // 2) Categoría (por ID)
     final matchesCategory =
-        filters.selectedCategory == ExerciseFilterState.allOption ||
-        categoryKey == filters.selectedCategory;
+        filters.selectedCategoryId == ExerciseFilterState.allOptionId ||
+        ex.categoryId == filters.selectedCategoryId;
 
-    // 3. Filtrar por Nivel
-    final levelKey = ex.level.trim().toLowerCase();
+    // 3) Nivel (por ID)
     final matchesLevel =
-        filters.selectedLevel == ExerciseFilterState.allOption ||
-        levelKey == filters.selectedLevel;
+        filters.selectedLevelId == ExerciseFilterState.allOptionId ||
+        ex.levelId == filters.selectedLevelId;
 
-    // 4. Filtrar por Equipamiento
-    final equipmentKeys = ex.equipment.map((e) => e.trim().toLowerCase()).toSet();
+    // 4) Equipamiento: todos los seleccionados deben estar presentes
+    final exerciseEquip = ex.equipmentIds.toSet();
+    final requiredEquip = filters.selectedEquipmentIds;
     final matchesEquipment =
-        filters.selectedEquipment.isEmpty ||
-        filters.selectedEquipment.every(
-          (key) => equipmentKeys.contains(key),
-        );
+        requiredEquip.isEmpty || exerciseEquip.containsAll(requiredEquip);
 
-    // Devuelve true solo si todas las condiciones se cumplen
-    return matchesSearch &&
-        matchesCategory &&
-        matchesLevel &&
-        matchesEquipment;
+    return matchesSearch && matchesCategory && matchesLevel && matchesEquipment;
   }).toList();
 });

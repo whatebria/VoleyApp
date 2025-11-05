@@ -4,6 +4,7 @@ import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
 import 'package:voley_app/src/screens/program_view/searchable_excersice_list_screen.dart';
+import 'package:voley_app/src/models/program/intensity.dart';
 
 class ExercisePickerScreen extends ConsumerStatefulWidget {
   final TrainingSession session;
@@ -16,6 +17,7 @@ class ExercisePickerScreen extends ConsumerStatefulWidget {
   });
 
   @override
+  // ignore: library_private_types_in_public_api
   _ExercisePickerScreenState createState() => _ExercisePickerScreenState();
 }
 
@@ -40,20 +42,22 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
     final newExercise = await Navigator.push<WorkoutExercise>(
       context,
       MaterialPageRoute(
-        builder: (context) => SearchableExerciseListScreen(profile: widget.profile),
+        builder: (context) =>
+            SearchableExerciseListScreen(profile: widget.profile),
       ),
     );
 
     // Si el usuario seleccionó un ejercicio, lo añade al estado local
     if (newExercise != null && mounted) {
       setState(() {
-        final newExercises = List<WorkoutExercise>.from(_currentSession.exercises);
+        final newExercises = List<WorkoutExercise>.from(
+          _currentSession.exercises,
+        );
         newExercises.add(newExercise);
         _currentSession = _currentSession.copyWith(exercises: newExercises);
       });
     }
   }
-
 
   /// [NUEVO MÉTODO]: Devuelve la sesión modificada y cierra
   void _handleSaveAndClose() {
@@ -61,22 +65,78 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
     Navigator.pop(context, _currentSession);
   }
 
+  // --- AÑADIDO: Helper para formatear reps ---
+  String _formatReps(WorkoutExercise ex) {
+    if (ex.repsMin == ex.repsMax) return '${ex.repsMax}';
+    // Si no hay max, o es igual al min, muestra solo uno
+    if (ex.repsMax == 0 || ex.repsMax == ex.repsMin) return '${ex.repsMin}';
+    return '${ex.repsMin}-${ex.repsMax}';
+  }
+
+  // --- AÑADIDO: Helper para formatear intensidad ---
+  String _formatPrescription(Intensity p) {
+    switch (p.type) {
+      case IntensityType.rpe:
+        return 'RPE ${p.value.toInt()}';
+      case IntensityType.percent_1rm:
+        return '${(p.value * 100).toInt()}% 1RM';
+      case IntensityType.fixed_weight:
+        // Quita el .0 si es un número entero
+        final weight = p.value % 1 == 0
+            ? p.value.toInt()
+            : p.value.toStringAsFixed(1);
+        return '$weight kg'; // Asume kg
+      case IntensityType.rpe_range:
+        return 'RPE ${p.value.toInt()}-${p.valueMax?.toInt()}';
+      case IntensityType.open:
+        return p.label ?? 'N/A';
+    }
+  }
+
+  // --- AÑADIDO: Helper para pre-llenar el diálogo de edición ---
+  String _formatPrescriptionForEdit(Intensity p) {
+    switch (p.type) {
+      case IntensityType.rpe:
+        return 'RPE ${p.value.toInt()}';
+      case IntensityType.percent_1rm:
+        return '${(p.value * 100).toInt()}%';
+      case IntensityType.fixed_weight:
+        final weight = p.value % 1 == 0
+            ? p.value.toInt()
+            : p.value.toStringAsFixed(1);
+        return '$weight kg';
+      case IntensityType.rpe_range:
+        return 'RPE ${p.value.toInt()}-${p.valueMax?.toInt()}';
+      case IntensityType.open:
+        return p.label ?? '';
+    }
+  }
+
   /// [MÉTODO MOVIDO]: Muestra el diálogo para EDITAR series, repeticiones e intensidad.
+  /// --- CAMBIO: Actualizado para usar los nuevos modelos ---
   Future<void> _showEditExerciseDialog(
     WorkoutExercise exercise,
     int index,
   ) async {
     final theme = Theme.of(context);
+
+    // --- CAMBIO: Pre-llena los controladores desde el modelo ---
     final setsCtrl = TextEditingController(text: exercise.sets.toString());
-    final repsCtrl = TextEditingController(text: exercise.reps);
-    final intensityCtrl = TextEditingController(text: exercise.intensity);
+    final repsCtrl = TextEditingController(text: _formatReps(exercise));
+    final intensityCtrl = TextEditingController(
+      text: _formatPrescriptionForEdit(exercise.prescription),
+    );
+    // --- FIN DEL CAMBIO ---
 
     final updatedExercise = await showDialog<WorkoutExercise>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: theme.colorScheme.surface,
-          title: Text('Editar ${exercise.name}', style: TextStyle(color: theme.colorScheme.primary)),
+          title: Text(
+            'Editar ${exercise.name}',
+            style: TextStyle(color: theme.colorScheme.primary),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -87,28 +147,54 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
               ),
               TextField(
                 controller: repsCtrl,
-                decoration: const InputDecoration(labelText: 'Repeticiones'),
+                decoration: const InputDecoration(
+                  labelText: 'Repeticiones (Ej: 10 o 8-10)',
+                ),
                 keyboardType: TextInputType.text,
               ),
               TextField(
                 controller: intensityCtrl,
-                decoration: const InputDecoration(labelText: 'Intensidad (RPE)'),
+                decoration: const InputDecoration(
+                  labelText: 'Intensidad (Ej: RPE 7, 80%, 100kg)',
+                ),
                 keyboardType: TextInputType.text,
               ),
             ],
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(dialogContext, rootNavigator: true).maybePop(),
+              onPressed: () =>
+                  Navigator.of(dialogContext, rootNavigator: true).maybePop(),
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
               onPressed: () {
+                // --- CAMBIO: Lógica de parseo igual a la de la pantalla de búsqueda ---
+                final String oldReps = repsCtrl.text.trim();
+                int repsMin = 0;
+                int repsMax = 0;
+                if (oldReps.contains('-')) {
+                  final parts = oldReps.split('-');
+                  repsMin = int.tryParse(parts.first.trim()) ?? 0;
+                  repsMax = int.tryParse(parts.last.trim()) ?? 0;
+                } else {
+                  repsMin = int.tryParse(oldReps.trim()) ?? 0;
+                  repsMax = repsMin;
+                }
+
+                final Intensity prescription = WorkoutExercise.migrateIntensity(
+                  intensityCtrl.text,
+                );
+
+                // --- CAMBIO: Usa los nuevos campos en copyWith ---
                 final updated = exercise.copyWith(
                   sets: int.tryParse(setsCtrl.text) ?? exercise.sets,
-                  reps: repsCtrl.text,
-                  intensity: intensityCtrl.text,
+                  repsMin: repsMin,
+                  repsMax: repsMax,
+                  prescription: prescription,
                 );
+                // --- FIN DEL CAMBIO ---
+
                 Navigator.of(dialogContext, rootNavigator: true).pop(updated);
               },
               child: const Text('Guardar'),
@@ -121,17 +207,19 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
     if (updatedExercise != null && mounted) {
       // Actualiza el ejercicio en el estado local
       setState(() {
-        final newExercises = List<WorkoutExercise>.from(_currentSession.exercises);
+        final newExercises = List<WorkoutExercise>.from(
+          _currentSession.exercises,
+        );
         newExercises[index] = updatedExercise;
         _currentSession = _currentSession.copyWith(exercises: newExercises);
       });
     }
-    
+
     setsCtrl.dispose();
     repsCtrl.dispose();
     intensityCtrl.dispose();
   }
-  
+
   /// [NUEVO WIDGET]: Construye la lista principal de ejercicios de la sesión
   Widget _buildExerciseList(ThemeData theme) {
     final exercises = _currentSession.exercises;
@@ -144,24 +232,30 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
             'Sesión vacía.\nPresiona "+" para añadir ejercicios.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.7)
+              color: theme.colorScheme.onSurface.withOpacity(0.7),
             ),
           ),
         ),
       );
     }
-    
+
     return ListView.builder(
       itemCount: exercises.length,
       padding: const EdgeInsets.all(8.0),
       itemBuilder: (context, index) {
         final ex = exercises[index];
+
+        // --- CAMBIO: Formatea los valores para el subtítulo ---
+        final repsLabel = _formatReps(ex);
+        final intensityLabel = _formatPrescription(ex.prescription);
+        // --- FIN DEL CAMBIO ---
+
         return Card(
           elevation: 0,
           color: theme.colorScheme.background,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: theme.colorScheme.surface)
+            side: BorderSide(color: theme.colorScheme.surface),
           ),
           margin: const EdgeInsets.symmetric(vertical: 4.0),
           child: ListTile(
@@ -171,8 +265,12 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
               foregroundColor: theme.colorScheme.onSecondary,
               child: Text('${index + 1}'),
             ),
-            title: Text(ex.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('${ex.sets}x${ex.reps} @ ${ex.intensity}'),
+            title: Text(
+              ex.name,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            // --- CAMBIO: Subtítulo actualizado ---
+            subtitle: Text('${ex.sets}x$repsLabel @ $intensityLabel'),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -182,13 +280,20 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                   onPressed: () => _showEditExerciseDialog(ex, index),
                 ),
                 IconButton(
-                  icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: theme.colorScheme.error,
+                  ),
                   tooltip: 'Eliminar ejercicio',
                   onPressed: () {
                     setState(() {
-                      final newList = List<WorkoutExercise>.from(_currentSession.exercises);
+                      final newList = List<WorkoutExercise>.from(
+                        _currentSession.exercises,
+                      );
                       newList.removeAt(index);
-                      _currentSession = _currentSession.copyWith(exercises: newList);
+                      _currentSession = _currentSession.copyWith(
+                        exercises: newList,
+                      );
                     });
                   },
                 ),
@@ -231,7 +336,9 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Text(
               'Ejercicios en Sesión (${_currentSession.exercises.length})',
-              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           // --- CAMBIO: La lista de ejercicios es el contenido principal ---
@@ -240,7 +347,9 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
               elevation: 0,
               margin: const EdgeInsets.all(16),
               color: theme.colorScheme.surface, // grisPro
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               clipBehavior: Clip.antiAlias,
               child: _buildExerciseList(theme),
             ),

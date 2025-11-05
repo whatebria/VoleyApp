@@ -1,7 +1,9 @@
-// lib/screens/player_evaluation_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:voley_app/providers/evaluation_editor_provider.dart';
 import 'package:voley_app/providers/providers.dart';
+import 'package:voley_app/src/models/player_profile/test_score.dart';
+import 'package:collection/collection.dart'; // Para .firstWhereOrNull
 
 class PlayerEvaluationScreen extends ConsumerStatefulWidget {
   const PlayerEvaluationScreen({super.key});
@@ -14,21 +16,43 @@ class PlayerEvaluationScreen extends ConsumerStatefulWidget {
 class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen> {
   final _formKey = GlobalKey<FormState>();
   
+  // --- CAMBIO: IDs fijos para los tests ---
+  static const String _saltoId = 'salto_vertical';
+  static const String _agilidadId = 'agilidad_t_test';
+  static const String _velocidadId = 'velocidad_20m';
+  static const String _fuerzaId = 'fuerza_press';
+
   // Controladores para los tests
   late final TextEditingController _saltoController;
   late final TextEditingController _agilidadController;
   late final TextEditingController _velocidadController;
   late final TextEditingController _fuerzaController;
+  
+  // --- CAMBIO: Helper para parsear de forma segura ---
+  double? _parseDouble(String? text) {
+    if (text == null) return null;
+    return double.tryParse(text.replaceAll(',', '.'));
+  }
+  
+  /// Helper para buscar un valor en la lista de TestScore
+  String _findScore(List<TestScore>? scores, String testId) {
+    if (scores == null) return '';
+    final score = scores.firstWhereOrNull((s) => s.testId == testId);
+    // Devuelve el valor como string, o un string vacío si no se encuentra
+    return score?.value.toString() ?? '';
+  }
 
   @override
   void initState() {
     super.initState();
-    final scores = ref.read(playerProfileProvider).asData?.value?.evaluation.testScores;
+    // --- CAMBIO: Lee la lista 'testScores' del 'latestEvaluation' ---
+    final scores = ref.read(playerProfileProvider).value?.latestEvaluation?.testScores;
 
-    _saltoController = TextEditingController(text: scores?['Salto Vertical']?.toString() ?? '');
-    _agilidadController = TextEditingController(text: scores?['Agilidad (T-Test)']?.toString() ?? '');
-    _velocidadController = TextEditingController(text: scores?['Velocidad 20m']?.toString() ?? '');
-    _fuerzaController = TextEditingController(text: scores?['Fuerza (Press)']?.toString() ?? '');
+    // Rellena los controladores buscando en la lista
+    _saltoController = TextEditingController(text: _findScore(scores, _saltoId));
+    _agilidadController = TextEditingController(text: _findScore(scores, _agilidadId));
+    _velocidadController = TextEditingController(text: _findScore(scores, _velocidadId));
+    _fuerzaController = TextEditingController(text: _findScore(scores, _fuerzaId));
   }
 
   @override
@@ -40,35 +64,85 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
     super.dispose();
   }
 
-  void _saveForm() {
+  // --- CAMBIO: _saveForm ahora usa el provider ---
+  void _saveForm() async {
     if (_formKey.currentState!.validate()) {
-      // Creamos el mapa de scores actualizado
-      final updatedScores = {
-        'Salto Vertical': double.tryParse(_saltoController.text) ?? 0.0,
-        'Agilidad (T-Test)': double.tryParse(_agilidadController.text) ?? 0.0,
-        'Velocidad 20m': double.tryParse(_velocidadController.text) ?? 0.0,
-        'Fuerza (Press)': double.tryParse(_fuerzaController.text) ?? 0.0,
-      };
-
-      // TODO: Llamar al Notifier para guardar
-      // ref.read(playerProfileProvider.notifier).updateEvaluation(updatedScores);
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Evaluación guardada (simulado)')),
-      );
-      Navigator.pop(context);
+      // 1. Obtener los datos del jugador (no del coach)
+      final player = ref.read(currentUserAppUserProvider).value;
+      final currentProfile = ref.read(playerProfileProvider).value;
+
+      if (player == null) {
+         ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(content: Text('Error: No se pudo encontrar el usuario.'), backgroundColor: Colors.red),
+         );
+         return;
+      }
+      
+      // 2. Crear la lista de TestScore desde los campos
+      final newTestScores = [
+        TestScore(
+          testId: _saltoId,
+          value: _parseDouble(_saltoController.text) ?? 0.0,
+          unit: 'cm', // Unidad fija para este campo
+        ),
+        TestScore(
+          testId: _agilidadId,
+          value: _parseDouble(_agilidadController.text) ?? 0.0,
+          unit: 'seg', // Unidad fija para este campo
+        ),
+        TestScore(
+          testId: _velocidadId,
+          value: _parseDouble(_velocidadController.text) ?? 0.0,
+          unit: 'seg', // Unidad fija para este campo
+        ),
+        TestScore(
+          testId: _fuerzaId,
+          value: _parseDouble(_fuerzaController.text) ?? 0.0,
+          unit: 'kg', // Unidad fija para este campo
+        ),
+      ];
+      
+      // 3. Actualizar el estado del provider
+      // (Esto sobreescribe cualquier test que estuviera en el editor)
+      ref.read(evaluationEditorProvider.notifier).state = newTestScores;
+
+      // 4. Llamar a la lógica de guardado centralizada
+      try {
+        await ref.read(evaluationEditorProvider.notifier).saveEvaluation(
+          player,
+          currentProfile,
+        );
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Evaluación guardada con éxito'), backgroundColor: Colors.green),
+          );
+          Navigator.pop(context);
+        }
+      } catch (e) {
+         if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al guardar: $e'), backgroundColor: Colors.red),
+          );
+         }
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Observa el estado de carga del provider
+    final isSaving = ref.watch(evaluationIsSavingProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mi Evaluación Física'),
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
-            onPressed: _saveForm,
+            // Desactiva el botón si está guardando
+            onPressed: isSaving ? null : _saveForm,
             tooltip: 'Guardar',
           ),
         ],
@@ -87,7 +161,7 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
             const Divider(height: 32),
             TextFormField(
               controller: _saltoController,
-              decoration: const InputDecoration(labelText: 'Salto Vertical', suffixText: 'pts/cm'),
+              decoration: const InputDecoration(labelText: 'Salto Vertical', suffixText: 'cm'), // Unidad actualizada
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
             const SizedBox(height: 16),
@@ -105,13 +179,20 @@ class _PlayerEvaluationScreenState extends ConsumerState<PlayerEvaluationScreen>
             const SizedBox(height: 16),
             TextFormField(
               controller: _fuerzaController,
-              decoration: const InputDecoration(labelText: 'Fuerza (Press)', suffixText: 'kg/pts'),
+              decoration: const InputDecoration(labelText: 'Fuerza (Press)', suffixText: 'kg'), // Unidad actualizada
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
             const SizedBox(height: 32),
             ElevatedButton(
-              onPressed: _saveForm,
-              child: const Text('Guardar Evaluación'),
+              // Desactiva el botón si está guardando
+              onPressed: isSaving ? null : _saveForm,
+              child: isSaving 
+                ? const SizedBox(
+                    height: 24, 
+                    width: 24, 
+                    child: CircularProgressIndicator(strokeWidth: 2)
+                  )
+                : const Text('Guardar Evaluación'),
             ),
           ],
         ),

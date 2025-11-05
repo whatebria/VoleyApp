@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:voley_app/src/models/player_profile/injury.dart';
+import 'package:voley_app/src/models/player_profile/test_score.dart';
 import 'package:voley_app/src/models/player_profile/availability.dart';
 import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
 import 'package:voley_app/src/models/player_profile/form_peak.dart';
 import 'package:voley_app/src/models/player_profile/player_event.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
+import 'package:intl/intl.dart'; // Para formateo de fechas
 
 // --- CAMBIO ---
 // Renombrado de 'CoachPlayerProfile' a 'CoachPlayerProfile' para
@@ -18,6 +21,12 @@ class CoachPlayerProfile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // --- CAMBIO: Lógica de lesiones movida aquí ---
+    final activeInjuries = profile.injuries
+        .where((i) => i.status == InjuryStatus.active)
+        .map((i) => i.description)
+        .toList();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(profile.name),
@@ -26,32 +35,34 @@ class CoachPlayerProfile extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         children: [
           // --- Sección de Cabecera ---
-          _buildHeader(context),
+          _buildHeader(context, theme),
           const SizedBox(height: 24),
 
           // --- CAMBIO: Botones de Acción ---
-          _buildActionButtons(context),
+          _buildActionButtons(context, theme),
           const SizedBox(height: 24),
 
           // --- Sección de Biometría ---
-          _buildBiometrics(context),
+          _buildBiometrics(context, theme),
           const SizedBox(height: 16),
 
           // --- Sección de Objetivos ---
+          // --- CAMBIO: Mapea la List<Goal> a List<String> ---
           _buildListCard(
             context: context,
             title: 'Objetivos',
-            items: profile.goals,
+            items: profile.goals.map((g) => g.description).toList(),
             icon: Icons.flag_circle_outlined,
             iconColor: theme.colorScheme.primary, // voltNeon
           ),
           const SizedBox(height: 16),
 
           // --- Sección de Lesiones ---
+          // --- CAMBIO: Mapea la List<Injury> a List<String> (solo activas) ---
           _buildListCard(
             context: context,
-            title: 'Historial de Lesiones',
-            items: profile.injuries,
+            title: 'Historial de Lesiones (Activas)',
+            items: activeInjuries,
             icon: Icons.healing_outlined,
             iconColor: theme.colorScheme.error, // errorRed
           ),
@@ -61,38 +72,39 @@ class CoachPlayerProfile extends StatelessWidget {
           _buildListCard(
             context: context,
             title: 'Equipamiento Disponible',
-            items: profile.equipment,
+            items: profile.equipmentIds,
             icon: Icons.fitness_center_outlined,
             iconColor: theme.colorScheme.secondary, // azulPro
           ),
           const SizedBox(height: 16),
 
           // --- Sección de Disponibilidad ---
-          _buildAvailabilityCard(context, profile.availability),
+          // --- CAMBIO: Usa la data real ---
+          _buildAvailabilityCard(context, theme, profile.availability),
           const SizedBox(height: 16),
 
           // --- Sección de Evaluación ---
-          _buildEvaluationCard(context, profile.evaluation),
+          // --- CAMBIO: Pasa la evaluación MÁS RECIENTE ---
+          _buildEvaluationCard(context, theme, profile.latestEvaluation),
           const SizedBox(height: 16),
 
           // --- Sección de Torneos ---
-          _buildTournamentsCard(context, profile.tournaments),
+          _buildTournamentsCard(context, theme, profile.tournaments),
           const SizedBox(height: 16),
 
           // --- Sección de Eventos Clave ---
-          _buildKeyEventsCard(context, profile.keyEvents),
+          _buildKeyEventsCard(context, theme, profile.keyEvents),
           const SizedBox(height: 16),
 
           // --- Sección de Picos de Forma ---
-          _buildFormPeaksCard(context, profile.formPeaks),
+          _buildFormPeaksCard(context, theme, profile.formPeaks),
         ],
       ),
     );
   }
 
   /// Widget de cabecera con Posición y Nivel
-  Widget _buildHeader(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget _buildHeader(BuildContext context, ThemeData theme) {
     return Card(
       // Usamos el color de superficie (grisPro)
       color: theme.colorScheme.surface,
@@ -129,8 +141,7 @@ class CoachPlayerProfile extends StatelessWidget {
   }
 
   // --- CAMBIO: Nuevo Widget para los botones ---
-  Widget _buildActionButtons(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget _buildActionButtons(BuildContext context, ThemeData theme) {
     return Column(
       children: [
         // Botón 1: Ver/Editar Evaluación
@@ -170,8 +181,7 @@ class CoachPlayerProfile extends StatelessWidget {
   }
 
   /// Widget para la cuadrícula de Biometría
-  Widget _buildBiometrics(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget _buildBiometrics(BuildContext context, ThemeData theme) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -191,12 +201,12 @@ class CoachPlayerProfile extends StatelessWidget {
               alignment: WrapAlignment.spaceBetween,
               children: [
                 _buildStatItem(
-                    context, 'Edad', profile.age?.toString() ?? 'N/A'),
+                    context, theme, 'Edad', profile.age?.toString() ?? 'N/A'),
                 _buildStatItem(
-                    context, 'Peso', '${profile.weightKg?.toString() ?? 'N/A'} kg'),
+                    context, theme, 'Peso', '${profile.weightKg?.toString() ?? 'N/A'} kg'),
                 _buildStatItem(
-                    context, 'Altura', '${profile.heightCm?.toString() ?? 'N/A'} cm'),
-                _buildStatItem(context, 'Envergadura',
+                    context, theme, 'Altura', '${profile.heightCm?.toString() ?? 'N/A'} cm'),
+                _buildStatItem(context, theme, 'Envergadura',
                     '${profile.wingspanCm?.toString() ?? 'N/A'} cm'),
               ],
             ),
@@ -207,8 +217,7 @@ class CoachPlayerProfile extends StatelessWidget {
   }
 
   /// Un solo item de estadística (p.ej. "Edad", "25")
-  Widget _buildStatItem(BuildContext context, String title, String value) {
-    final theme = Theme.of(context);
+  Widget _buildStatItem(BuildContext context, ThemeData theme, String title, String value) {
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 100),
       child: Column(
@@ -303,57 +312,91 @@ class CoachPlayerProfile extends StatelessWidget {
   }
 
   // --- PLACEHOLDERS PARA OBJETOS COMPLEJOS ---
-  // Implementa estos widgets cuando tengas los sub-modelos listos.
 
+  // --- CAMBIO: Widget actualizado (ya no es un placeholder) ---
   Widget _buildAvailabilityCard(
-      BuildContext context, Availability availability) {
-    final theme = Theme.of(context);
-    // TODO: Implementar la vista para Availability
-    // Por ahora, solo muestra un placeholder
+      BuildContext context, ThemeData theme, Availability availability) {
+    final days = availability.trainingDays.isEmpty 
+        ? 'No especificado' 
+        : availability.trainingDays.join(', ');
+        
     return Card(
       child: ListTile(
         leading: Icon(Icons.event_available_outlined,
             color: theme.colorScheme.secondary),
         title: const Text('Disponibilidad'),
-        subtitle: Text('ID de Disponibilidad: ...${availability.hashCode.toString().substring(0, 4)}', // Ejemplo
+        subtitle: Text(
+          '$days • ${availability.sessionMinutes} min/sesión',
             style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6))),
-        trailing: const Icon(Icons.arrow_forward_ios),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: () {
-          // Navegar a una pantalla de detalle de disponibilidad si se desea
+          // TODO: Navegar a la pantalla de edición de disponibilidad
         },
       ),
     );
   }
 
+  // --- CAMBIO: Widget actualizado (ya no es un placeholder) ---
   Widget _buildEvaluationCard(
-      BuildContext context, EvaluationResult evaluation) {
-    final theme = Theme.of(context);
-    // TODO: Implementar la vista para EvaluationResult
-    // p.ej. Mostrar evaluation.verticalJump, evaluation.strength, etc.
+      BuildContext context, ThemeData theme, EvaluationResult? evaluation) {
+    
+    final scores = evaluation?.testScores ?? [];
+
     return Card(
-      child: ListTile(
+      child: ExpansionTile(
         leading: Icon(Icons.assignment_turned_in_outlined,
             color: theme.colorScheme.primary),
         title: const Text('Resultados de Evaluación'),
         subtitle: Text(
-            'Ver detalles de la evaluación...',
+            scores.isEmpty
+              ? 'Sin tests registrados'
+              : 'Última evaluación: ${DateFormat('dd/MM/yy').format(evaluation!.date)}',
             style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6))),
-        trailing: const Icon(Icons.arrow_forward_ios),
-        onTap: () {
-          // Navegar a la pantalla de detalle de NewEvaluationScreen o similar
-          // --- CAMBIO SUGERIDO ---
-          // Ya que el botón de arriba ya hace esto, podríamos
-          // simplemente llamar a la misma acción.
-          Navigator.pushNamed(context, '/evaluation');
-        },
+        trailing: Icon(Icons.expand_more, color: theme.colorScheme.primary),
+        children: [
+          if (scores.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'No hay tests registrados en esta evaluación.',
+                style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6))
+              ),
+            )
+          else
+            ...scores.map((TestScore test) {
+              return ListTile(
+                title: Text(
+                  _formatTestId(test.testId), // Formatea 'salto_vertical' a 'Salto Vertical'
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                trailing: Text(
+                  '${test.value.toStringAsFixed(1)} ${test.unit}',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.primary
+                  ),
+                ),
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24.0),
+              );
+            }),
+          // Botón para ir a la pantalla de evaluación
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextButton.icon(
+              icon: const Icon(Icons.edit_note),
+              label: const Text('Ver historial o añadir nueva'),
+              onPressed: () {
+                 Navigator.pushNamed(context, '/evaluation');
+              },
+            ),
+          )
+        ],
       ),
     );
   }
 
   Widget _buildTournamentsCard(
-      BuildContext context, List<Tournament> tournaments) {
-    final theme = Theme.of(context);
-    // TODO: Implementar la vista para la lista de Torneos
+      BuildContext context, ThemeData theme, List<Tournament> tournaments) {
     return Card(
       child: ListTile(
         leading: Icon(Icons.emoji_events_outlined,
@@ -364,7 +407,7 @@ class CoachPlayerProfile extends StatelessWidget {
                 ? 'No hay torneos registrados.'
                 : '${tournaments.length} torneos registrados.',
             style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6))),
-        trailing: const Icon(Icons.arrow_forward_ios),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: () {
           // Navegar a una pantalla que muestre la lista de torneos
         },
@@ -373,9 +416,7 @@ class CoachPlayerProfile extends StatelessWidget {
   }
 
   Widget _buildKeyEventsCard(
-      BuildContext context, List<PlayerEvent> keyEvents) {
-    final theme = Theme.of(context);
-    // TODO: Implementar la vista para la lista de Eventos Clave
+      BuildContext context, ThemeData theme, List<PlayerEvent> keyEvents) {
     return Card(
       child: ListTile(
         leading: Icon(Icons.calendar_month, // Corregido (no existe calendar_star_outlined)
@@ -386,15 +427,13 @@ class CoachPlayerProfile extends StatelessWidget {
                 ? 'No hay eventos registrados.'
                 : '${keyEvents.length} eventos registrados.',
             style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6))),
-        trailing: const Icon(Icons.arrow_forward_ios),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
       ),
     );
   }
 
   Widget _buildFormPeaksCard(
-      BuildContext context, List<FormPeak> formPeaks) {
-    final theme = Theme.of(context);
-    // TODO: Implementar la vista para la lista de Picos de Forma
+      BuildContext context, ThemeData theme, List<FormPeak> formPeaks) {
     return Card(
       child: ListTile(
         leading: Icon(Icons.trending_up_outlined,
@@ -405,9 +444,40 @@ class CoachPlayerProfile extends StatelessWidget {
                 ? 'No hay picos registrados.'
                 : '${formPeaks.length} picos registrados.',
             style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6))),
-        trailing: const Icon(Icons.arrow_forward_ios),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
       ),
     );
   }
+  
+  // --- AÑADIDO: Helper para formatear IDs de tests ---
+  String _formatTestId(String testId) {
+    if (testId.isEmpty) return 'Test';
+    // Convierte 'salto_vertical' en 'Salto Vertical'
+    return testId.split('_')
+      .map((word) => word[0].toUpperCase() + word.substring(1))
+      .join(' ');
+  }
+  
+  // --- AÑADIDO: Helper para formatear números ---
+  String _formatNumber(double value) {
+    final isInt = value % 1 == 0;
+    return isInt ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+  }
+  
+  // --- AÑADIDO: Helper para etiquetas de eventos ---
+  String _eventLabel(String type) {
+    switch (type) {
+      case 'cup':
+        return 'Copa';
+      case 'playoff':
+        return 'Play-offs';
+      case 'national_team':
+        return 'Selección';
+      case 'travel':
+        return 'Viaje';
+      case 'league':
+      default:
+        return 'Liga';
+    }
+  }
 }
-
