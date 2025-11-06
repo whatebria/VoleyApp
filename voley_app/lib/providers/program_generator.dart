@@ -1,5 +1,5 @@
-import 'package:voley_app/src/models/program/mesocycles.dart';
-import 'package:voley_app/src/models/program/microcicle.dart';
+import 'package:voley_app/src/models/program/mesocycle.dart';
+import 'package:voley_app/src/models/program/microcycle.dart';
 import 'package:uuid/uuid.dart';
 
 /// Clase de lógica de negocio para generar y manipular estructuras de programas.
@@ -14,8 +14,10 @@ class ProgramGenerator {
   }
 
   /// Genera una lista de microciclos (semanas) basados en una plantilla.
-  List<Microcycle> generateMicrocyclesFromTemplate(
-      {required int weeks, required Microcycle templateMicro}) {
+  List<Microcycle> generateMicrocyclesFromTemplate({
+    required int weeks,
+    required Microcycle templateMicro,
+  }) {
     final templateSessions = templateMicro.sessions;
     final totalWeeks = weeks;
 
@@ -60,8 +62,8 @@ class ProgramGenerator {
       objective: objective,
       weeks: weeks,
       focus: "Personalizado",
-      progressionType: 'lineal',
-      matchDayIndex: 5, // Sábado (valor por defecto)
+      progressionType: ProgressionType.linear, // <- enum
+      matchDayIndex: 5, // Sábado si usas 0..6 (Mon..Sun)
       microcycles: microcycles,
     );
   }

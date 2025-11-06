@@ -1,47 +1,63 @@
+import 'package:flutter/foundation.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
-import 'package:uuid/uuid.dart';
+import 'package:voley_app/src/models/shared/day_of_week.dart';
+import 'package:voley_app/utils/common/utils.dart';
 
+@immutable
 class TrainingSession {
   final String id;
-  final String day;
-  final double load;
+  final DayOfWeek day;
+  final double load; // Define tu métrica (p.ej., sRPE * minutos)
   final List<WorkoutExercise> exercises;
 
-  TrainingSession({
+  const TrainingSession({
     required this.id,
     required this.day,
     required this.load,
-    required this.exercises,
+    this.exercises = const [],
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'day': day,
-        'load': load,
-        'exercises': exercises.map((e) => e.toJson()).toList(),
-      };
+    'id': id,
+    'day': day.name,
+    'load': load,
+    'exercises': exercises.map((e) => e.toJson()).toList(),
+  };
 
   static TrainingSession fromJson(Map<String, dynamic> json) => TrainingSession(
-        id: json['id'] as String? ?? const Uuid().v4(),
-        day: json['day'] as String? ?? 'Día 1',
-        load: (json['load'] as num?)?.toDouble() ?? 0.0,
-        exercises: (json['exercises'] as List<dynamic>? ?? [])
-            .map((e) => WorkoutExercise.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
+    id: json['id'] as String? ?? '',
+    day: ModelUtils.enumByName(DayOfWeek.values, json['day'] as String?, DayOfWeek.mon),
+    load: (json['load'] as num?)?.toDouble() ?? 0,
+    exercises: ((json['exercises'] as List?) ?? [])
+      .whereType<Map<String, dynamic>>()
+      .map(WorkoutExercise.fromJson)
+      .toList(),
+  );
 
-  // --- AÑADIDO: Método copyWith ---
   TrainingSession copyWith({
     String? id,
-    String? day,
+    DayOfWeek? day,
     double? load,
     List<WorkoutExercise>? exercises,
-  }) {
-    return TrainingSession(
-      id: id ?? this.id,
-      day: day ?? this.day,
-      load: load ?? this.load,
-      exercises: exercises ?? this.exercises,
-    );
-  }
+  }) => TrainingSession(
+    id: id ?? this.id,
+    day: day ?? this.day,
+    load: load ?? this.load,
+    exercises: exercises ?? this.exercises,
+  );
+
+  @override
+  String toString() => 'TrainingSession(id: $id, day: ${day.name}, load: $load, exercises: ${exercises.length})';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TrainingSession &&
+        other.id == id &&
+        other.day == day &&
+        other.load == load &&
+        listEquals(other.exercises, exercises);
+
+  @override
+  int get hashCode => id.hashCode ^ day.hashCode ^ load.hashCode ^ exercises.hashCode;
 }

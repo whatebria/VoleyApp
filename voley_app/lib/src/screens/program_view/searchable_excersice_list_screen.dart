@@ -5,7 +5,6 @@ import 'package:voley_app/src/models/bd/exercise.dart'; // <- V4 con enums (tu c
 import 'package:voley_app/src/models/player_profile/injury.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
-import 'package:voley_app/src/models/program/intensity.dart';
 
 /// Pantalla para buscar y seleccionar un ejercicio (compatible con Exercise V4/enums).
 class SearchableExerciseListScreen extends ConsumerStatefulWidget {
@@ -80,12 +79,17 @@ class _SearchableExerciseListScreenState
     for (final id in activeInjuryIds) {
       final s = id.toLowerCase().trim();
       normalizedInj.add(s);
-      if (s.startsWith('contra_')) normalizedInj.add(s.replaceFirst('contra_', ''));
-      else normalizedInj.add('contra_$s');
+      if (s.startsWith('contra_')) {
+        normalizedInj.add(s.replaceFirst('contra_', ''));
+      } else {
+        normalizedInj.add('contra_$s');
+      }
     }
 
     // Compara con las contraindicaciones por name del enum
-    final contras = ex.contraindicationIds.map((c) => c.name.toLowerCase()).toSet();
+    final contras = ex.contraindicationIds
+        .map((c) => c.name.toLowerCase())
+        .toSet();
     // Si hay intersección, NO pasa
     return contras.intersection(normalizedInj).isEmpty;
   }
@@ -95,7 +99,9 @@ class _SearchableExerciseListScreenState
     final theme = Theme.of(context);
     final setsCtrl = TextEditingController(text: '3');
     final repsCtrl = TextEditingController(text: '8-10'); // 10 o 8-10
-    final intensityCtrl = TextEditingController(text: 'RPE 7'); // RPE 7 / 80% / 100kg
+    final intensityCtrl = TextEditingController(
+      text: 'RPE 7',
+    ); // RPE 7 / 80% / 100kg
 
     final result = await showDialog<WorkoutExercise>(
       context: context,
@@ -117,7 +123,8 @@ class _SearchableExerciseListScreenState
               TextField(
                 controller: repsCtrl,
                 decoration: const InputDecoration(
-                    labelText: 'Repeticiones (Ej: 10 o 8-10)'),
+                  labelText: 'Repeticiones (Ej: 10 o 8-10)',
+                ),
               ),
               TextField(
                 controller: intensityCtrl,
@@ -137,33 +144,20 @@ class _SearchableExerciseListScreenState
               onPressed: () {
                 // 1) Parseo de reps
                 final String oldReps = repsCtrl.text.trim();
-                int repsMin = 0;
-                int repsMax = 0;
                 if (oldReps.contains('-')) {
                   final parts = oldReps.split('-');
-                  repsMin = int.tryParse(parts.first.trim()) ?? 0;
-                  repsMax = int.tryParse(parts.last.trim()) ?? 0;
                 } else {
-                  repsMin = int.tryParse(oldReps) ?? 0;
-                  repsMax = repsMin;
                 }
 
-                // 2) Parseo de intensidad
-                final Intensity prescription =
-                    WorkoutExercise.migrateIntensity(intensityCtrl.text);
-
                 // 3) Crear objeto WorkoutExercise
-                final workoutExercise = WorkoutExercise(
-                  exerciseId: exercise.id,
-                  name: exercise.name,
-                  sets: int.tryParse(setsCtrl.text) ?? 3,
-                  repsMin: repsMin,
-                  repsMax: repsMax,
-                  prescription: prescription,
-                );
+                String formatReps(WorkoutExercise ex) {
+                  final min = ex.reps.min;
+                  final max = ex.reps.max;
+                  if (max == 0 || max == min) return '$min';
+                  return '$min-$max';
+                }
 
-                Navigator.of(context, rootNavigator: true)
-                    .pop(workoutExercise);
+                Navigator.of(context, rootNavigator: true).pop(formatReps);
               },
               child: const Text('Añadir'),
             ),
@@ -190,8 +184,9 @@ class _SearchableExerciseListScreenState
           decoration: InputDecoration(
             hintText: 'Buscar por nombre o palabra clave...',
             border: InputBorder.none,
-            hintStyle:
-                TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6)),
+            hintStyle: TextStyle(
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
           ),
           style: TextStyle(color: theme.colorScheme.onSurface),
         ),
@@ -200,7 +195,7 @@ class _SearchableExerciseListScreenState
             IconButton(
               icon: const Icon(Icons.close),
               onPressed: () => _searchController.clear(),
-            )
+            ),
         ],
       ),
       body: Column(
@@ -224,7 +219,9 @@ class _SearchableExerciseListScreenState
                 }).toList();
 
                 if (filteredList.isEmpty) {
-                  return const Center(child: Text('No se encontraron ejercicios.'));
+                  return const Center(
+                    child: Text('No se encontraron ejercicios.'),
+                  );
                 }
 
                 return ListView.builder(

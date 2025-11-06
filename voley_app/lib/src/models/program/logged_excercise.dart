@@ -8,9 +8,9 @@ import 'package:collection/collection.dart'; // Para ListEquality
 class LoggedExercise {
   /// El ID del tipo de ejercicio (ej. "squat")
   final String exerciseId;
-
   /// La lista de series que el usuario SÍ hizo
   final List<SetLog> sets;
+
 
   const LoggedExercise({
     required this.exerciseId,

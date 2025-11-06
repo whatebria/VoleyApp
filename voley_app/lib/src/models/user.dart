@@ -17,17 +17,11 @@ enum UserRole {
 class User {
   final String id;
   final String email;
-
   final String name;
-
   final UserRole role;
-
   final DateTime createdAt;
-
   final List<int> testScores;
-
   final String? coachId;
-
   final String linkCode;
 
   User({

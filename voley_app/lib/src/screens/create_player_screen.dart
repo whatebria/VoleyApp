@@ -12,6 +12,7 @@ import 'package:voley_app/src/models/player_profile/form_peak.dart';
 import 'package:voley_app/src/models/player_profile/test_score.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
+import 'package:voley_app/src/models/shared/day_of_week.dart';
 
 // (Asegúrate de que 'isCreatingPlayerProvider' y 'coachPlayersProvider'
 // estén definidos en tu archivo 'providers.dart')
@@ -43,28 +44,21 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
   final goalCtrl = TextEditingController();
   final uuid = Uuid();
 
-  // --- CAMBIO: Estado del formulario actualizado ---
-  String selectedPosition = 'Central';
-  String selectedLevel = 'Competitivo';
+  PlayerPosition selectedPosition = PlayerPosition.mb; // Central por defecto
+  PlayerLevel selectedLevel =
+      PlayerLevel.competitivo; // Competitivo por defecto
+  List<DayOfWeek> selectedDays = [];
+
+  // Torneos / lesiones / metas / tests / eventos / picos
   List<Tournament> _selectedTournaments = [];
-  // --- CAMBIO: Actualizado a List<Injury> ---
   List<Injury> selectedInjuries = [];
-  List<String> selectedDays = [];
-  // --- CAMBIO: Actualizado a List<Goal> ---
   List<Goal> _goals = [];
-  // --- CAMBIO: Actualizado a List<TestScore> ---
   List<TestScore> _testScores = [];
   List<PlayerEvent> _keyEvents = [];
   List<FormPeak> _formPeaks = [];
-  final List<String> _allDays = [
-    'Lunes',
-    'Martes',
-    'Miércoles',
-    'Jueves',
-    'Viernes',
-    'Sábado',
-    'Domingo',
-  ];
+  // Días disponibles (usa enum)
+  final List<DayOfWeek> _allDays = DayOfWeek.values;
+
   final Map<String, int> _durationOptions = {
     '30-45 minutos': 45,
     '45-60 minutos': 60,
@@ -74,18 +68,44 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
   };
   int _selectedDurationMinutes = 60;
 
-  String _eventTypeLabel(String type) {
-    switch (type) {
-      case 'cup':
+  // Helpers de etiqueta
+  String _posLabel(PlayerPosition p) {
+    switch (p) {
+      case PlayerPosition.oh:
+        return 'Punta';
+      case PlayerPosition.mb:
+        return 'Central';
+      case PlayerPosition.s:
+        return 'Armadora';
+      case PlayerPosition.op:
+        return 'Opuesto';
+      case PlayerPosition.l:
+        return 'Líbero';
+    }
+  }
+
+  String _levelLabel(PlayerLevel l) {
+    switch (l) {
+      case PlayerLevel.recreativo:
+        return 'Recreativo';
+      case PlayerLevel.competitivo:
+        return 'Competitivo';
+      case PlayerLevel.semiprofesional:
+        return 'Semiprofesional';
+    }
+  }
+
+  String _eventTypeLabel(PlayerEventType t) {
+    switch (t) {
+      case PlayerEventType.cup:
         return 'Copa';
-      case 'playoff':
+      case PlayerEventType.playoff:
         return 'Play-offs';
-      case 'national_team':
+      case PlayerEventType.nationalTeam:
         return 'Selección';
-      case 'travel':
+      case PlayerEventType.travel:
         return 'Viaje';
-      case 'league':
-      default:
+      case PlayerEventType.league:
         return 'Liga';
     }
   }
@@ -139,7 +159,7 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
 
       // 2. Preparar el Perfil de Jugador
       final availability = Availability(
-        trainingDays: selectedDays, // 'days' es el nombre correcto en tu modelo Availability
+        trainingDays: selectedDays, // ✅ List<DayOfWeek>
         sessionMinutes: _selectedDurationMinutes,
       );
 
@@ -157,22 +177,17 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
 
       // --- CAMBIO: Creación del PlayerProfile actualizada ---
       final profileToSave = PlayerProfile(
-        id: uuid.v4(), // El ID del perfil
-        userId: userId, // El ID del usuario de Auth
+        id: uuid.v4(),
+        userId: userId,
         assignedCoachId: coachId,
         name: nameCtrl.text.trim(),
-        position: selectedPosition,
-        level: selectedLevel.toLowerCase(),
-        // --- CAMBIO: Pasa las listas de objetos ---
+        position: selectedPosition, // ✅ PlayerPosition
+        level: selectedLevel, // ✅ PlayerLevel
         goals: _goals,
         injuries: selectedInjuries,
         availability: availability,
-        // --- CAMBIO: Crea la primera evaluación en el historial ---
         evaluationHistory: [
-          EvaluationResult(
-            date: DateTime.now(),
-            testScores: _testScores,
-          )
+          EvaluationResult(date: DateTime.now(), testScores: _testScores),
         ],
         tournaments: _selectedTournaments,
         age: parseAge(ageCtrl.text),
@@ -336,14 +351,13 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
             ElevatedButton(
               onPressed: () {
                 if (goalCtrl.text.trim().isNotEmpty) {
-                  Navigator.of(
-                    context,
-                    rootNavigator: true,
-                  ).pop(Goal(
-                    id: uuid.v4(),
-                    description: goalCtrl.text.trim(),
-                    isCompleted: false, // Por defecto no está completado
-                  ));
+                  Navigator.of(context, rootNavigator: true).pop(
+                    Goal(
+                      id: uuid.v4(),
+                      description: goalCtrl.text.trim(),
+                      isCompleted: false, // Por defecto no está completado
+                    ),
+                  );
                 }
               },
               child: const Text('Guardar'),
@@ -431,15 +445,17 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                   final value = double.parse(
                     valueCtrl.text.replaceAll(',', '.'),
                   );
-                  Navigator.of(
-                    context,
-                    rootNavigator: true,
-                  ).pop(TestScore(
-                    // Crea un ID simple basado en el nombre
-                    testId: nameCtrl.text.trim().toLowerCase().replaceAll(' ', '_'),
-                    value: value,
-                    unit: unitCtrl.text.trim(),
-                  ));
+                  Navigator.of(context, rootNavigator: true).pop(
+                    TestScore(
+                      // Crea un ID simple basado en el nombre
+                      testId: nameCtrl.text.trim().toLowerCase().replaceAll(
+                        ' ',
+                        '_',
+                      ),
+                      value: value,
+                      unit: unitCtrl.text.trim(),
+                    ),
+                  );
                 }
               },
               child: const Text('Añadir'),
@@ -456,7 +472,7 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
     valueCtrl.dispose();
     unitCtrl.dispose();
   }
-  
+
   // --- AÑADIDO: Diálogo para Lesiones ---
   Future<void> _showAddInjuryDialog() async {
     final descriptionCtrl = TextEditingController();
@@ -482,8 +498,9 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                         helperText: 'Ej: Esguince de tobillo',
                       ),
                       autofocus: true,
-                      validator: (v) =>
-                          (v?.isEmpty ?? true) ? 'La descripción es requerida' : null,
+                      validator: (v) => (v?.isEmpty ?? true)
+                          ? 'La descripción es requerida'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<InjuryStatus>(
@@ -513,14 +530,13 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                 ElevatedButton(
                   onPressed: () {
                     if (formKey.currentState!.validate()) {
-                      Navigator.of(
-                        context,
-                        rootNavigator: true,
-                      ).pop(Injury(
-                        id: uuid.v4(),
-                        description: descriptionCtrl.text.trim(),
-                        status: status,
-                      ));
+                      Navigator.of(context, rootNavigator: true).pop(
+                        Injury(
+                          id: uuid.v4(),
+                          description: descriptionCtrl.text.trim(),
+                          status: status,
+                        ),
+                      );
                     }
                   },
                   child: const Text('Guardar'),
@@ -538,17 +554,11 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
     descriptionCtrl.dispose();
   }
 
-
   Future<void> _showAddEventDialog() async {
-    const eventOptions = {
-      'league': 'Liga',
-      'cup': 'Copa',
-      'playoff': 'Play-offs',
-      'national_team': 'Selección',
-      'travel': 'Viaje',
-    };
+    // Asegúrate de tener este helper en la clase (ya lo mostraste arriba)
+    // String _eventTypeLabel(PlayerEventType t) { ... }
 
-    String selectedType = 'league';
+    PlayerEventType selectedType = PlayerEventType.league; // ✅ enum, no String
     DateTime selectedDate = DateTime.now();
     final descriptionCtrl = TextEditingController();
 
@@ -562,16 +572,17 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  DropdownButtonFormField<String>(
+                  // ✅ Dropdown de enum
+                  DropdownButtonFormField<PlayerEventType>(
                     value: selectedType,
                     decoration: const InputDecoration(
                       labelText: 'Tipo de evento',
                     ),
-                    items: eventOptions.entries
+                    items: PlayerEventType.values
                         .map(
-                          (entry) => DropdownMenuItem<String>(
-                            value: entry.key,
-                            child: Text(entry.value),
+                          (t) => DropdownMenuItem<PlayerEventType>(
+                            value: t,
+                            child: Text(_eventTypeLabel(t)),
                           ),
                         )
                         .toList(),
@@ -622,7 +633,7 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                   onPressed: () {
                     Navigator.of(context, rootNavigator: true).pop(
                       PlayerEvent(
-                        type: selectedType,
+                        type: selectedType, // ✅ enum
                         date: selectedDate,
                         description: descriptionCtrl.text.trim().isEmpty
                             ? null
@@ -720,14 +731,15 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
     }
     noteCtrl.dispose();
   }
-  
+
   // --- AÑADIDO: Helper para formatear IDs de tests ---
   String _formatTestId(String testId) {
     if (testId.isEmpty) return 'Test';
     // Convierte 'salto_vertical' en 'Salto Vertical'
-    return testId.split('_')
-      .map((word) => word[0].toUpperCase() + word.substring(1))
-      .join(' ');
+    return testId
+        .split('_')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
   }
 
   @override
@@ -878,43 +890,42 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
         key: _step2Key,
         child: Column(
           children: [
-            DropdownButtonFormField<String>(
+            // Posición
+            DropdownButtonFormField<PlayerPosition>(
               value: selectedPosition,
               decoration: const InputDecoration(
                 labelText: 'Posición',
                 prefixIcon: Icon(Icons.sports_volleyball),
               ),
-              items: ['Central', 'Libero', 'Punta', 'Opuesto', 'Armadora']
+              items: PlayerPosition.values
                   .map(
-                    (String value) => DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value),
-                    ),
+                    (p) =>
+                        DropdownMenuItem(value: p, child: Text(_posLabel(p))),
                   )
                   .toList(),
-              onChanged: (newValue) {
-                setState(() => selectedPosition = newValue!);
-              },
+              onChanged: (v) =>
+                  setState(() => selectedPosition = v ?? selectedPosition),
             ),
+
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+
+            // Nivel
+            DropdownButtonFormField<PlayerLevel>(
               value: selectedLevel,
               decoration: const InputDecoration(
                 labelText: 'Nivel',
                 prefixIcon: Icon(Icons.bar_chart),
               ),
-              items: ['Competitivo', 'Recreativo']
+              items: PlayerLevel.values
                   .map(
-                    (String value) => DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value),
-                    ),
+                    (l) =>
+                        DropdownMenuItem(value: l, child: Text(_levelLabel(l))),
                   )
                   .toList(),
-              onChanged: (newValue) {
-                setState(() => selectedLevel = newValue!);
-              },
+              onChanged: (v) =>
+                  setState(() => selectedLevel = v ?? selectedLevel),
             ),
+
             const SizedBox(height: 12),
             TextFormField(
               controller: ageCtrl,
@@ -1067,15 +1078,16 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                         ),
                         leading: IconButton(
                           icon: const Icon(Icons.delete_outline),
-                          onPressed: () =>
-                              setState(() => _testScores.remove(test)), // <-- CAMBIO
+                          onPressed: () => setState(
+                            () => _testScores.remove(test),
+                          ), // <-- CAMBIO
                         ),
                       ),
                     )
                     .toList(),
               ),
             const SizedBox(height: 16),
-            
+
             // --- CAMBIO: Lógica de Lesiones actualizada ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1117,8 +1129,9 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
                                     : Colors.green,
                               ),
                               deleteIcon: const Icon(Icons.cancel, size: 18),
-                              onDeleted: () =>
-                                  setState(() => selectedInjuries.remove(injury)),
+                              onDeleted: () => setState(
+                                () => selectedInjuries.remove(injury),
+                              ),
                             ),
                           )
                           .toList(),
@@ -1144,32 +1157,35 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
               'Días de Entrenamiento (opcional)',
               style: theme.textTheme.titleSmall,
             ),
+
             Wrap(
               spacing: 4.0,
               runSpacing: 0.0,
-              children: _allDays
-                  .map(
-                    (day) => SizedBox(
-                      width: 160,
-                      child: CheckboxListTile(
-                        title: Text(day),
-                        value: selectedDays.contains(day),
-                        onChanged: (bool? value) {
-                          setState(() {
-                            if (value == true)
-                              selectedDays.add(day);
-                            else
-                              selectedDays.remove(day);
-                          });
-                        },
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        controlAffinity: ListTileControlAffinity.leading,
-                      ),
-                    ),
-                  )
-                  .toList(),
+              children: _allDays.map((day) {
+                final isOn = selectedDays.contains(day);
+                return SizedBox(
+                  width: 160,
+                  child: CheckboxListTile(
+                    title: Text(day.longEs), // usa extension .longEs
+                    value: isOn,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        if (value == true) {
+                          if (!selectedDays.contains(day))
+                            selectedDays.add(day);
+                        } else {
+                          selectedDays.remove(day);
+                        }
+                      });
+                    },
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                );
+              }).toList(),
             ),
+
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
               value: _selectedDurationMinutes,

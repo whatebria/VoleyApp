@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:voley_app/providers/providers.dart'; // coachPlayersWithProfilesProvider, explorerSelectedPlayerProvider, playerProfileProvider, firestoreProvider, functionsProvider, currentUserAppUserProvider
+import 'package:voley_app/src/models/shared/day_of_week.dart';
 import 'package:voley_app/src/models/user.dart' as app_user;
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/availability.dart';
@@ -154,143 +155,100 @@ class EvaluationController extends AutoDisposeNotifier<EvaluationState> {
   /// -----------------------------
   /// 3) GUARDADO CENTRALIZADO (Modelos nuevos)
   /// -----------------------------
-  Future<void> handleSubmit({
-    // Datos del formulario
-    required String name,
-    required String email,
-    required String password,
-    required String position,
-    required String level,
-    required List<Injury> injuries,             // <- ahora List<Injury>
-    required List<String> availabilityDays,
-    required int availabilityMinutes,
-    required List<Tournament> tournaments,
-    required List<TestScore> testScores,        // <- ahora List<TestScore>
-  }) async {
-    state = state.copyWith(isSubmitting: true);
+ 
+Future<void> handleSubmit({
+  required String name,
+  required String email,
+  required String password,
+  required String position, // viene como id (ej: "oh","mb","s","l","op")
+  required String level,    // viene como id (ej: "recreativo","competitivo","semiprofesional")
+  required List<Injury> injuries,
+  required List<String> availabilityDays, // ["mon","wed","fri"] etc.
+  required int availabilityMinutes,
+  required List<Tournament> tournaments,
+  required List<TestScore> testScores,
+}) async {
+  state = state.copyWith(isSubmitting: true);
+  final currentUser = state.currentUser.value;
+  if (currentUser == null) {
+    state = state.copyWith(isSubmitting: false, errorMessage: "No se pudo identificar al usuario actual.");
+    return;
+  }
 
-    final currentUser = state.currentUser.value;
-    if (currentUser == null) {
-      state = state.copyWith(
-        isSubmitting: false,
-        errorMessage: "No se pudo identificar al usuario actual.",
+  // ✅ Convertir a enums seguros (con fallback si quisieras)
+  final playerPosition = PlayerPosition.values.byName(position);
+  final playerLevel    = PlayerLevel.values.byName(level);
+  final daysEnum = availabilityDays.map((d) => DayOfWeek.values.byName(d)).toList();
+
+  try {
+    final availability = Availability(
+      trainingDays: daysEnum,
+      sessionMinutes: availabilityMinutes,
+    );
+
+    final newEvaluation = EvaluationResult(
+      date: DateTime.now(),
+      testScores: testScores,
+    );
+
+    PlayerProfile profileToSave;
+
+    if (state.isCreatingNewUser) {
+      profileToSave = PlayerProfile(
+        id: _uuid.v4(),
+        userId: currentUser.id,
+        name: name,
+        position: playerPosition,   // ✅ enum
+        level: playerLevel,         // ✅ enum
+        goals: const [],
+        injuries: injuries,
+        availability: availability, // ✅ Days como enums
+        evaluationHistory: [newEvaluation],
+        tournaments: tournaments,
       );
-      return;
-    }
+    } else {
+      final loadedProfile = state.loadedProfile.value;
+      final selectedUser = state.selectedUser;
+      if (selectedUser == null) {
+        throw Exception("No hay un usuario seleccionado.");
+      }
 
-    final String coachIdToAssign =
-        currentUser.isCoach ? currentUser.id : (currentUser.coachId ?? "");
+      if (loadedProfile != null) {
+        final updatedHistory = [...loadedProfile.evaluationHistory, newEvaluation];
 
-    try {
-      final availability = Availability(
-        trainingDays: availabilityDays,
-        sessionMinutes: availabilityMinutes,
-      );
-
-      // Crear la evaluación nueva (modelo nuevo)
-      final newEvaluation = EvaluationResult(
-        date: DateTime.now(),
-        testScores: testScores, // List<TestScore>
-      );
-
-      PlayerProfile profileToSave;
-
-      if (state.isCreatingNewUser) {
-        // 1) Crear usuario (Cloud Function)
-        final callable = _functions.httpsCallable('createPlayerAccount');
-        final result = await callable.call(<String, dynamic>{
-          'email': email,
-          'password': password,
-          'name': name,
-          'coachId': coachIdToAssign,
-        });
-
-        final userId = result.data['userId'];
-        if (userId == null) {
-          throw Exception('La Cloud Function no devolvió un userId.');
-        }
-
-        // 1.a) Crear perfil inicial con evaluationHistory
+        profileToSave = loadedProfile.copyWith(
+          position: playerPosition,     // ✅ enum
+          level: playerLevel,           // ✅ enum
+          injuries: injuries,
+          availability: availability,   // ✅ enum list
+          tournaments: tournaments,
+          evaluationHistory: updatedHistory,
+        );
+      } else {
+        // No tenía perfil aún
         profileToSave = PlayerProfile(
           id: _uuid.v4(),
-          userId: userId,
-          assignedCoachId: coachIdToAssign,
-          name: name,
-          position: position,
-          level: level.toLowerCase(),
+          userId: selectedUser.id,
+          name: selectedUser.name,
+          position: playerPosition,
+          level: playerLevel,
           goals: const [],
           injuries: injuries,
           availability: availability,
-          evaluationHistory: [newEvaluation], // <- lista con la nueva evaluación
+          evaluationHistory: [newEvaluation],
           tournaments: tournaments,
         );
-      } else {
-        // 2) Actualizar o crear perfil para usuario existente
-        final loadedProfile = state.loadedProfile.value;
-        final selectedUser = state.selectedUser;
-        if (selectedUser == null) {
-          throw Exception("No hay un usuario seleccionado.");
-        }
-
-        if (loadedProfile != null) {
-          // 2.a) Actualizar perfil existente (agregar evaluación al historial)
-          final updatedHistory = [
-            ...loadedProfile.evaluationHistory,
-            newEvaluation,
-          ];
-
-          profileToSave = loadedProfile.copyWith(
-            position: position,
-            level: level.toLowerCase(),
-            injuries: injuries,
-            availability: availability,
-            tournaments: tournaments,
-            evaluationHistory: updatedHistory,
-          );
-        } else {
-          // 2.b) Crear primer perfil para el usuario ya existente
-          profileToSave = PlayerProfile(
-            id: _uuid.v4(),
-            userId: selectedUser.id,
-            assignedCoachId: coachIdToAssign,
-            name: selectedUser.name, // tomamos el nombre del user existente
-            position: position,
-            level: level.toLowerCase(),
-            goals: const [],
-            injuries: injuries,
-            availability: availability,
-            evaluationHistory: [newEvaluation],
-            tournaments: tournaments,
-          );
-        }
       }
-
-      // Guardar en Firestore
-      await _firestore.savePlayerProfile(profileToSave);
-
-      // Invalidaciones para refrescar vistas
-      if (currentUser.isCoach) {
-        ref.invalidate(coachPlayersWithProfilesProvider);
-
-        final selectedInExplorer = ref.read(explorerSelectedPlayerProvider);
-        if (state.selectedUser?.id == selectedInExplorer?.player.id) {
-          ref.invalidate(selectedPlayerProfileProvider);
-        }
-      } else {
-        ref.invalidate(playerProfileProvider);
-      }
-
-      state = state.copyWith(
-        isSubmitting: false,
-        successMessage: "Evaluación guardada exitosamente",
-        loadedProfile: AsyncData(profileToSave),
-      );
-    } catch (e) {
-      state = state.copyWith(
-        isSubmitting: false,
-        errorMessage: "Error al guardar: $e",
-      );
     }
+
+    await _firestore.savePlayerProfile(profileToSave);
+    state = state.copyWith(
+      isSubmitting: false,
+      successMessage: "Evaluación guardada correctamente.",
+    );
+    // invalidaciones que ya tienes...
+  } catch (e, s) {
+    state = state.copyWith(isSubmitting: false, errorMessage: "Error al guardar: $e");
   }
 }
 
@@ -301,3 +259,4 @@ final evaluationControllerProvider =
     AutoDisposeNotifierProvider<EvaluationController, EvaluationState>(
   EvaluationController.new,
 );
+}

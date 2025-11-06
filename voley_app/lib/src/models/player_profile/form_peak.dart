@@ -1,43 +1,23 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:voley_app/utils/common/utils.dart';
 
+@immutable
 class FormPeak {
   final DateTime date;
   final String? note;
 
-  const FormPeak({
-    required this.date,
-    this.note,
-  });
+  const FormPeak({required this.date, this.note});
 
   Map<String, dynamic> toJson() => {
-        'date': Timestamp.fromDate(date),
+        'date': date.toIso8601String(),
         'note': note,
       };
 
-  static FormPeak fromJson(Map<String, dynamic> json) {
-    final rawDate = json['date'];
-    DateTime parsedDate;
-    if (rawDate is Timestamp) {
-      parsedDate = rawDate.toDate();
-    } else if (rawDate is String) {
-      parsedDate = DateTime.tryParse(rawDate) ?? DateTime.now();
-    } else {
-      parsedDate = DateTime.now();
-    }
+  static FormPeak fromJson(Map<String, dynamic> json) => FormPeak(
+        date: ModelUtils.parseDateFlex(json['date']) ?? DateTime.now(),
+        note: json['note'] as String?,
+      );
 
-    return FormPeak(
-      date: parsedDate,
-      note: json['note'] as String?,
-    );
-  }
-
-  FormPeak copyWith({
-    DateTime? date,
-    String? note,
-  }) {
-    return FormPeak(
-      date: date ?? this.date,
-      note: note ?? this.note,
-    );
-  }
+  FormPeak copyWith({DateTime? date, String? note}) =>
+      FormPeak(date: date ?? this.date, note: note ?? this.note);
 }

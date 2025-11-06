@@ -2,9 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum PermissionStatus {
   pending,
-
   accepted,
-
   rejected;
 
   String toJson() => name;
@@ -20,15 +18,10 @@ enum PermissionStatus {
 
 class CoachPlayerPermission {
   final String id;
-
   final String coachId;
-
   final String playerId;
-
   final PermissionStatus status;
-
   final DateTime createdAt;
-
   final DateTime? updatedAt;
 
   CoachPlayerPermission({

@@ -1,22 +1,26 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:voley_app/utils/common/utils.dart';
 
+@immutable
 class Tournament {
+  final String? id; // opcional si luego necesitas editar
   final DateTime date;
   final String name;
 
-  Tournament({required this.date, required this.name});
+  const Tournament({this.id, required this.date, required this.name});
 
   Map<String, dynamic> toJson() => {
-        'date': Timestamp.fromDate(date),
+        'id': id,
+        'date': date.toIso8601String(),
         'name': name,
       };
 
   static Tournament fromJson(Map<String, dynamic> json) => Tournament(
-        date: json['date'] != null
-            ? (json['date'] is Timestamp 
-                ? (json['date'] as Timestamp).toDate() 
-                : DateTime.parse(json['date'] as String))
-            : DateTime.now(),
+        id: json['id'] as String?,
+        date: ModelUtils.parseDateFlex(json['date']) ?? DateTime.now(),
         name: json['name'] as String? ?? '',
       );
+
+  Tournament copyWith({String? id, DateTime? date, String? name}) =>
+      Tournament(id: id ?? this.id, date: date ?? this.date, name: name ?? this.name);
 }

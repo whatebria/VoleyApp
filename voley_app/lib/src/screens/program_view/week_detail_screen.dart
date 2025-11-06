@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
-import 'package:voley_app/src/models/program/microcicle.dart';
+import 'package:voley_app/src/models/program/microcycle.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/screens/program_view/edit_session_screen.dart'; // Importa la pantalla de edición
+import 'package:voley_app/src/models/shared/day_of_week.dart';
 
 /// Muestra las Sesiones (Cards) de un Microciclo (Semana)
 class WeekDetailScreen extends StatelessWidget {
@@ -14,6 +15,12 @@ class WeekDetailScreen extends StatelessWidget {
     required this.microcycle,
     required this.profile,
   });
+
+String _dayLabel(DayOfWeek d) => {
+  DayOfWeek.mon:'Lun', DayOfWeek.tue:'Mar', DayOfWeek.wed:'Mié',
+  DayOfWeek.thu:'Jue', DayOfWeek.fri:'Vie', DayOfWeek.sat:'Sáb',
+  DayOfWeek.sun:'Dom',
+}[d]!;
 
   @override
   Widget build(BuildContext context) {
@@ -51,8 +58,7 @@ class WeekDetailScreen extends StatelessWidget {
           backgroundColor: theme.colorScheme.secondary.withOpacity(0.2),
           child: Icon(Icons.fitness_center, color: theme.colorScheme.secondary),
         ),
-        title: Text(
-          session.day,
+        title: Text(_dayLabel(session.day),
           style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(

@@ -1,64 +1,33 @@
-import 'package:cloud_firestore/cloud_firestore.dart'; // Para Timestamps
-// --- AÑADIDO: Import del nuevo modelo ---
-import 'package:voley_app/src/models/player_profile/test_score.dart';
+import 'package:flutter/foundation.dart';
+import 'package:voley_app/utils/common/utils.dart';
+import 'test_score.dart';
 
+@immutable
 class EvaluationResult {
   final DateTime date;
-  // --- CAMBIO: El tipo ahora es una lista de objetos TestScore ---
   final List<TestScore> testScores;
-  // (Opcional) final String? notes; // Notas del entrenador, etc.
 
-  EvaluationResult({
+  const EvaluationResult({
     required this.date,
-    this.testScores = const [], // Valor por defecto es una lista vacía
-    // this.notes,
+    this.testScores = const [],
   });
 
   Map<String, dynamic> toJson() => {
-        'date': Timestamp.fromDate(date), // Guardar como Timestamp en Firestore
-        // --- CAMBIO: Mapea la lista de objetos a JSON ---
-        'testScores': testScores.map((score) => score.toJson()).toList(),
-        // 'notes': notes,
+        'date': date.toIso8601String(),
+        'testScores': testScores.map((s) => s.toJson()).toList(),
       };
 
-  static EvaluationResult fromJson(Map<String, dynamic> json) {
-    return EvaluationResult(
-      // Leer como Timestamp y convertir a DateTime
-      date: (json['date'] as Timestamp? ?? Timestamp.now()).toDate(),
-      // --- CAMBIO: Parsea la lista de JSON a una lista de TestScore ---
-      testScores: (json['testScores'] as List<dynamic>? ?? [])
-          .map((scoreJson) =>
-              TestScore.fromJson(scoreJson as Map<String, dynamic>))
-          .toList(),
-      // notes: json['notes'] as String?,
-    );
-  }
+  static EvaluationResult fromJson(Map<String, dynamic> json) => EvaluationResult(
+        date: ModelUtils.parseDateFlex(json['date']) ?? DateTime.now(),
+        testScores: ((json['testScores'] as List?) ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map(TestScore.fromJson)
+            .toList(),
+      );
 
-  // --- AÑADIDO: Método copyWith para gestión de estado inmutable ---
-  EvaluationResult copyWith({
-    DateTime? date,
-    List<TestScore>? testScores,
-    // String? notes,
-  }) {
-    return EvaluationResult(
-      date: date ?? this.date,
-      testScores: testScores ?? this.testScores,
-      // notes: notes ?? this.notes,
-    );
-  }
-
-  // --- Opcional: Métodos de igualdad para comparaciones ---
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-  
-    return other is EvaluationResult &&
-      other.date == date &&
-      // Compara las listas
-      ListEquality().equals(other.testScores, testScores);
-  }
-
-  @override
-  int get hashCode => date.hashCode ^ testScores.hashCode;
+  EvaluationResult copyWith({DateTime? date, List<TestScore>? testScores}) =>
+      EvaluationResult(
+        date: date ?? this.date,
+        testScores: testScores ?? this.testScores,
+      );
 }
-

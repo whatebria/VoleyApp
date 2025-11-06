@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/src/models/program/program.dart';
-import 'package:voley_app/src/models/program/mesocycles.dart';
+import 'package:voley_app/src/models/program/mesocycle.dart';
 import 'package:voley_app/providers/providers.dart'; // Para explorerProgramsProvider y firestoreProvider
 
 /// Manages the state of a single Program being edited.

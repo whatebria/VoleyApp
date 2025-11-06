@@ -12,6 +12,8 @@ import 'package:voley_app/src/models/program/intensity.dart';
 import 'package:collection/collection.dart'; // Para .firstWhereOrNull
 // --- FIN AÑADIDO ---
 import 'package:uuid/uuid.dart';
+import 'package:voley_app/src/models/shared/day_of_week.dart';
+
 
 final isSubmittingWorkoutProvider = StateProvider<bool>((ref) => false);
 const int DEFAULT_REST_TIME_SECONDS = 90; // 90 segundos de descanso
@@ -37,6 +39,17 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
 
   final _notesController = TextEditingController();
   double _rpeValue = 5;
+    String _dayLabel(DayOfWeek d) {
+    switch (d) {
+      case DayOfWeek.mon: return 'Lun';
+      case DayOfWeek.tue: return 'Mar';
+      case DayOfWeek.wed: return 'Mié';
+      case DayOfWeek.thu: return 'Jue';
+      case DayOfWeek.fri: return 'Vie';
+      case DayOfWeek.sat: return 'Sáb';
+      case DayOfWeek.sun: return 'Dom';
+    }
+  }
 
   @override
   void initState() {
@@ -159,7 +172,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
       completedAt: DateTime.now(),
       // --- CAMBIO: Pasa la List<LoggedExercise> ---
       loggedExercises: finalLoggedExercises,
-      rpe: feedback['rpe'] as int,
+      rpe: (feedback['rpe'] as num?)?.toDouble() ?? 0.0,
       notes: feedback['notes'] as String,
     );
 
@@ -277,7 +290,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
     final isSubmitting = ref.watch(isSubmittingWorkoutProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.session.day)),
+      appBar: AppBar(title: Text(_dayLabel(widget.session.day))),
       body: Column(
         children: [
           Expanded(
@@ -537,31 +550,31 @@ class _WorkoutExerciseCard extends ConsumerWidget {
   });
 
   // --- AÑADIDO: Helper para formatear reps ---
-  String _formatReps(WorkoutExercise ex) {
-    if (ex.repsMin == ex.repsMax) return '${ex.repsMax}';
-    // Si no hay max, o es igual al min, muestra solo uno
-    if (ex.repsMax == 0 || ex.repsMax == ex.repsMin) return '${ex.repsMin}';
-    return '${ex.repsMin}-${ex.repsMax}';
-  }
+String _formatReps(WorkoutExercise ex) {
+  final min = ex.reps.min;
+  final max = ex.reps.max;
+  if (max == 0 || max == min) return '$min';
+  return '$min-$max';
+}
+
 
   // --- AÑADIDO: Helper para formatear intensidad ---
-  String _formatPrescription(Intensity p) {
-    switch (p.type) {
-      case IntensityType.rpe:
-        return 'RPE ${p.value.toInt()}';
-      case IntensityType.percent_1rm:
-        return '${(p.value * 100).toInt()}% 1RM';
-      case IntensityType.fixed_weight:
-        // Quita el .0 si es un número entero
-        final weight = p.value % 1 == 0 ? p.value.toInt() : p.value.toStringAsFixed(1);
-        return '$weight kg'; // Asume kg
-      case IntensityType.rpe_range:
-        return 'RPE ${p.value.toInt()}-${p.valueMax?.toInt()}';
-      case IntensityType.open:
-      default:
-        return p.label ?? 'N/A';
-    }
+String _formatPrescription(Intensity p) {
+  switch (p.type) {
+    case IntensityType.rpe:
+      return 'RPE ${p.value.toInt()}';
+    case IntensityType.percent1rm: // <- sin guión bajo
+      return '${(p.value * 100).toInt()}% 1RM';
+    case IntensityType.loadkg:
+      final weight = p.value % 1 == 0 ? p.value.toInt() : p.value.toStringAsFixed(1);
+      return '$weight kg';
+    case IntensityType.rpeRange:
+      return 'RPE ${p.value.toInt()}-${p.valueMax?.toInt()}';
+    case IntensityType.open:
+    return p.label ?? 'N/A';
   }
+}
+
 
   /// Widget para "Última vez"
   Widget _buildLastTime(BuildContext context, WidgetRef ref, ThemeData theme) {
@@ -630,11 +643,11 @@ class _WorkoutExerciseCard extends ConsumerWidget {
     final String intensityLabel = _formatPrescription(exercise.prescription);
     
     // Determina los valores iniciales para _SetRow
-    final double initialWeight = 
-      exercise.prescription.type == IntensityType.fixed_weight 
-      ? exercise.prescription.value 
-      : 0.0;
-    final int initialReps = exercise.repsMin;
+    final bool isFixedLoad = exercise.prescription.type == IntensityType.loadkg;
+final double initialWeight = isFixedLoad ? exercise.prescription.value : 0.0;
+
+    final int initialReps = exercise.reps.min;
+
     // --- FIN DEL CAMBIO ---
 
     return LayoutBuilder(

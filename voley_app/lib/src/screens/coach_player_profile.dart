@@ -28,9 +28,7 @@ class CoachPlayerProfile extends StatelessWidget {
         .toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(profile.name),
-      ),
+      appBar: AppBar(title: Text(profile.name)),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
@@ -105,6 +103,7 @@ class CoachPlayerProfile extends StatelessWidget {
 
   /// Widget de cabecera con Posición y Nivel
   Widget _buildHeader(BuildContext context, ThemeData theme) {
+    String _enumLabel(Enum e) => e.name[0].toUpperCase() + e.name.substring(1);
     return Card(
       // Usamos el color de superficie (grisPro)
       color: theme.colorScheme.surface,
@@ -112,27 +111,30 @@ class CoachPlayerProfile extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         child: Row(
           children: [
-            Icon(Icons.person_outline,
-                size: 48, color: theme.colorScheme.primary),
+            Icon(
+              Icons.person_outline,
+              size: 48,
+              color: theme.colorScheme.primary,
+            ),
             const SizedBox(width: 16),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  profile.position,
+                  _enumLabel(profile.position),
                   style: theme.textTheme.headlineMedium?.copyWith(
-                    color: theme.colorScheme.primary, // voltNeon
+                    color: theme.colorScheme.primary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                Text(
-                  profile.level.toUpperCase(),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.7),
-                    letterSpacing: 1.1,
-                  ),
-                ),
               ],
+            ),
+            Text(
+              _enumLabel(profile.level).toUpperCase(),
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                letterSpacing: 1.1,
+              ),
             ),
           ],
         ),
@@ -201,13 +203,29 @@ class CoachPlayerProfile extends StatelessWidget {
               alignment: WrapAlignment.spaceBetween,
               children: [
                 _buildStatItem(
-                    context, theme, 'Edad', profile.age?.toString() ?? 'N/A'),
+                  context,
+                  theme,
+                  'Edad',
+                  profile.age?.toString() ?? 'N/A',
+                ),
                 _buildStatItem(
-                    context, theme, 'Peso', '${profile.weightKg?.toString() ?? 'N/A'} kg'),
+                  context,
+                  theme,
+                  'Peso',
+                  '${profile.weightKg?.toString() ?? 'N/A'} kg',
+                ),
                 _buildStatItem(
-                    context, theme, 'Altura', '${profile.heightCm?.toString() ?? 'N/A'} cm'),
-                _buildStatItem(context, theme, 'Envergadura',
-                    '${profile.wingspanCm?.toString() ?? 'N/A'} cm'),
+                  context,
+                  theme,
+                  'Altura',
+                  '${profile.heightCm?.toString() ?? 'N/A'} cm',
+                ),
+                _buildStatItem(
+                  context,
+                  theme,
+                  'Envergadura',
+                  '${profile.wingspanCm?.toString() ?? 'N/A'} cm',
+                ),
               ],
             ),
           ],
@@ -217,7 +235,12 @@ class CoachPlayerProfile extends StatelessWidget {
   }
 
   /// Un solo item de estadística (p.ej. "Edad", "25")
-  Widget _buildStatItem(BuildContext context, ThemeData theme, String title, String value) {
+  Widget _buildStatItem(
+    BuildContext context,
+    ThemeData theme,
+    String title,
+    String value,
+  ) {
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 100),
       child: Column(
@@ -232,8 +255,9 @@ class CoachPlayerProfile extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             value,
-            style: theme.textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -275,9 +299,10 @@ class CoachPlayerProfile extends StatelessWidget {
                       Text(
                         '• ',
                         style: TextStyle(
-                            color: iconColor,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold),
+                          color: iconColor,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Expanded(
                         child: Text(item, style: theme.textTheme.bodyMedium),
@@ -294,7 +319,11 @@ class CoachPlayerProfile extends StatelessWidget {
 
   /// Título de sección reutilizable
   Widget _buildSectionTitle(
-      BuildContext context, String title, IconData icon, Color color) {
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color color,
+  ) {
     final theme = Theme.of(context);
     return Row(
       children: [
@@ -315,19 +344,25 @@ class CoachPlayerProfile extends StatelessWidget {
 
   // --- CAMBIO: Widget actualizado (ya no es un placeholder) ---
   Widget _buildAvailabilityCard(
-      BuildContext context, ThemeData theme, Availability availability) {
-    final days = availability.trainingDays.isEmpty 
-        ? 'No especificado' 
+    BuildContext context,
+    ThemeData theme,
+    Availability availability,
+  ) {
+    final days = availability.trainingDays.isEmpty
+        ? 'No especificado'
         : availability.trainingDays.join(', ');
-        
+
     return Card(
       child: ListTile(
-        leading: Icon(Icons.event_available_outlined,
-            color: theme.colorScheme.secondary),
+        leading: Icon(
+          Icons.event_available_outlined,
+          color: theme.colorScheme.secondary,
+        ),
         title: const Text('Disponibilidad'),
         subtitle: Text(
           '$days • ${availability.sessionMinutes} min/sesión',
-            style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6))),
+          style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6)),
+        ),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: () {
           // TODO: Navegar a la pantalla de edición de disponibilidad
@@ -338,20 +373,25 @@ class CoachPlayerProfile extends StatelessWidget {
 
   // --- CAMBIO: Widget actualizado (ya no es un placeholder) ---
   Widget _buildEvaluationCard(
-      BuildContext context, ThemeData theme, EvaluationResult? evaluation) {
-    
+    BuildContext context,
+    ThemeData theme,
+    EvaluationResult? evaluation,
+  ) {
     final scores = evaluation?.testScores ?? [];
 
     return Card(
       child: ExpansionTile(
-        leading: Icon(Icons.assignment_turned_in_outlined,
-            color: theme.colorScheme.primary),
+        leading: Icon(
+          Icons.assignment_turned_in_outlined,
+          color: theme.colorScheme.primary,
+        ),
         title: const Text('Resultados de Evaluación'),
         subtitle: Text(
-            scores.isEmpty
+          scores.isEmpty
               ? 'Sin tests registrados'
               : 'Última evaluación: ${DateFormat('dd/MM/yy').format(evaluation!.date)}',
-            style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6))),
+          style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6)),
+        ),
         trailing: Icon(Icons.expand_more, color: theme.colorScheme.primary),
         children: [
           if (scores.isEmpty)
@@ -359,20 +399,24 @@ class CoachPlayerProfile extends StatelessWidget {
               padding: const EdgeInsets.all(16.0),
               child: Text(
                 'No hay tests registrados en esta evaluación.',
-                style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6))
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                ),
               ),
             )
           else
             ...scores.map((TestScore test) {
               return ListTile(
                 title: Text(
-                  _formatTestId(test.testId), // Formatea 'salto_vertical' a 'Salto Vertical'
+                  _formatTestId(
+                    test.testId,
+                  ), // Formatea 'salto_vertical' a 'Salto Vertical'
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 trailing: Text(
                   '${test.value.toStringAsFixed(1)} ${test.unit}',
                   style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.primary
+                    color: theme.colorScheme.primary,
                   ),
                 ),
                 dense: true,
@@ -386,27 +430,33 @@ class CoachPlayerProfile extends StatelessWidget {
               icon: const Icon(Icons.edit_note),
               label: const Text('Ver historial o añadir nueva'),
               onPressed: () {
-                 Navigator.pushNamed(context, '/evaluation');
+                Navigator.pushNamed(context, '/evaluation');
               },
             ),
-          )
+          ),
         ],
       ),
     );
   }
 
   Widget _buildTournamentsCard(
-      BuildContext context, ThemeData theme, List<Tournament> tournaments) {
+    BuildContext context,
+    ThemeData theme,
+    List<Tournament> tournaments,
+  ) {
     return Card(
       child: ListTile(
-        leading: Icon(Icons.emoji_events_outlined,
-            color: theme.colorScheme.secondary),
+        leading: Icon(
+          Icons.emoji_events_outlined,
+          color: theme.colorScheme.secondary,
+        ),
         title: const Text('Torneos'),
         subtitle: Text(
-            tournaments.isEmpty
-                ? 'No hay torneos registrados.'
-                : '${tournaments.length} torneos registrados.',
-            style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6))),
+          tournaments.isEmpty
+              ? 'No hay torneos registrados.'
+              : '${tournaments.length} torneos registrados.',
+          style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6)),
+        ),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: () {
           // Navegar a una pantalla que muestre la lista de torneos
@@ -416,54 +466,67 @@ class CoachPlayerProfile extends StatelessWidget {
   }
 
   Widget _buildKeyEventsCard(
-      BuildContext context, ThemeData theme, List<PlayerEvent> keyEvents) {
+    BuildContext context,
+    ThemeData theme,
+    List<PlayerEvent> keyEvents,
+  ) {
     return Card(
       child: ListTile(
-        leading: Icon(Icons.calendar_month, // Corregido (no existe calendar_star_outlined)
-            color: theme.colorScheme.secondary),
+        leading: Icon(
+          Icons.calendar_month, // Corregido (no existe calendar_star_outlined)
+          color: theme.colorScheme.secondary,
+        ),
         title: const Text('Eventos Clave'),
         subtitle: Text(
-            keyEvents.isEmpty
-                ? 'No hay eventos registrados.'
-                : '${keyEvents.length} eventos registrados.',
-            style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6))),
+          keyEvents.isEmpty
+              ? 'No hay eventos registrados.'
+              : '${keyEvents.length} eventos registrados.',
+          style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6)),
+        ),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
       ),
     );
   }
 
   Widget _buildFormPeaksCard(
-      BuildContext context, ThemeData theme, List<FormPeak> formPeaks) {
+    BuildContext context,
+    ThemeData theme,
+    List<FormPeak> formPeaks,
+  ) {
     return Card(
       child: ListTile(
-        leading: Icon(Icons.trending_up_outlined,
-            color: theme.colorScheme.secondary),
+        leading: Icon(
+          Icons.trending_up_outlined,
+          color: theme.colorScheme.secondary,
+        ),
         title: const Text('Picos de Forma'),
         subtitle: Text(
-            formPeaks.isEmpty
-                ? 'No hay picos registrados.'
-                : '${formPeaks.length} picos registrados.',
-            style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6))),
+          formPeaks.isEmpty
+              ? 'No hay picos registrados.'
+              : '${formPeaks.length} picos registrados.',
+          style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6)),
+        ),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
       ),
     );
   }
-  
+
   // --- AÑADIDO: Helper para formatear IDs de tests ---
   String _formatTestId(String testId) {
     if (testId.isEmpty) return 'Test';
     // Convierte 'salto_vertical' en 'Salto Vertical'
-    return testId.split('_')
-      .map((word) => word[0].toUpperCase() + word.substring(1))
-      .join(' ');
+    return testId
+        .split('_')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
   }
-  
+
   // --- AÑADIDO: Helper para formatear números ---
   String _formatNumber(double value) {
     final isInt = value % 1 == 0;
     return isInt ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
   }
-  
+
   // --- AÑADIDO: Helper para etiquetas de eventos ---
   String _eventLabel(String type) {
     switch (type) {

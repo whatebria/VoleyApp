@@ -1,58 +1,47 @@
-// lib/src/models/program/program.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:voley_app/src/models/program/mesocycles.dart'; // Ajusta el path si es necesario
+import 'package:flutter/foundation.dart';
+import 'package:voley_app/src/models/program/mesocycle.dart';
+import 'package:voley_app/utils/common/utils.dart';
 
+@immutable
 class Program {
   final String id;
   final String title;
-  final String source;
+  final String source; // autor/origen
   final DateTime startDate;
   final DateTime endDate;
   final List<Mesocycle> mesocycles;
 
-  Program({
+  const Program({
     required this.id,
     required this.title,
     required this.source,
     required this.startDate,
     required this.endDate,
-    required this.mesocycles,
+    this.mesocycles = const [],
   });
-
-  // --- CONSTRUCTOR fromJson CORREGIDO Y SEGURO ---
-  factory Program.fromJson(Map<String, dynamic> json) {
-    return Program(
-      id: json['id'] as String? ?? '',
-      title: json['title'] as String? ?? '',
-      source: json['source'] as String? ?? 'Automático',
-      startDate: (json['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      endDate: (json['endDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      mesocycles: (json['mesocycles'] as List<dynamic>? ?? [])
-          .map(
-            (mesoJson) => Mesocycle.fromJson(mesoJson as Map<String, dynamic>),
-          )
-          .toList(),
-    );
-  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'title': title,
     'source': source,
-    'startDate': Timestamp.fromDate(startDate),
-    'endDate': Timestamp.fromDate(endDate),
+    'startDate': startDate.toIso8601String(),
+    'endDate': endDate.toIso8601String(),
     'mesocycles': mesocycles.map((m) => m.toJson()).toList(),
   };
 
-  // Constructor fromFirestore (para leer el ID del documento)
-  factory Program.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    // Añade el ID del documento a los datos antes de parsear
-    data['id'] = doc.id;
-    return Program.fromJson(data);
-  }
+  static Program fromJson(Map<String, dynamic> json) => Program(
+    id: json['id'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    source: json['source'] as String? ?? '',
+    startDate: ModelUtils.parseDateFlex(json['startDate']) ?? DateTime.now(),
+    endDate: ModelUtils.parseDateFlex(json['endDate']) ?? DateTime.now(),
+    mesocycles: ((json['mesocycles'] as List?) ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(Mesocycle.fromJson)
+        .toList(),
+  );
 
-  // Método auxiliar 'copyWith'
   Program copyWith({
     String? id,
     String? title,
@@ -60,25 +49,28 @@ class Program {
     DateTime? startDate,
     DateTime? endDate,
     List<Mesocycle>? mesocycles,
-  }) {
-    return Program(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      source: source ?? this.source,
-      startDate: startDate ?? this.startDate,
-      endDate: endDate ?? this.endDate,
-      mesocycles: mesocycles ?? this.mesocycles,
-    );
-  }
+  }) => Program(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    source: source ?? this.source,
+    startDate: startDate ?? this.startDate,
+    endDate: endDate ?? this.endDate,
+    mesocycles: mesocycles ?? this.mesocycles,
+  );
 
-  // Implementación de operator == y hashCode para comparación por ID
+  @override
+  String toString() =>
+      'Program($title • ${startDate.toIso8601String()} → ${endDate.toIso8601String()})';
+
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Program &&
-          runtimeType == other.runtimeType &&
-          id == other.id;
+      identical(this, other) || other is Program && other.id == id;
 
   @override
   int get hashCode => id.hashCode;
+  
+  factory Program.fromFirestore(DocumentSnapshot doc) {
+    final data = (doc.data() as Map<String, dynamic>)..['id'] = doc.id;
+    return Program.fromJson(data); // si ya tienes fromJson
+  }
 }

@@ -404,27 +404,9 @@ class FirestoreService {
     return snap.docs.map((d) => Program.fromJson(d.data())).toList();
   }
 
-  Stream<List<Program>> getAllProgramsStream(String profileId) {
-    // Usamos 'players' porque tus otros métodos (saveProgram, getPlayerProfile)
-    // también usan la colección 'players'.
-    return _db
-        .collection('players')
-        .doc(profileId)
-        .collection('programs')
-        .orderBy('startDate', descending: true)
-        .snapshots() // .snapshots() devuelve un Stream
-        .map((snapshot) {
-          // Convierte el QuerySnapshot en un List<Program>
-          if (snapshot.docs.isEmpty) {
-            return []; // Devuelve una lista vacía si no hay programas
-          }
-          return snapshot.docs
-              .map(
-                (doc) => Program.fromFirestore(doc),
-              ) // Usa el constructor que creamos
-              .toList();
-        });
-  }
+
+
+
 
   Future<PlayerProfile?> getPlayerProfileByUserId(String userId) async {
     final snap = await _db
@@ -549,6 +531,18 @@ Future<void> upsertPlayerProfile(
 
     // 3) Guardar con merge
     await _db.collection('players').doc(docId).set(data, SetOptions(merge: true));
+  }
+
+  Stream<List<Program>> getAllProgramsStream(String profileId) {
+    return _db
+        .collection('players')
+        .doc(profileId)
+        .collection('programs')
+        .orderBy('startDate', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Program.fromFirestore(doc))
+            .toList());
   }
 }
 

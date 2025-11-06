@@ -5,6 +5,7 @@ import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
 import 'package:voley_app/src/screens/program_view/searchable_excersice_list_screen.dart';
 import 'package:voley_app/src/models/program/intensity.dart';
+import 'package:voley_app/src/models/shared/day_of_week.dart';
 
 class ExercisePickerScreen extends ConsumerStatefulWidget {
   final TrainingSession session;
@@ -25,10 +26,14 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
   // [CORRECCIÓN]: ESTADO LOCAL. Mantenemos una lista mutable localmente.
   late TrainingSession _currentSession;
 
-  @override
-  void initState() {
-    super.initState();
-    // [CORRECCIÓN]: Inicializa el estado local como una copia de la sesión inmutable.
+late DayOfWeek _editableDay;
+late List<WorkoutExercise> _exercises;
+
+@override
+void initState() {
+  super.initState();
+  _editableDay = widget.session.day;
+  _exercises = List.of(widget.session.exercises);
     _currentSession = widget.session;
   }
 
@@ -65,47 +70,45 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
     Navigator.pop(context, _currentSession);
   }
 
-  // --- AÑADIDO: Helper para formatear reps ---
-  String _formatReps(WorkoutExercise ex) {
-    if (ex.repsMin == ex.repsMax) return '${ex.repsMax}';
-    // Si no hay max, o es igual al min, muestra solo uno
-    if (ex.repsMax == 0 || ex.repsMax == ex.repsMin) return '${ex.repsMin}';
-    return '${ex.repsMin}-${ex.repsMax}';
-  }
+String _formatReps(WorkoutExercise ex) {
+  final min = ex.reps.min;
+  final max = ex.reps.max;
+  if (max == 0 || max == min) return '$min';
+  return '$min-$max';
+}
+
 
   // --- AÑADIDO: Helper para formatear intensidad ---
-  String _formatPrescription(Intensity p) {
-    switch (p.type) {
-      case IntensityType.rpe:
-        return 'RPE ${p.value.toInt()}';
-      case IntensityType.percent_1rm:
-        return '${(p.value * 100).toInt()}% 1RM';
-      case IntensityType.fixed_weight:
-        // Quita el .0 si es un número entero
-        final weight = p.value % 1 == 0
-            ? p.value.toInt()
-            : p.value.toStringAsFixed(1);
-        return '$weight kg'; // Asume kg
-      case IntensityType.rpe_range:
-        return 'RPE ${p.value.toInt()}-${p.valueMax?.toInt()}';
-      case IntensityType.open:
-        return p.label ?? 'N/A';
-    }
+String _formatPrescription(Intensity p) {
+  switch (p.type) {
+    case IntensityType.rpe:
+      return 'RPE ${p.value.toInt()}';
+    case IntensityType.percent1rm:
+      return '${(p.value * 100).toInt()}% 1RM';
+    case IntensityType.loadkg:
+      final w = p.value % 1 == 0 ? p.value.toInt() : p.value.toStringAsFixed(1);
+      return '$w kg';
+    case IntensityType.rpeRange:
+      return 'RPE ${p.value.toInt()}-${p.valueMax?.toInt()}';
+    case IntensityType.open:
+      return p.label ?? 'N/A';
   }
+}
+
 
   // --- AÑADIDO: Helper para pre-llenar el diálogo de edición ---
   String _formatPrescriptionForEdit(Intensity p) {
     switch (p.type) {
       case IntensityType.rpe:
         return 'RPE ${p.value.toInt()}';
-      case IntensityType.percent_1rm:
+      case IntensityType.percent1rm:
         return '${(p.value * 100).toInt()}%';
-      case IntensityType.fixed_weight:
+      case IntensityType.loadkg:
         final weight = p.value % 1 == 0
             ? p.value.toInt()
             : p.value.toStringAsFixed(1);
         return '$weight kg';
-      case IntensityType.rpe_range:
+      case IntensityType.rpeRange:
         return 'RPE ${p.value.toInt()}-${p.valueMax?.toInt()}';
       case IntensityType.open:
         return p.label ?? '';
@@ -182,20 +185,17 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                   repsMax = repsMin;
                 }
 
-                final Intensity prescription = WorkoutExercise.migrateIntensity(
-                  intensityCtrl.text,
-                );
 
                 // --- CAMBIO: Usa los nuevos campos en copyWith ---
-                final updated = exercise.copyWith(
-                  sets: int.tryParse(setsCtrl.text) ?? exercise.sets,
-                  repsMin: repsMin,
-                  repsMax: repsMax,
-                  prescription: prescription,
-                );
+                final updatedSession = widget.session.copyWith(
+  day: _editableDay,
+  exercises: _exercises,
+);
+Navigator.pop(context, updatedSession);
+
                 // --- FIN DEL CAMBIO ---
 
-                Navigator.of(dialogContext, rootNavigator: true).pop(updated);
+                Navigator.of(dialogContext, rootNavigator: true).pop(updatedSession);
               },
               child: const Text('Guardar'),
             ),
@@ -308,11 +308,18 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    String _dayLabel(DayOfWeek d) => {
+  DayOfWeek.mon:'Lun', DayOfWeek.tue:'Mar', DayOfWeek.wed:'Mié',
+  DayOfWeek.thu:'Jue', DayOfWeek.fri:'Vie', DayOfWeek.sat:'Sáb',
+  DayOfWeek.sun:'Dom',
+}[d]!;
+
 
     return Scaffold(
       appBar: AppBar(
         // --- CAMBIO: Título de la sesión ---
-        title: Text(widget.session.day),
+        title: Text(_dayLabel(widget.session.day)),
+
         actions: [
           // --- CAMBIO: Botón de Añadir ---
           IconButton(

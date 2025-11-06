@@ -1,49 +1,36 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:voley_app/utils/common/utils.dart';
 
+enum PlayerEventType { league, cup, playoff, nationalTeam, travel }
+
+@immutable
 class PlayerEvent {
-  final String type; // league, cup, playoff, national_team, travel
+  final PlayerEventType type;
   final DateTime date;
   final String? description;
 
-  const PlayerEvent({
-    required this.type,
-    required this.date,
-    this.description,
-  });
+  const PlayerEvent({required this.type, required this.date, this.description});
 
   Map<String, dynamic> toJson() => {
-        'type': type,
-        'date': Timestamp.fromDate(date),
+        'type': type.name,
+        'date': date.toIso8601String(),
         'description': description,
       };
 
-  static PlayerEvent fromJson(Map<String, dynamic> json) {
-    final rawDate = json['date'];
-    DateTime parsedDate;
-    if (rawDate is Timestamp) {
-      parsedDate = rawDate.toDate();
-    } else if (rawDate is String) {
-      parsedDate = DateTime.tryParse(rawDate) ?? DateTime.now();
-    } else {
-      parsedDate = DateTime.now();
-    }
+  static PlayerEvent fromJson(Map<String, dynamic> json) => PlayerEvent(
+        type: ModelUtils.enumByName(
+          PlayerEventType.values,
+          json['type'] as String?,
+          PlayerEventType.league,
+        ),
+        date: ModelUtils.parseDateFlex(json['date']) ?? DateTime.now(),
+        description: json['description'] as String?,
+      );
 
-    return PlayerEvent(
-      type: json['type'] as String? ?? 'league',
-      date: parsedDate,
-      description: json['description'] as String?,
-    );
-  }
-
-  PlayerEvent copyWith({
-    String? type,
-    DateTime? date,
-    String? description,
-  }) {
-    return PlayerEvent(
-      type: type ?? this.type,
-      date: date ?? this.date,
-      description: description ?? this.description,
-    );
-  }
+  PlayerEvent copyWith({PlayerEventType? type, DateTime? date, String? description}) =>
+      PlayerEvent(
+        type: type ?? this.type,
+        date: date ?? this.date,
+        description: description ?? this.description,
+      );
 }

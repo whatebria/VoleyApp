@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/program.dart';
-import 'package:voley_app/src/models/program/mesocycles.dart';
-import 'package:voley_app/src/models/program/microcicle.dart';
+import 'package:voley_app/src/models/program/mesocycle.dart';
+import 'package:voley_app/src/models/program/microcycle.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/screens/program_view/create_block_screen.dart'; 
 import 'package:voley_app/src/screens/program_view/edit_session_screen.dart'; // <-- AÑADIDO

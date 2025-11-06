@@ -1,147 +1,107 @@
-// lib/screens/edit_availability_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:voley_app/src/models/player_profile/availability.dart';
 import 'package:voley_app/providers/providers.dart';
+import 'package:voley_app/src/models/shared/day_of_week.dart';
 
 class EditAvailabilityScreen extends ConsumerStatefulWidget {
   const EditAvailabilityScreen({super.key});
 
   @override
-  ConsumerState<EditAvailabilityScreen> createState() =>
-      _EditAvailabilityScreenState();
+  ConsumerState<EditAvailabilityScreen> createState() => _EditAvailabilityScreenState(); // <- CORRECTO
 }
 
 class _EditAvailabilityScreenState extends ConsumerState<EditAvailabilityScreen> {
-  
-  // Estado local para los switches
-  final Map<String, bool> _trainingDays = {
-    'Lunes': false, 'Martes': false, 'Miércoles': false, 'Jueves': false,
-    'Viernes': false, 'Sábado': false, 'Domingo': false,
-  };
-  
-  late final TextEditingController _sessionMinutesController;
-  late final TextEditingController _injuriesController;
+  final _formKey = GlobalKey<FormState>();
+
+  final _minutesCtrl = TextEditingController(text: '60');
+  final Set<DayOfWeek> _selected = {};
 
   @override
   void initState() {
     super.initState();
-    final profile = ref.read(playerProfileProvider).asData?.value;
+final profile = ref.read(playerProfileProvider).valueOrNull;
 
-    // Inicializar switches
-    profile?.availability.trainingDays.forEach((day) {
-      if (_trainingDays.containsKey(day)) {
-        _trainingDays[day] = true;
-      }
-    });
-
-    // Inicializar controladores
-    _sessionMinutesController = TextEditingController(
-      text: profile?.availability.sessionMinutes.toString() ?? '60',
-    );
-    _injuriesController = TextEditingController(
-      text: profile?.injuries.join('\n') ?? '', // Unimos con saltos de línea
-    );
+    if (profile != null) {
+      _selected.addAll(profile.availability.trainingDays);
+      _minutesCtrl.text = profile.availability.sessionMinutes.toString();
+    }
   }
 
   @override
   void dispose() {
-    _sessionMinutesController.dispose();
-    _injuriesController.dispose();
+    _minutesCtrl.dispose();
     super.dispose();
   }
 
-  void _saveForm() {
-    // Convertir el mapa de switches a una lista de strings
-    final selectedDays = _trainingDays.entries
-        .where((entry) => entry.value)
-        .map((entry) => entry.key)
-        .toList();
-    
-    final sessionMinutes = int.tryParse(_sessionMinutesController.text) ?? 60;
-    
-    // Convertir el texto de lesiones a una lista
-    final injuries = _injuriesController.text
-        .split('\n')
-        .where((line) => line.trim().isNotEmpty)
-        .toList();
-
-    // TODO: Llamar al Notifier para guardar
-    // ref.read(playerProfileProvider.notifier).updateAvailability(
-    //   days: selectedDays,
-    //   minutes: sessionMinutes,
-    //   injuries: injuries,
-    // );
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Estado guardado (simulado)')),
-    );
-    Navigator.pop(context);
+  String _dayLabel(DayOfWeek d) {
+    switch (d) {
+      case DayOfWeek.mon: return 'Lun';
+      case DayOfWeek.tue: return 'Mar';
+      case DayOfWeek.wed: return 'Mié';
+      case DayOfWeek.thu: return 'Jue';
+      case DayOfWeek.fri: return 'Vie';
+      case DayOfWeek.sat: return 'Sáb';
+      case DayOfWeek.sun: return 'Dom';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final days = DayOfWeek.values;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Disponibilidad y Estado'),
-        actions: [
-          IconButton(icon: const Icon(Icons.save), onPressed: _saveForm),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          Text('Días de Entrenamiento', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          ..._trainingDays.keys.map((day) {
-            return SwitchListTile(
-              title: Text(day),
-              value: _trainingDays[day]!,
-              onChanged: (bool value) {
-                setState(() {
-                  _trainingDays[day] = value;
-                });
+      appBar: AppBar(title: const Text('Disponibilidad')),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Wrap(
+              spacing: 8,
+              children: days.map((d) {
+                final selected = _selected.contains(d);
+                return FilterChip(
+                  label: Text(_dayLabel(d)),
+                  selected: selected,
+                  onSelected: (v) => setState(() {
+                    v ? _selected.add(d) : _selected.remove(d);
+                  }),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _minutesCtrl,
+              decoration: const InputDecoration(labelText: 'Minutos por sesión'),
+              keyboardType: TextInputType.number,
+              validator: (v) {
+                final n = int.tryParse(v ?? '');
+                if (n == null || n <= 0) return 'Ingresa minutos válidos';
+                return null;
               },
-            );
-          }).toList(),
-          
-          const Divider(height: 32),
-          
-          Text('Logística', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _sessionMinutesController,
-            decoration: const InputDecoration(
-              labelText: 'Duración de Sesión (minutos)',
-              border: OutlineInputBorder(),
             ),
-            keyboardType: TextInputType.number,
-          ),
-          
-          const Divider(height: 32),
-
-          Text('Lesiones', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(
-            'Añade lesiones activas o molestias. Una por línea.',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _injuriesController,
-            decoration: const InputDecoration(
-              labelText: 'Lesiones (una por línea)',
-              border: OutlineInputBorder(),
-              alignLabelWithHint: true,
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              icon: const Icon(Icons.save),
+              label: const Text('Guardar'),
+              onPressed: () async {
+                if (!_formKey.currentState!.validate()) return;
+                final profile = ref.read(playerProfileProvider).valueOrNull;
+                if (profile == null) return;
+                final updated = profile.copyWith(
+                  availability: Availability(
+                    trainingDays: _selected.toList(),
+                    sessionMinutes: int.parse(_minutesCtrl.text),
+                  ),
+                );
+                // TODO: guardar
+                // await ref.read(firestoreProvider).savePlayerProfile(updated);
+                if (!mounted) return;
+                Navigator.pop(context, updated);
+              },
             ),
-            maxLines: 4,
-            textCapitalization: TextCapitalization.sentences,
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton(
-            onPressed: _saveForm,
-            child: const Text('Guardar Cambios'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

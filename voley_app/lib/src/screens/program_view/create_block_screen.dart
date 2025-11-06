@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:voley_app/providers/program_generator.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
-import 'package:voley_app/src/models/program/mesocycles.dart';
-import 'package:voley_app/src/models/program/microcicle.dart';
+import 'package:voley_app/src/models/program/mesocycle.dart';
+import 'package:voley_app/src/models/program/microcycle.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
-import 'package:voley_app/src/models/program/workout_exercise.dart';
 import 'package:voley_app/src/screens/program_view/exercise_picker_screen.dart';
 import 'package:uuid/uuid.dart';
-import 'package:voley_app/providers/providers.dart'; 
+import 'package:voley_app/providers/providers.dart';
+import 'package:voley_app/src/models/shared/day_of_week.dart';
 
 /// Pantalla dedicada a crear o EDITAR un nuevo Mesociclo (Bloque).
 /// Recibe el [profile] para mostrar contexto (días disponibles)
@@ -19,8 +18,8 @@ class CreateBlockScreen extends ConsumerStatefulWidget {
   final Mesocycle? mesoToEdit;
 
   const CreateBlockScreen({
-    super.key, 
-    required this.profile, 
+    super.key,
+    required this.profile,
     this.mesoToEdit, // <-- AÑADIDO
   });
 
@@ -34,16 +33,25 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
   final _mesoObjectiveCtrl = TextEditingController();
   int _mesoWeeks = 4;
   int _mesoSessions = 3;
-  
+  String _dayLabel(DayOfWeek d) => {
+    DayOfWeek.mon: 'Lun',
+    DayOfWeek.tue: 'Mar',
+    DayOfWeek.wed: 'Mié',
+    DayOfWeek.thu: 'Jue',
+    DayOfWeek.fri: 'Vie',
+    DayOfWeek.sat: 'Sáb',
+    DayOfWeek.sun: 'Dom',
+  }[d]!;
+
   // --- AÑADIDO: Estado para la Semana Plantilla ---
   Microcycle? _templateMicro;
-  
+
   final Uuid _uuid = const Uuid();
-  
+
   @override
   void initState() {
     super.initState();
-    
+
     // --- AÑADIDO: Lógica de Edición ---
     if (widget.mesoToEdit != null) {
       // Estamos en modo EDICIÓN
@@ -55,14 +63,12 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
       // Asumimos que todas las sesiones tienen la misma longitud
       _mesoSessions = meso.microcycles.first.sessions.length;
       _templateMicro = meso.microcycles.first.copyWith(id: _uuid.v4());
-
     } else {
       // Estamos en modo CREACIÓN
       // Genera la plantilla inicial al cargar la pantalla
       _generateTemplateMicro(_mesoSessions);
     }
   }
-
 
   @override
   void dispose() {
@@ -74,24 +80,25 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
   // --- CAMBIO: Lógica movida a program_generator.dart ---
   // double _suggestedLoadFor(int weekIndex, int totalWeeks) { ... }
 
-  
   // --- AÑADIDO: Generador de Semana Plantilla ---
   /// Crea o actualiza la semana plantilla (Microcycle)
   void _generateTemplateMicro(int sessionsPerWeek) {
     // --- CAMBIO: Llama al provider para la lógica ---
     final generator = ref.read(programGeneratorProvider);
-    
+
     final sessions = List.generate(sessionsPerWeek, (sIndex) {
       // Si ya existe una plantilla, intenta mantener las sesiones existentes
       if (_templateMicro != null && sIndex < _templateMicro!.sessions.length) {
         return _templateMicro!.sessions[sIndex];
       }
       // Si no, crea una sesión vacía
+      DayOfWeek dayFromIndex(int i) =>
+          DayOfWeek.values[i % DayOfWeek.values.length];
+
       return TrainingSession(
         id: _uuid.v4(),
-        day: 'Sesión ${sIndex + 1}',
-        // --- CAMBIO: Usa el generator ---
-        load: generator.suggestedLoadFor(0, _mesoWeeks), // Carga base
+        day: dayFromIndex(sIndex), // ✅ enum
+        load: generator.suggestedLoadFor(0, _mesoWeeks),
         exercises: [],
       );
     });
@@ -104,11 +111,11 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
       );
     });
   }
-  
+
   // --- AÑADIDO: Navegación para editar la sesión plantilla ---
   Future<void> _editTemplateSession(int sessionIndex) async {
     if (_templateMicro == null) return;
-    
+
     final sessionToEdit = _templateMicro!.sessions[sessionIndex];
 
     // Navega al ExercisePickerScreen
@@ -116,8 +123,8 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => ExercisePickerScreen(
-          session: sessionToEdit, 
-          profile: widget.profile
+          session: sessionToEdit,
+          profile: widget.profile,
         ),
       ),
     );
@@ -130,12 +137,10 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
     }
   }
 
-
   /// Guarda el nuevo mesociclo y lo devuelve a la pantalla anterior
   void _saveNewMesocycle() {
     // --- CAMBIO: Lógica movida a ProgramGenerator ---
     if (_mesoFormKey.currentState!.validate() && _templateMicro != null) {
-      
       // 1. Leer el servicio/provider
       final generator = ref.read(programGeneratorProvider);
 
@@ -166,7 +171,6 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
     }
   }
 
-
   // --- WIDGETS DE CONSTRUCCIÓN ---
 
   Widget _buildSectionHeader(ThemeData theme, String title, IconData icon) {
@@ -184,9 +188,10 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
 
   Widget _buildAvailabilityReminder(ThemeData theme) {
     final availability = widget.profile.availability;
-    
+
     // Asumiendo que el modelo tiene 'trainingDays' como en tu query
-    final trainingDays = availability.trainingDays; // O usa availability.trainingDays si existe
+    final trainingDays =
+        availability.trainingDays; // O usa availability.trainingDays si existe
 
     if (trainingDays.isEmpty) {
       return const SizedBox.shrink();
@@ -198,22 +203,28 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Días disponibles del atleta:", 
+            "Días disponibles del atleta:",
             style: theme.textTheme.titleSmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.7)
-            )
+              color: theme.colorScheme.onSurface.withOpacity(0.7),
+            ),
           ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8.0,
             runSpacing: 4.0,
-            children: trainingDays.map((day) => Chip(
-              label: Text(day),
-              backgroundColor: theme.colorScheme.secondary.withOpacity(0.2), // azulPro
-              labelStyle: TextStyle(color: theme.colorScheme.onSurface),
-              side: BorderSide.none,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-            )).toList(),
+            children: trainingDays
+                .map(
+                  (day) => Chip(
+                    label: Text(_dayLabel(day)), // ✅ 'day' del map
+                    backgroundColor: theme.colorScheme.secondary.withOpacity(
+                      0.2,
+                    ),
+                    labelStyle: TextStyle(color: theme.colorScheme.onSurface),
+                    side: BorderSide.none,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                )
+                .toList(),
           ),
         ],
       ),
@@ -265,7 +276,7 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
       ),
     );
   }
-  
+
   // --- AÑADIDO: Card para la Semana Tipo ---
   Widget _buildTemplateWeekCard(ThemeData theme) {
     if (_templateMicro == null) return const SizedBox.shrink();
@@ -280,12 +291,16 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionHeader(theme, 'Define tu Semana Tipo', Icons.edit_calendar_outlined),
+            _buildSectionHeader(
+              theme,
+              'Define tu Semana Tipo',
+              Icons.edit_calendar_outlined,
+            ),
             Text(
               'Edita las sesiones de esta semana. Se copiarán a las ${_mesoWeeks} semanas del bloque.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7)
-              )
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
+              ),
             ),
             const Divider(height: 24),
             ListView.builder(
@@ -300,19 +315,26 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
                   color: theme.colorScheme.background, // negroEnfocado
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: theme.colorScheme.surface)
+                    side: BorderSide(color: theme.colorScheme.surface),
                   ),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: theme.colorScheme.secondary.withOpacity(0.2),
-                      child: Icon(Icons.fitness_center, color: theme.colorScheme.secondary, size: 20),
+                      backgroundColor: theme.colorScheme.secondary.withOpacity(
+                        0.2,
+                      ),
+                      child: Icon(
+                        Icons.fitness_center,
+                        color: theme.colorScheme.secondary,
+                        size: 20,
+                      ),
                     ),
-                    title: Text(session.day, style: theme.textTheme.titleMedium),
+                    title: Text(session.day.shortEs, style: theme.textTheme.titleMedium,
+                    ),
                     subtitle: Text(
                       '${session.exercises.length} ejercicios',
-                       style: theme.textTheme.bodyMedium?.copyWith(
-                         color: theme.colorScheme.onSurface.withOpacity(0.7)
-                       ),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacity(0.7),
+                      ),
                     ),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => _editTemplateSession(index),
@@ -325,7 +347,6 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
       ),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -349,26 +370,34 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
               children: [
                 Text(
                   // --- CAMBIO: Título dinámico ---
-                  isEditing ? 'Detalles del Bloque' : 'Crear Bloque de Entrenamiento',
+                  isEditing
+                      ? 'Detalles del Bloque'
+                      : 'Crear Bloque de Entrenamiento',
                   style: theme.textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.primary, // voltNeon
                   ),
                 ),
                 const Divider(height: 24),
-          
+
                 // --- Card 1 - Detalles ---
                 Card(
                   elevation: 0,
                   color: theme.colorScheme.surface, // grisPro
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   clipBehavior: Clip.antiAlias,
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildSectionHeader(theme, 'Detalles del Bloque', Icons.description_outlined),
+                        _buildSectionHeader(
+                          theme,
+                          'Detalles del Bloque',
+                          Icons.description_outlined,
+                        ),
                         TextFormField(
                           controller: _mesoNameCtrl,
                           decoration: const InputDecoration(
@@ -393,25 +422,32 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-          
+
                 // --- Card 2 - Configuración ---
                 Card(
                   elevation: 0,
                   color: theme.colorScheme.surface, // grisPro
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   clipBehavior: Clip.antiAlias,
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildSectionHeader(theme, 'Configuración Semanal', Icons.calendar_today_outlined),
-                        _buildAvailabilityReminder(theme), 
+                        _buildSectionHeader(
+                          theme,
+                          'Configuración Semanal',
+                          Icons.calendar_today_outlined,
+                        ),
+                        _buildAvailabilityReminder(theme),
                         _buildNumberStepper(
                           theme: theme,
                           title: 'Duración (Semanas):',
                           value: _mesoWeeks,
-                          onChanged: (newValue) => setState(() => _mesoWeeks = newValue),
+                          onChanged: (newValue) =>
+                              setState(() => _mesoWeeks = newValue),
                           max: 12,
                         ),
                         _buildNumberStepper(
@@ -430,14 +466,14 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // --- AÑADIDO: Card 3 - Semana Tipo ---
                 _buildTemplateWeekCard(theme),
-          
+
                 const SizedBox(height: 24),
-          
+
                 ElevatedButton.icon(
                   icon: Icon(isEditing ? Icons.save_as : Icons.add),
                   // --- CAMBIO: Texto de botón dinámico ---
@@ -455,4 +491,3 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
     );
   }
 }
-

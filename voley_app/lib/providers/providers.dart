@@ -1,4 +1,5 @@
 // lib/providers.dart
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:voley_app/src/auth/auth_provider.dart';
@@ -301,5 +302,15 @@ final exerciseTagLabelsProvider = Provider<Map<String, String>>((ref) {
     'warmup': 'Calentamiento',
     'cooldown': 'Vuelta a la calma',
     'core': 'Core',
+  };
+});
+
+final signOutActionProvider = Provider<Future<void> Function()>((ref) {
+  return () async {
+    await FirebaseAuth.instance.signOut();
+    // Limpia estados relevantes si aplica
+    ref.invalidate(currentUserAppUserProvider);
+    ref.invalidate(playerProfileProvider);
+    ref.invalidate(playerProgramsProvider);
   };
 });

@@ -3,35 +3,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:voley_app/src/models/program/program.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
-import 'package:voley_app/providers/providers.dart'; // Para playerProgramsProvider
+import 'package:voley_app/providers/providers.dart';
+import 'package:voley_app/src/models/shared/day_of_week.dart'; // playerProgramsProvider
 
-// --- CAMBIO: Convertido de StateProvider a NotifierProvider ---
-
-/// Este Notifier gestiona QUÉ programa está seleccionado actualmente.
-///
-/// Observa la lista de programas del jugador (`playerProgramsProvider`)
-/// y se actualiza automáticamente para asegurarse de que la selección
-/// sea siempre válida.
+// --- Selección del programa activo del jugador ---
 class SelectedProgramNotifier extends Notifier<Program?> {
-  Program? _lastSelected; // cache local
+  Program? _lastSelected;
 
   @override
   Program? build() {
     final programsAsync = ref.watch(playerProgramsProvider);
-
     return programsAsync.when(
-      loading: () => _lastSelected, // conserva lo anterior (o null)
-      error: (e, s) => _lastSelected, // no cambies nada en error
+      loading: () => _lastSelected,
+      error: (e, s) => _lastSelected,
       data: (programs) {
         if (programs.isEmpty) {
-          if (_lastSelected == null ||
-              !programs.any((p) => p.id == _lastSelected!.id)) {
-            _lastSelected = programs.first;
-          }
+          _lastSelected = null;
           return null;
         }
-        if (_lastSelected == null || !programs.contains(_lastSelected)) {
-          _lastSelected = programs.first; // default estable
+        if (_lastSelected == null ||
+            !programs.any((p) => p.id == _lastSelected!.id)) {
+          _lastSelected = programs.first;
         }
         return _lastSelected;
       },
@@ -39,82 +31,76 @@ class SelectedProgramNotifier extends Notifier<Program?> {
   }
 
   void selectProgram(Program newProgram) {
-    _lastSelected = newProgram; // actualiza cache
-    state = newProgram; // publica nuevo estado
+    _lastSelected = newProgram;
+    state = newProgram;
   }
 }
 
-final selectedProgramProvider = StateProvider<Program?>((ref) => null);
+final selectedProgramProvider =
+    NotifierProvider<SelectedProgramNotifier, Program?>(SelectedProgramNotifier.new);
 
-// --- 2. Provider de Eventos del Calendario (sin cambios) ---
-
-/// Este provider depende del programa seleccionado y calcula
-/// el mapa de eventos para `TableCalendar`.
+// --- Eventos para TableCalendar: Map<DateTime, List<TrainingSession>> ---
 final calendarEventsProvider =
     Provider<LinkedHashMap<DateTime, List<TrainingSession>>>((ref) {
-      final selectedProgram = ref.watch(selectedProgramProvider);
+  final selectedProgram = ref.watch(selectedProgramProvider);
+  if (selectedProgram == null) {
+    return LinkedHashMap<DateTime, List<TrainingSession>>(
+      equals: isSameDay,
+      hashCode: (key) => key.day * 1000000 + key.month * 10000 + key.year,
+    );
+  }
 
-      // Si no hay programa seleccionado, devuelve un mapa vacío
-      if (selectedProgram == null) {
-        return LinkedHashMap<DateTime, List<TrainingSession>>();
+  final map = LinkedHashMap<DateTime, List<TrainingSession>>(
+    equals: isSameDay,
+    hashCode: (key) => key.day * 1000000 + key.month * 10000 + key.year,
+  );
+
+  // Flatea todos los microciclos
+  final microcycles = selectedProgram.mesocycles.expand((m) => m.microcycles).toList();
+  DateTime currentWeekStart = selectedProgram.startDate;
+
+  for (final micro in microcycles) {
+    // Semana de 7 días desde currentWeekStart
+    for (int dayOffset = 0; dayOffset < 7; dayOffset++) {
+      final date = currentWeekStart.add(Duration(days: dayOffset));
+      final normalizedDate = DateTime(date.year, date.month, date.day);
+
+      final dayEnum = _weekdayToEnum(date.weekday);
+      final sessionsForDay = micro.sessions.where((s) => s.day == dayEnum).toList();
+
+      if (sessionsForDay.isNotEmpty) {
+        map.putIfAbsent(normalizedDate, () => []).addAll(sessionsForDay);
       }
+    }
+    // Avanza a la siguiente semana
+    currentWeekStart = currentWeekStart.add(const Duration(days: 7));
+  }
 
-      // Si hay un programa, construye el mapa de eventos
-      final newEvents = LinkedHashMap<DateTime, List<TrainingSession>>(
-        equals: isSameDay,
-        hashCode: (key) => key.day * 1000000 + key.month * 10000 + key.year,
-      );
+  return map;
+});
 
-      final allMicrocycles = selectedProgram.mesocycles
-          .expand((m) => m.microcycles)
-          .toList();
-      DateTime currentDate = selectedProgram.startDate;
+// Día de inicio/fin visibles del calendario
+final calendarFocusedDayProvider = StateProvider<DateTime>((_) => DateTime.now());
+final calendarRangeProvider = Provider<CalendarFormat>((_) => CalendarFormat.month);
 
-      for (int weekIndex = 0; weekIndex < allMicrocycles.length; weekIndex++) {
-        final micro = allMicrocycles[weekIndex];
-        for (int dayIndex = 0; dayIndex < 7; dayIndex++) {
-          final dateForDay = currentDate.add(Duration(days: dayIndex));
-          final dayString = _mapWeekdayToString(dateForDay.weekday);
-          final normalizedDate = DateTime(
-            dateForDay.year,
-            dateForDay.month,
-            dateForDay.day,
-          );
-
-          final sessionsForDay = micro.sessions
-              .where((s) => s.day.toLowerCase() == dayString)
-              .toList();
-
-          if (sessionsForDay.isNotEmpty) {
-            if (newEvents[normalizedDate] == null) {
-              newEvents[normalizedDate] = [];
-            }
-            newEvents[normalizedDate]!.addAll(sessionsForDay);
-          }
-        }
-        currentDate = currentDate.add(const Duration(days: 7));
-      }
-      return newEvents;
-    });
-
-// Helper privado para mapear días (puedes moverlo si lo usas en otro lado)
-String _mapWeekdayToString(int weekday) {
+// Helpers
+DayOfWeek _weekdayToEnum(int weekday) {
+  // DateTime.weekday: 1=Mon ... 7=Sun
   switch (weekday) {
-    case 1:
-      return 'lunes';
-    case 2:
-      return 'martes';
-    case 3:
-      return 'miércoles';
-    case 4:
-      return 'jueves';
-    case 5:
-      return 'viernes';
-    case 6:
-      return 'sábado';
-    case 7:
-      return 'domingo';
+    case DateTime.monday:
+      return DayOfWeek.mon;
+    case DateTime.tuesday:
+      return DayOfWeek.tue;
+    case DateTime.wednesday:
+      return DayOfWeek.wed;
+    case DateTime.thursday:
+      return DayOfWeek.thu;
+    case DateTime.friday:
+      return DayOfWeek.fri;
+    case DateTime.saturday:
+      return DayOfWeek.sat;
+    case DateTime.sunday:
     default:
-      return '';
+      return DayOfWeek.sun;
   }
 }
