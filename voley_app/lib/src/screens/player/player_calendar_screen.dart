@@ -124,75 +124,24 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
 
                     return Column(
                       children: [
-                        _buildTopBar(theme, programs, selectedProgram),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 250),
-                                  child: TodaySessionHeroCard(
-                                    key: ValueKey(
-                                      selectedDate.toIso8601String(),
-                                    ),
-                                    date: selectedDate,
-                                    session: selectedEvents.isNotEmpty
-                                        ? selectedEvents.first
-                                        : null,
-                                    completedLog: selectedLog,
-                                    onStart: selectedEvents.isNotEmpty
-                                        ? () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) =>
-                                                    WorkoutSessionScreen(
-                                                      session:
-                                                          selectedEvents.first,
-                                                    ),
-                                              ),
-                                            );
-                                          }
-                                        : null,
-                                    onViewLog:
-                                        selectedEvents.isNotEmpty &&
-                                            selectedLog != null
-                                        ? () => _showLogBottomSheet(
-                                            context,
-                                            theme,
-                                            selectedEvents.first,
-                                            selectedLog,
-                                          )
-                                        : null,
-                                    isToday: isTodaySelected,
-                                    sessionVisuals: selectedEvents.isNotEmpty
-                                        ? _resolveSessionVisuals(
-                                            selectedEvents.first,
-                                            theme,
-                                          )
-                                        : null,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              _GoToTodayButton(
-                                isTodaySelected: isTodaySelected,
-                                onTap: () {
-                                  final now = DateTime.now();
-                                  setState(() {
-                                    _focusedDay = now;
-                                    _selectedDay = DateTime(
-                                      now.year,
-                                      now.month,
-                                      now.day,
-                                    );
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
+                        _buildTopBar(
+                          theme,
+                          programs,
+                          selectedProgram,
+                          isTodaySelected: isTodaySelected,
+                          onGoToToday: () {
+                            final now = DateTime.now();
+                            setState(() {
+                              _focusedDay = now;
+                              _selectedDay = DateTime(
+                                now.year,
+                                now.month,
+                                now.day,
+                              );
+                            });
+                          },
                         ),
+
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8.0),
                           child: _buildWeekCalendar(
@@ -213,14 +162,17 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
                             duration: const Duration(milliseconds: 300),
                             switchInCurve: Curves.easeOutCubic,
                             switchOutCurve: Curves.easeInCubic,
-                            child: _buildEventList(
-                              context,
-                              theme,
-                              historyList,
-                              selectedEvents,
-                              selectedDate,
-                              key: ValueKey(
-                                'event-list-${selectedDate.toIso8601String()}',
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: _buildEventList(
+                                context,
+                                theme,
+                                historyList,
+                                selectedEvents,
+                                selectedDate,
+                                key: ValueKey(
+                                  'event-list-${selectedDate.toIso8601String()}',
+                                ),
                               ),
                             ),
                           ),
@@ -241,83 +193,166 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
   Widget _buildTopBar(
     ThemeData theme,
     List<Program> programs,
-    Program currentSelectedProgram,
-  ) {
+    Program currentSelectedProgram, {
+    required bool isTodaySelected,
+    required VoidCallback onGoToToday,
+  }) {
     final today = DateTime.now();
-    final todayLabel =
-        '${today.day.toString().padLeft(2, '0')}/${today.month.toString().padLeft(2, '0')}';
+    final weekdayNames = [
+      'Lunes',
+      'Martes',
+      'Miércoles',
+      'Jueves',
+      'Viernes',
+      'Sábado',
+      'Domingo',
+    ];
+    final monthNames = [
+      'ene',
+      'feb',
+      'mar',
+      'abr',
+      'may',
+      'jun',
+      'jul',
+      'ago',
+      'sep',
+      'oct',
+      'nov',
+      'dic',
+    ];
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+    final dayName = weekdayNames[today.weekday - 1];
+    final dateLabel =
+        '${today.day.toString().padLeft(2, '0')} ${monthNames[today.month - 1]}';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         children: [
-          // Info hoy
+          // Bloque de fecha "hoy"
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  dayName,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  dateLabel,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    'Hoy',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Selector de programa
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Programa actual',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceVariant.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<Program>(
+                      value: currentSelectedProgram,
+                      isDense: true,
+                      isExpanded: true,
+                      borderRadius: BorderRadius.circular(16),
+                      icon: Icon(
+                        Icons.expand_more_rounded,
+                        size: 22,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      style: theme.textTheme.bodyMedium,
+                      items: programs.map((program) {
+                        return DropdownMenuItem<Program>(
+                          value: program,
+                          child: Text(
+                            program.title,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (Program? newProgram) {
+                        if (newProgram != null) {
+                          ref.read(selectedProgramProvider.notifier).state =
+                              newProgram;
+
+                          // Al cambiar programa, volvemos a hoy
+                          onGoToToday();
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Botón Ir a hoy (nuevo lugar)
           Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Hoy',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              IconButton.filledTonal(
+                onPressed: isTodaySelected ? null : onGoToToday,
+                icon: const Icon(Icons.calendar_today_rounded, size: 18),
+                style: IconButton.styleFrom(
+                  padding: const EdgeInsets.all(10),
+                  backgroundColor: isTodaySelected
+                      ? theme.colorScheme.surfaceVariant
+                      : theme.colorScheme.primary.withOpacity(0.14),
                 ),
               ),
               const SizedBox(height: 2),
               Text(
-                todayLabel,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+                'Hoy',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
-          ),
-          const SizedBox(width: 12),
-          // Selector de programa expandible, para evitar overflow en pantallas pequeñas
-          Expanded(
-            child: DropdownButtonFormField<Program>(
-              value: currentSelectedProgram,
-              isDense: true,
-              isExpanded: true,
-              items: programs.map((program) {
-                return DropdownMenuItem<Program>(
-                  value: program,
-                  child: Text(program.title, overflow: TextOverflow.ellipsis),
-                );
-              }).toList(),
-              onChanged: (Program? newProgram) {
-                if (newProgram != null) {
-                  ref.read(selectedProgramProvider.notifier).state = newProgram;
-
-                  setState(() {
-                    _focusedDay = DateTime.now();
-                    _selectedDay = DateTime(
-                      _focusedDay.year,
-                      _focusedDay.month,
-                      _focusedDay.day,
-                    );
-                  });
-                }
-              },
-              decoration: InputDecoration(
-                isDense: true,
-                labelText: 'Programa',
-                labelStyle: theme.textTheme.bodySmall,
-                filled: true,
-                fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.4),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 8.0,
-                  horizontal: 12.0,
-                ),
-              ),
-              icon: Icon(
-                Icons.expand_more,
-                size: 20,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
           ),
         ],
       ),
@@ -480,231 +515,77 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
     ThemeData theme,
     List<SessionLog> historyList,
     List<TrainingSession> selectedEvents,
-    DateTime selectedDate,
-    {Key? key}
-  ) {
-    // Día sin sesiones
+    DateTime selectedDate, {
+    Key? key,
+  }) {
+    // --- Día sin sesiones ---
     if (selectedEvents.isEmpty) {
-      return KeyedSubtree(
-        key: key,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.coffee_outlined,
-                  size: 60,
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.coffee_outlined,
+                size: 60,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Día de descanso',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'No tienes sesiones planificadas para este día.',
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  'Día de descanso',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'No tienes sesiones planificadas para este día.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       );
     }
 
-    // Hay al menos una sesión: mostramos un pequeño resumen + lista
-    final bool anyCompletedForDay = selectedEvents.any((session) {
-      return historyList.any((log) => log.sessionId == session.id);
-    });
-
-    final selectedDateLabel =
-        '${selectedDate.day.toString().padLeft(2, '0')}/${selectedDate.month.toString().padLeft(2, '0')}';
-
+    // --- Hay sesión: solo hero ---
+    final session = selectedEvents.first;
     final isToday = isSameDay(selectedDate, DateTime.now());
+    final log = historyList.firstWhereOrNull((l) => l.sessionId == session.id);
+    final visuals = _resolveSessionVisuals(session, theme);
 
-    final sessionVisuals = _resolveSessionVisuals(selectedEvents.first, theme);
-
-    final statusLabel = anyCompletedForDay
-        ? 'Sesión completada'
-        : 'Sesión planificada';
-
-    final statusIcon = anyCompletedForDay
-        ? Icons.check_circle_rounded
-        : Icons.flash_on;
-
-    final statusColor = anyCompletedForDay
-        ? theme.colorScheme.primary
-        : theme.colorScheme.secondary;
-
-    return KeyedSubtree(
-      key: key,
-      child: Column(
-        children: [
-          // Resumen del día seleccionado
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: isToday
-                    ? theme.colorScheme.primary.withOpacity(0.1)
-                    : theme.colorScheme.surfaceVariant.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isToday
-                      ? theme.colorScheme.primary.withOpacity(0.6)
-                      : Colors.transparent,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    statusIcon,
-                    color: statusColor,
-                    size: 22,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isToday
-                              ? 'Hoy • $selectedDateLabel'
-                              : 'Día $selectedDateLabel',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${sessionVisuals.label} • $statusLabel',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            itemCount: selectedEvents.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final session = selectedEvents[index];
-              final visuals = _resolveSessionVisuals(session, theme);
-
-              final SessionLog? completedLog = historyList.firstWhereOrNull(
-                (log) => log.sessionId == session.id,
-              );
-              final bool isCompleted = completedLog != null;
-
-              if (isCompleted) {
-                return _CompletedSessionCard(
-                  session: session,
-                  visuals: visuals,
-                  log: completedLog!,
-                  onTap: () => _showLogBottomSheet(
-                    context,
-                    theme,
-                    session,
-                    completedLog,
-                  ),
-                );
-              } else {
-                return _PlannedSessionCard(
-                  session: session,
-                  theme: theme,
-                  visuals: visuals,
-                  onTap: () {
+    return Column(
+      mainAxisSize: MainAxisSize.min, // 👈 CLAVE PARA QUE NO CREZCA
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: TodaySessionHeroCard(
+            key: ValueKey('hero-${selectedDate.toIso8601String()}'),
+            date: selectedDate,
+            session: session,
+            completedLog: log,
+            isToday: isToday,
+            sessionVisuals: visuals,
+            onStart: log == null
+                ? () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            WorkoutSessionScreen(session: session),
+                        builder: (_) => WorkoutSessionScreen(session: session),
                       ),
                     );
-                  },
-                );
-              }
-            },
+                  }
+                : null,
+            onViewLog: log != null
+                ? () => _showLogBottomSheet(context, theme, session, log!)
+                : null,
           ),
         ),
       ],
-    ));
-  }
-
-  // ---------- SECCIÓN CHIPS (se usa en el resumen largo, la dejo por si la quieres reutilizar) ----------
-  Widget _buildSectionChips(
-    ThemeData theme,
-    String title,
-    List<WorkoutExercise> exercises,
-  ) {
-    if (exercises.isEmpty) return const SizedBox.shrink();
-
-    final visible = exercises.take(3).toList();
-    final remaining = exercises.length - visible.length;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: [
-              ...visible.map(
-                (e) => Chip(
-                  label: Text(e.name),
-                  backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(
-                    0.4,
-                  ),
-                  labelStyle: theme.textTheme.bodySmall,
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-              if (remaining > 0)
-                Chip(
-                  label: Text('+$remaining más'),
-                  backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(
-                    0.2,
-                  ),
-                  labelStyle: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 

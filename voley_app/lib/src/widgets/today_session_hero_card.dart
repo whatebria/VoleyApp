@@ -87,26 +87,8 @@ class TodaySessionHeroCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    if (!isToday)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.onPrimary.withOpacity(0.14),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'Día seleccionado',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onPrimary,
-                          ),
-                        ),
-                      ),
-                    if (!isToday) const SizedBox(width: 6),
                     Text(
-                      '${isToday ? 'Hoy • ' : ''}Día $dateLabel',
+                      '${isToday ? 'Hoy • ' : ''} $dateLabel',
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: theme.colorScheme.onPrimary.withOpacity(0.9),
                       ),
@@ -177,36 +159,104 @@ class _SessionDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final focusExercise = _firstExercise(session.trainingExercises);
+    // Tomamos todos los ejercicios “reales” de la sesión
+    // Preferimos trainingExercises, pero si está vacío,
+    // podemos caer en allExercises si tu modelo lo tiene.
+    final List<WorkoutExercise> allExercises = session.trainingExercises.isNotEmpty
+        ? session.trainingExercises
+        : (session.allExercises); // si no existe allExercises, quita esto y deja solo trainingExercises
+
+    final int total = allExercises.length;
+    final List<WorkoutExercise> preview = allExercises.take(3).toList();
+
+    final String? focusExercise = _firstExerciseName(allExercises);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Línea de resumen principal
         Text(
-          '${session.totalExercises} ejercicios planificados',
+          '$total ejercicios planificados',
           style: theme.textTheme.bodyLarge?.copyWith(
             color: theme.colorScheme.onPrimary,
             fontWeight: FontWeight.w700,
           ),
         ),
-        if (focusExercise != null) ...[
-          const SizedBox(height: 4),
+        if (preview.isNotEmpty) ...[
+          const SizedBox(height: 8),
           Text(
-            'Primer foco: $focusExercise',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onPrimary,
+            'Hoy trabajas:',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onPrimary.withOpacity(0.9),
+              fontWeight: FontWeight.w600,
             ),
+          ),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              // Chips con algunos ejercicios
+              ...preview.map((ex) {
+                return _ExercisePill(
+                  label: ex.name,
+                  theme: theme,
+                );
+              }),
+              if (total > preview.length)
+                _ExercisePill(
+                  label: '+${total - preview.length} más',
+                  theme: theme,
+                  isMoreChip: true,
+                ),
+            ],
           ),
         ],
       ],
     );
   }
 
-  String? _firstExercise(List<WorkoutExercise> exercises) {
+  String? _firstExerciseName(List<WorkoutExercise> exercises) {
     if (exercises.isEmpty) return null;
-    return exercises.first.name.isNotEmpty ? exercises.first.name : null;
+    final first = exercises.first;
+    if (first.name.trim().isEmpty) return null;
+    return first.name;
   }
 }
+
+// Pequeño pill reutilizable para mostrar ejercicios
+class _ExercisePill extends StatelessWidget {
+  const _ExercisePill({
+    required this.label,
+    required this.theme,
+    this.isMoreChip = false,
+  });
+
+  final String label;
+  final ThemeData theme;
+  final bool isMoreChip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.onPrimary.withOpacity(isMoreChip ? 0.12 : 0.18),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: theme.colorScheme.onPrimary,
+          fontWeight: isMoreChip ? FontWeight.w600 : FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
 
 class _StatusChip extends StatelessWidget {
   const _StatusChip({
