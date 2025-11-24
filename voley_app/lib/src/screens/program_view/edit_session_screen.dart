@@ -76,9 +76,6 @@ String _formatPrescriptionForEdit(Intensity p) {
   }
 }
 
-
-
-
 /// Nueva pantalla para editar una sesión (nombre y lista de ejercicios).
 class EditSessionScreen extends ConsumerStatefulWidget {
   final TrainingSession session;
@@ -101,28 +98,13 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
   late DayOfWeek _editableDay;
 
   @override
-  @override
   void initState() {
     super.initState();
+    _sessionNameCtrl = TextEditingController(
+      text: _dayLabel(widget.session.day),
+    );
     _editableDay = widget.session.day;
     _exercises = List.of(widget.session.exercises);
-
-    DropdownButtonFormField<DayOfWeek>(
-      initialValue: _editableDay,
-      decoration: const InputDecoration(labelText: 'Día de la semana'),
-      items: DayOfWeek.values
-          .map((d) => DropdownMenuItem(value: d, child: Text(_dayLabel(d))))
-          .toList(),
-      onChanged: (v) => setState(() => _editableDay = v ?? _editableDay),
-    );
-
-    // Al guardar:
-    final updatedSession = widget.session.copyWith(
-      day: _editableDay, // ✅ guarda enum
-      exercises: _exercises,
-    );
-
-    _exercises = List.from(widget.session.exercises);
   }
 
   @override
@@ -170,7 +152,6 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
         _exercises[index] = updatedExercise;
       });
     }
-
   }
 
   /// Guarda la sesión actualizada y la devuelve a la pantalla anterior
