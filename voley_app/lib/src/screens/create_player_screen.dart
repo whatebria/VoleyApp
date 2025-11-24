@@ -10,6 +10,7 @@ import 'package:voley_app/src/models/player_profile/tournament.dart';
 import 'package:voley_app/src/models/player_profile/player_event.dart';
 import 'package:voley_app/src/models/player_profile/form_peak.dart';
 import 'package:voley_app/src/models/player_profile/test_score.dart';
+import 'package:voley_app/src/screens/forms/player_form_screens.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import 'package:voley_app/src/models/shared/day_of_week.dart';
@@ -238,133 +239,25 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
   }
 
   Future<void> _showAddTournamentDialog() async {
-    final nameCtrl = TextEditingController();
-    DateTime selectedDate = DateTime.now();
-    final formKey = GlobalKey<FormState>();
+    final result = await Navigator.push<Tournament>(
+      context,
+      MaterialPageRoute(builder: (_) => const TournamentFormScreen()),
 
-    final result = await showDialog<Tournament>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Añadir Torneo'),
-              content: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: nameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Nombre del Torneo *',
-                        prefixIcon: Icon(Icons.emoji_events),
-                        helperText: 'Ej: Copa Nacional 2024',
-                      ),
-                      validator: (v) => (v?.isEmpty ?? true)
-                          ? 'El nombre es requerido'
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.calendar_today),
-                      title: const Text('Fecha del Torneo'),
-                      subtitle: Text(
-                        DateFormat('dd/MM/yyyy').format(selectedDate),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      trailing: const Icon(Icons.edit),
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 365),
-                          ),
-                        );
-                        if (picked != null) {
-                          setDialogState(() => selectedDate = picked);
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () =>
-                      Navigator.of(context, rootNavigator: true).maybePop(),
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (formKey.currentState?.validate() ?? false) {
-                      final tournament = Tournament(
-                        name: nameCtrl.text.trim(),
-                        date: selectedDate,
-                      );
-                      Navigator.of(
-                        context,
-                        rootNavigator: true,
-                      ).pop(tournament);
-                    }
-                  },
-                  child: const Text('Añadir'),
-                ),
-              ],
-            );
-          },
-        );
-      },
     );
 
     if (result != null) {
       setState(() => _selectedTournaments.add(result));
     }
-    nameCtrl.dispose();
   }
 
   // --- CAMBIO: _showAddGoalDialog ahora devuelve un objeto Goal ---
   Future<void> _showAddGoalDialog() async {
     goalCtrl.clear();
-    final result = await showDialog<Goal>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Agregar Objetivo'),
-          content: TextField(
-            controller: goalCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Objetivo',
-              helperText: 'Ej: Mejorar salto vertical',
-            ),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(context, rootNavigator: true).maybePop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (goalCtrl.text.trim().isNotEmpty) {
-                  Navigator.of(context, rootNavigator: true).pop(
-                    Goal(
-                      id: uuid.v4(),
-                      description: goalCtrl.text.trim(),
-                      isCompleted: false, // Por defecto no está completado
-                    ),
-                  );
-                }
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
-        );
-      },
+     final result = await Navigator.push<Goal>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GoalFormScreen(idBuilder: uuid.v4),
+      ),
     );
 
     if (result != null) {
@@ -374,362 +267,50 @@ class _CreatePlayerScreenState extends ConsumerState<CreatePlayerScreen> {
 
   // --- CAMBIO: _showAddTestDialog ahora devuelve un objeto TestScore ---
   Future<void> _showAddTestDialog() async {
-    final nameCtrl = TextEditingController();
-    final valueCtrl = TextEditingController();
-    final unitCtrl = TextEditingController(); // <-- AÑADIDO
-    final formKey = GlobalKey<FormState>();
-
-    final result = await showDialog<TestScore>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Registrar Test Inicial'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Nombre del Test *',
-                    helperText: 'Ej: Salto vertical',
-                  ),
-                  validator: (value) => (value == null || value.trim().isEmpty)
-                      ? 'Ingresa un nombre'
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: valueCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Resultado *',
-                    helperText: 'Ej: 45.5',
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Ingresa un resultado';
-                    }
-                    return double.tryParse(value.replaceAll(',', '.')) == null
-                        ? 'Ingresa un número válido'
-                        : null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                // --- AÑADIDO: Campo de Unidad ---
-                TextFormField(
-                  controller: unitCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Unidad *',
-                    helperText: 'Ej: cm, seg, kg',
-                  ),
-                  validator: (value) => (value == null || value.trim().isEmpty)
-                      ? 'Ingresa una unidad'
-                      : null,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(context, rootNavigator: true).maybePop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (formKey.currentState?.validate() ?? false) {
-                  final value = double.parse(
-                    valueCtrl.text.replaceAll(',', '.'),
-                  );
-                  Navigator.of(context, rootNavigator: true).pop(
-                    TestScore(
-                      // Crea un ID simple basado en el nombre
-                      testId: nameCtrl.text.trim().toLowerCase().replaceAll(
-                        ' ',
-                        '_',
-                      ),
-                      value: value,
-                      unit: unitCtrl.text.trim(),
-                    ),
-                  );
-                }
-              },
-              child: const Text('Añadir'),
-            ),
-          ],
-        );
-      },
+    final result = await Navigator.push<TestScore>(
+      context,
+      MaterialPageRoute(builder: (_) => const TestScoreFormScreen()),
     );
 
     if (result != null) {
       setState(() => _testScores.add(result));
     }
-    nameCtrl.dispose();
-    valueCtrl.dispose();
-    unitCtrl.dispose();
   }
 
   // --- AÑADIDO: Diálogo para Lesiones ---
   Future<void> _showAddInjuryDialog() async {
-    final descriptionCtrl = TextEditingController();
-    InjuryStatus status = InjuryStatus.active; // Por defecto
-    final formKey = GlobalKey<FormState>();
-
-    final result = await showDialog<Injury>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Registrar Lesión'),
-              content: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: descriptionCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Descripción de la Lesión *',
-                        helperText: 'Ej: Esguince de tobillo',
-                      ),
-                      autofocus: true,
-                      validator: (v) => (v?.isEmpty ?? true)
-                          ? 'La descripción es requerida'
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<InjuryStatus>(
-                      value: status,
-                      decoration: const InputDecoration(labelText: 'Estado'),
-                      items: InjuryStatus.values.map((s) {
-                        return DropdownMenuItem(
-                          value: s,
-                          child: Text(s.toString()),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setDialogState(() => status = val);
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () =>
-                      Navigator.of(context, rootNavigator: true).maybePop(),
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (formKey.currentState!.validate()) {
-                      Navigator.of(context, rootNavigator: true).pop(
-                        Injury(
-                          id: uuid.v4(),
-                          description: descriptionCtrl.text.trim(),
-                          status: status,
-                        ),
-                      );
-                    }
-                  },
-                  child: const Text('Guardar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+    final result = await Navigator.push<Injury>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => InjuryFormScreen(idBuilder: uuid.v4),
+      ),
     );
 
     if (result != null) {
       setState(() => selectedInjuries.add(result));
     }
-    descriptionCtrl.dispose();
   }
 
   Future<void> _showAddEventDialog() async {
-    // Asegúrate de tener este helper en la clase (ya lo mostraste arriba)
-    // String _eventTypeLabel(PlayerEventType t) { ... }
-
-    PlayerEventType selectedType = PlayerEventType.league; // ✅ enum, no String
-    DateTime selectedDate = DateTime.now();
-    final descriptionCtrl = TextEditingController();
-
-    final result = await showDialog<PlayerEvent>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Agregar Fecha Clave'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // ✅ Dropdown de enum
-                  DropdownButtonFormField<PlayerEventType>(
-                    value: selectedType,
-                    decoration: const InputDecoration(
-                      labelText: 'Tipo de evento',
-                    ),
-                    items: PlayerEventType.values
-                        .map(
-                          (t) => DropdownMenuItem<PlayerEventType>(
-                            value: t,
-                            child: Text(_eventTypeLabel(t)),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setDialogState(() => selectedType = value);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.calendar_today),
-                    title: const Text('Fecha'),
-                    subtitle: Text(
-                      DateFormat('dd/MM/yyyy').format(selectedDate),
-                    ),
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate,
-                        firstDate: DateTime.now().subtract(
-                          const Duration(days: 365),
-                        ),
-                        lastDate: DateTime.now().add(const Duration(days: 730)),
-                      );
-                      if (picked != null) {
-                        setDialogState(() => selectedDate = picked);
-                      }
-                    },
-                  ),
-                  TextField(
-                    controller: descriptionCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Descripción (opcional)',
-                      helperText: 'Ej: Liga Metropolitana',
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () =>
-                      Navigator.of(context, rootNavigator: true).maybePop(),
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context, rootNavigator: true).pop(
-                      PlayerEvent(
-                        type: selectedType, // ✅ enum
-                        date: selectedDate,
-                        description: descriptionCtrl.text.trim().isEmpty
-                            ? null
-                            : descriptionCtrl.text.trim(),
-                      ),
-                    );
-                  },
-                  child: const Text('Agregar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+    final result = await Navigator.push<PlayerEvent>(
+      context,
+      MaterialPageRoute(builder: (_) => const PlayerEventFormScreen()),
     );
 
     if (result != null) {
       setState(() => _keyEvents.add(result));
     }
-    descriptionCtrl.dispose();
   }
 
   Future<void> _showAddFormPeakDialog() async {
-    DateTime selectedDate = DateTime.now();
-    final noteCtrl = TextEditingController();
-
-    final result = await showDialog<FormPeak>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Registrar Pico de Forma'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.calendar_today),
-                    title: const Text('Fecha estimada'),
-                    subtitle: Text(
-                      DateFormat('dd/MM/yyyy').format(selectedDate),
-                    ),
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate,
-                        firstDate: DateTime.now().subtract(
-                          const Duration(days: 365),
-                        ),
-                        lastDate: DateTime.now().add(const Duration(days: 730)),
-                      );
-                      if (picked != null) {
-                        setDialogState(() => selectedDate = picked);
-                      }
-                    },
-                  ),
-                  TextField(
-                    controller: noteCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Nota (opcional)',
-                      helperText: 'Ej: Preparar pico para play-offs',
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () =>
-                      Navigator.of(context, rootNavigator: true).maybePop(),
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context, rootNavigator: true).pop(
-                      FormPeak(
-                        date: selectedDate,
-                        note: noteCtrl.text.trim().isEmpty
-                            ? null
-                            : noteCtrl.text.trim(),
-                      ),
-                    );
-                  },
-                  child: const Text('Guardar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+    final result = await Navigator.push<FormPeak>(
+      context,
+      MaterialPageRoute(builder: (_) => const FormPeakFormScreen()),
     );
 
     if (result != null) {
       setState(() => _formPeaks.add(result));
     }
-    noteCtrl.dispose();
   }
 
   // --- AÑADIDO: Helper para formatear IDs de tests ---

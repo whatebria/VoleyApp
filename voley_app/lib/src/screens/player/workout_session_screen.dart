@@ -7,13 +7,11 @@ import 'package:voley_app/src/models/program/logged_excercise.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
 import 'package:voley_app/src/models/program/session_log.dart';
-// --- AÑADIDO: Imports para los nuevos modelos ---
 import 'package:voley_app/src/models/program/intensity.dart';
 import 'package:collection/collection.dart'; // Para .firstWhereOrNull
-// --- FIN AÑADIDO ---
 import 'package:uuid/uuid.dart';
 import 'package:voley_app/src/models/shared/day_of_week.dart';
-
+import 'package:voley_app/src/screens/forms/player_form_screens.dart';
 
 final isSubmittingWorkoutProvider = StateProvider<bool>((ref) => false);
 const int DEFAULT_REST_TIME_SECONDS = 90; // 90 segundos de descanso
@@ -1065,40 +1063,12 @@ class __SetRowState extends State<_SetRow> {
 
   /// Helper para mostrar un NumberPad para entrada manual
   Future<double?> _showNumberPad(double initialValue) {
-    final controller = TextEditingController(text: initialValue.toString());
-    controller.selection = TextSelection(
-      baseOffset: 0,
-      extentOffset: controller.text.length,
-    );
+    return Navigator.push<double>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NumberPadScreen(initialValue: initialValue),
+      ),
 
-    return showDialog<double>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Editar Valor'),
-          content: TextField(
-            controller: controller,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(context, rootNavigator: true).maybePop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(
-                  context,
-                  rootNavigator: true,
-                ).pop(double.tryParse(controller.text));
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
     );
   }
 }
