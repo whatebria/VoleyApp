@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
+import 'package:intl/intl.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/mesocycle.dart';
 import 'package:voley_app/src/models/program/program.dart';
@@ -14,19 +15,23 @@ class ProgramDetailScreen extends ConsumerWidget {
   final PlayerProfile profile;
 
   const ProgramDetailScreen({
-    super.key, 
+    super.key,
     required this.program,
     required this.profile,
   });
 
   // --- AÑADIDO: Lógica para editar el título ---
-  Future<void> _showTitleDialog(BuildContext context, WidgetRef ref, Program currentProgram) async {
+  Future<void> _showTitleDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Program currentProgram,
+  ) async {
     final newTitle = await Navigator.push<String>(
       context,
       MaterialPageRoute(
-        builder: (_) => _ProgramTitleEditScreen(initialValue: currentProgram.title),
+        builder: (_) =>
+            _ProgramTitleEditScreen(initialValue: currentProgram.title),
       ),
-
     );
 
     if (newTitle != null && newTitle != currentProgram.title) {
@@ -34,7 +39,24 @@ class ProgramDetailScreen extends ConsumerWidget {
       ref.read(programEditorProvider.notifier).updateTitle(newTitle);
     }
   }
-  
+
+  Future<void> _pickStartDate(
+    BuildContext context,
+    WidgetRef ref,
+    Program currentProgram,
+  ) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: currentProgram.startDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365 * 5)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+    );
+
+    if (picked != null) {
+      ref.read(programEditorProvider.notifier).updateStartDate(picked);
+    }
+  }
+
   // --- AÑADIDO: Navegación para Añadir Bloque ---
   void _navigateToAddBlock(BuildContext context, WidgetRef ref) async {
     final newMeso = await Navigator.push<Mesocycle>(
@@ -51,7 +73,11 @@ class ProgramDetailScreen extends ConsumerWidget {
   }
 
   // --- AÑADIDO: Lógica de navegación para Editar Bloque ---
-  void _navigateToEditBlock(BuildContext context, WidgetRef ref, Mesocycle mesoToEdit) async {
+  void _navigateToEditBlock(
+    BuildContext context,
+    WidgetRef ref,
+    Mesocycle mesoToEdit,
+  ) async {
     final updatedMeso = await Navigator.push<Mesocycle>(
       context,
       MaterialPageRoute(
@@ -71,7 +97,7 @@ class ProgramDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    
+
     // --- CAMBIO: Observa el provider ---
     // Usamos `watch` para que la UI reaccione a los cambios.
     final programState = ref.watch(programEditorProvider);
@@ -81,7 +107,8 @@ class ProgramDetailScreen extends ConsumerWidget {
     // lo inicializamos con el programa que nos pasaron.
     // Usamos un PostFrameCallback para no modificar el estado durante el build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (ref.read(programEditorProvider) == null || ref.read(programEditorProvider)!.id != program.id) {
+      if (ref.read(programEditorProvider) == null ||
+          ref.read(programEditorProvider)!.id != program.id) {
         ref.read(programEditorProvider.notifier).init(program, profile.id);
       }
     });
@@ -106,63 +133,38 @@ class ProgramDetailScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: ListView.builder(
+      body: ListView(
         padding: const EdgeInsets.all(16.0),
-        // --- CAMBIO: Lista reactiva ---
-        itemCount: programState.mesocycles.length,
-        itemBuilder: (context, index) {
-          final mesocycle = programState.mesocycles[index];
-          
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12.0),
-            color: theme.colorScheme.surface, // grisPro
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            clipBehavior: Clip.antiAlias,
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
-              leading: Icon(Icons.timeline, color: theme.colorScheme.secondary, size: 32), // azulPro
-              title: Text(
-                mesocycle.name,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+        children: [
+          _StartDateTile(
+            formattedDate: DateFormat(
+              'dd/MM/yyyy',
+            ).format(programState.startDate),
+            onEdit: () => _pickStartDate(context, ref, programState),
+          ),
+          const SizedBox(height: 12),
+          ...programState.mesocycles.map(
+            (mesocycle) => _MesocycleCard(
+              mesocycle: mesocycle,
+              profile: profile,
+              onEdit: () => _navigateToEditBlock(context, ref, mesocycle),
+              onDelete: () => ref
+                  .read(programEditorProvider.notifier)
+                  .deleteBlock(mesocycle),
+            ),
+          ),
+          if (programState.mesocycles.isEmpty)
+            Card(
+              color: theme.colorScheme.surface,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'Aún no hay bloques en este programa.',
+                  style: theme.textTheme.bodyLarge,
                 ),
               ),
-              subtitle: Text('${mesocycle.weeks} Semanas • Foco: ${mesocycle.focus}'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // --- AÑADIDO: Botón de Editar Bloque ---
-                  IconButton(
-                    icon: Icon(Icons.edit, color: theme.colorScheme.secondary),
-                    tooltip: 'Editar Bloque',
-                    onPressed: () => _navigateToEditBlock(context, ref, mesocycle),
-                  ),
-                  // --- AÑADIDO: Botón de Eliminar Bloque ---
-                  IconButton(
-                    icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
-                    tooltip: 'Eliminar Bloque',
-                    onPressed: () {
-                      // Llama al provider para eliminar
-                      ref.read(programEditorProvider.notifier).deleteBlock(mesocycle);
-                    },
-                  ),
-                ],
-              ),
-              onTap: () {
-                // Navega a BlockDetailScreen (esta pantalla no necesita ser modificada)
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => BlockDetailScreen(
-                      mesocycle: mesocycle,
-                      profile: profile,
-                    ),
-                  ),
-                );
-              },
             ),
-          );
-        },
+        ],
       ),
       // --- AÑADIDO: Floating Action Button ---
       floatingActionButton: FloatingActionButton(
@@ -174,13 +176,106 @@ class ProgramDetailScreen extends ConsumerWidget {
   }
 }
 
+class _StartDateTile extends StatelessWidget {
+  final String formattedDate;
+  final VoidCallback onEdit;
+
+  const _StartDateTile({required this.formattedDate, required this.onEdit});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        leading: Icon(Icons.calendar_today, color: theme.colorScheme.secondary),
+        title: const Text('Fecha de inicio'),
+        subtitle: Text(formattedDate),
+        trailing: IconButton(
+          icon: const Icon(Icons.edit_calendar),
+          onPressed: onEdit,
+        ),
+      ),
+    );
+  }
+}
+
+class _MesocycleCard extends StatelessWidget {
+  final Mesocycle mesocycle;
+  final PlayerProfile profile;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _MesocycleCard({
+    required this.mesocycle,
+    required this.profile,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12.0),
+      color: theme.colorScheme.surface, // grisPro
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+        leading: Icon(Icons.timeline, color: theme.colorScheme.secondary, size: 32), // azulPro
+        title: Text(
+          mesocycle.name,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Text('${mesocycle.weeks} Semanas • Foco: ${mesocycle.focus}'),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // --- AÑADIDO: Botón de Editar Bloque ---
+            IconButton(
+              icon: Icon(Icons.edit, color: theme.colorScheme.secondary),
+              tooltip: 'Editar Bloque',
+              onPressed: onEdit,
+            ),
+            // --- AÑADIDO: Botón de Eliminar Bloque ---
+            IconButton(
+              icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
+              tooltip: 'Eliminar Bloque',
+              onPressed: onDelete,
+            ),
+          ],
+        ),
+        onTap: () {
+          // Navega a BlockDetailScreen (esta pantalla no necesita ser modificada)
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => BlockDetailScreen(
+                mesocycle: mesocycle,
+                profile: profile,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+
 class _ProgramTitleEditScreen extends StatefulWidget {
   final String initialValue;
 
   const _ProgramTitleEditScreen({required this.initialValue});
 
   @override
-  State<_ProgramTitleEditScreen> createState() => _ProgramTitleEditScreenState();
+  State<_ProgramTitleEditScreen> createState() =>
+      _ProgramTitleEditScreenState();
 }
 
 class _ProgramTitleEditScreenState extends State<_ProgramTitleEditScreen> {
@@ -212,7 +307,9 @@ class _ProgramTitleEditScreenState extends State<_ProgramTitleEditScreen> {
             TextField(
               controller: _titleCtrl,
               autofocus: true,
-              decoration: const InputDecoration(labelText: 'Nombre del Programa'),
+              decoration: const InputDecoration(
+                labelText: 'Nombre del Programa',
+              ),
             ),
             const Spacer(),
             Row(
@@ -224,7 +321,8 @@ class _ProgramTitleEditScreenState extends State<_ProgramTitleEditScreen> {
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton(
-                  onPressed: () => Navigator.pop(context, _titleCtrl.text.trim()),
+                  onPressed: () =>
+                      Navigator.pop(context, _titleCtrl.text.trim()),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.primary,
                   ),

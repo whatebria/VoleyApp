@@ -121,6 +121,7 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
                                       _selectedDay!.day,
                                     )
                                   : null;
+                                
 
                               final selectedEvents = (normalizedDay != null &&
                                       events.containsKey(normalizedDay))

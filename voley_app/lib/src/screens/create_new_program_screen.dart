@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
+import 'package:intl/intl.dart';
 import 'package:voley_app/src/models/program/program.dart';
 import 'package:voley_app/src/models/program/mesocycle.dart';
 import 'package:voley_app/src/models/program/microcycle.dart';
@@ -465,6 +466,41 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
     );
   }
 
+  Widget _buildStartDatePicker(ThemeData theme) {
+    final formattedDate = DateFormat('dd/MM/yyyy').format(_program.startDate);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: ListTile(
+        tileColor: theme.colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        leading: Icon(Icons.calendar_today, color: theme.colorScheme.secondary),
+        title: const Text('Fecha de inicio'),
+        subtitle: Text(formattedDate),
+        trailing: FilledButton.tonalIcon(
+          icon: const Icon(Icons.edit_calendar),
+          label: const Text('Cambiar'),
+          onPressed: _pickStartDate,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickStartDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _program.startDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365 * 5)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+    );
+
+    if (picked != null && mounted) {
+      setState(() {
+        _program = _program.copyWith(startDate: picked);
+      });
+    }
+  }
+
   // --- AÑADIDO: Widget para el header de los bloques ---
   Widget _buildBlockHeader(ThemeData theme) {
     return Padding(
@@ -526,6 +562,10 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
         children: [
           // 1. Editor de nombre de programa
           _buildProgramNameEditor(theme),
+
+          
+          // 1b. Selector de fecha de inicio
+          _buildStartDatePicker(theme),
           
           // 2. Header de Bloques
           _buildBlockHeader(theme),

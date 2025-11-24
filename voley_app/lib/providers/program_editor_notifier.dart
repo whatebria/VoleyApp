@@ -59,6 +59,14 @@ class ProgramEditorNotifier extends StateNotifier<Program?> {
     _saveState(); // Asynchronously save
   }
 
+    /// Updates the start date of the program.
+  void updateStartDate(DateTime newStartDate) {
+    if (state == null) return;
+    state = state!.copyWith(startDate: newStartDate);
+    _saveState();
+  }
+
+
   /// Adds a new Mesocycle (Bloque) to the program.
   void addBlock(Mesocycle newBlock) {
     if (state == null) return;
