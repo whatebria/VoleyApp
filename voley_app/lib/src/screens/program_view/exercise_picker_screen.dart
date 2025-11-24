@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:voley_app/src/screens/program_view/voley_app/lib/src/screens/program_view/workout_exercise_editor_screen.dart';
+import 'package:voley_app/src/screens/program_view/workout_exercise_editor_screen.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';

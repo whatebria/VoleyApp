@@ -5,7 +5,7 @@ import 'package:voley_app/src/models/bd/exercise.dart'; // <- V4 con enums (tu c
 import 'package:voley_app/src/models/player_profile/injury.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
-import 'package:voley_app/src/screens/program_view/voley_app/lib/src/screens/program_view/workout_exercise_editor_screen.dart';
+import 'package:voley_app/src/screens/program_view/workout_exercise_editor_screen.dart';
 
 /// Pantalla para buscar y seleccionar un ejercicio (compatible con Exercise V4/enums).
 class SearchableExerciseListScreen extends ConsumerStatefulWidget {

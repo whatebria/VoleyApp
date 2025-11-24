@@ -7,7 +7,7 @@ import 'package:voley_app/src/models/program/workout_exercise.dart';
 import 'package:voley_app/src/models/program/intensity.dart';
 import 'package:voley_app/src/screens/program_view/searchable_excersice_list_screen.dart';
 import 'package:voley_app/src/models/shared/day_of_week.dart';
-import 'package:voley_app/src/screens/program_view/voley_app/lib/src/screens/program_view/workout_exercise_editor_screen.dart';
+import 'package:voley_app/src/screens/program_view/workout_exercise_editor_screen.dart';
 
 // --- WIDGETS HELPER DE FORMATO ---
 // Se añaden al archivo para mantener la pantalla limpia.
