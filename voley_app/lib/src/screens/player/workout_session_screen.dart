@@ -112,15 +112,33 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
     });
   }
 
-  // --- ¡NUEVO MÉTODO! ---
+  String _sectionLabelForExercise(WorkoutExercise exercise) {
+    final id = exercise.exerciseId;
+
+    if (widget.session.warmUpExercises.any(
+      (element) => element.exerciseId == id,
+    )) {
+      return 'Movilidad / Calentamiento';
+    }
+    if (widget.session.trainingExercises.any(
+      (element) => element.exerciseId == id,
+    )) {
+      return 'Entrenamiento';
+    }
+    if (widget.session.coolDownExercises.any(
+      (element) => element.exerciseId == id,
+    )) {
+      return 'Enfriamiento';
+    }
+
+    return 'Ejercicio';
+  }
+
   /// Añade o quita segundos del temporizador de descanso actual
   void _adjustRestTime(int seconds) {
     setState(() {
-      // Usa clamp() para asegurar que el tiempo no sea negativo
       _restTimeRemaining = (_restTimeRemaining + seconds).clamp(0, 9999);
-
       if (_restTimeRemaining == 0) {
-        // Si el usuario lo baja a 0, cancela el timer
         _cancelRestTimer();
       }
     });
@@ -151,26 +169,22 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
       return;
     }
 
-    // --- CAMBIO: Convertir el Map a List<LoggedExercise> ---
+    // Convertir el Map a List<LoggedExercise>
     final List<LoggedExercise> finalLoggedExercises = [];
     _workoutData.forEach((exerciseId, sets) {
-      // Filtra solo los sets que fueron completados (no nulos)
       final loggedSets = sets.whereType<SetLog>().toList();
       if (loggedSets.isNotEmpty) {
-        // Añade un nuevo LoggedExercise a la lista
         finalLoggedExercises.add(
           LoggedExercise(exerciseId: exerciseId, sets: loggedSets),
         );
       }
     });
-    // --- FIN DEL CAMBIO ---
 
     final log = SessionLog(
       id: const Uuid().v4(),
       profileId: profile.id,
       sessionId: widget.session.id,
       completedAt: DateTime.now(),
-      // --- CAMBIO: Pasa la List<LoggedExercise> ---
       loggedExercises: finalLoggedExercises,
       rpe: (feedback['rpe'] as num?)?.toDouble() ?? 0.0,
       notes: feedback['notes'] as String,
@@ -190,7 +204,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
     }
   }
 
-  /// Diálogo de Feedback
+  /// Pantalla de Feedback final
   Future<Map<String, dynamic>?> _navigateToFeedbackScreen() async {
     return Navigator.push<Map<String, dynamic>>(
       context,
@@ -204,32 +218,105 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
     final isSubmitting = ref.watch(isSubmittingWorkoutProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(_dayLabel(widget.session.day))),
-      body: Column(
-        children: [
-          Expanded(
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: _exercises.length,
-              onPageChanged: (index) {
-                setState(() => _currentExerciseIndex = index);
-              },
-              itemBuilder: (context, index) {
-                final exercise = _exercises[index];
-                final loggedSets = _workoutData[exercise.exerciseId]!;
+      appBar: AppBar(
+        title: const Text('Sesión de entrenamiento'),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildSessionHeader(theme),
+            const SizedBox(height: 4),
+            Expanded(
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: _exercises.length,
+                onPageChanged: (index) {
+                  setState(() => _currentExerciseIndex = index);
+                },
+                itemBuilder: (context, index) {
+                  final exercise = _exercises[index];
+                  final loggedSets = _workoutData[exercise.exerciseId]!;
 
-                return _WorkoutExerciseCard(
-                  exercise: exercise,
-                  loggedSets: loggedSets,
-                  onSetLogged: (setIndex, log) {
-                    _onSetLogged(exercise.exerciseId, setIndex, log);
-                  },
-                );
-              },
+                  return _WorkoutExerciseCard(
+                    exercise: exercise,
+                    loggedSets: loggedSets,
+                    sectionLabel: _sectionLabelForExercise(exercise),
+                    onSetLogged: (setIndex, log) {
+                      _onSetLogged(exercise.exerciseId, setIndex, log);
+                    },
+                  );
+                },
+              ),
+            ),
+            _buildBottomNavBar(theme, isSubmitting),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Header superior con día, nombre de ejercicio actual y progreso
+  Widget _buildSessionHeader(ThemeData theme) {
+    if (_exercises.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            _dayLabel(widget.session.day),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
           ),
+        ),
+      );
+    }
 
-          _buildBottomNavBar(theme, isSubmitting),
+    final progress = (_currentExerciseIndex + 1) / _exercises.length;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color:
+                      theme.colorScheme.primaryContainer.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  'Sesión activa',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'Ejercicio ${_currentExerciseIndex + 1} / ${_exercises.length}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 6,
+            ),
+          ),
         ],
       ),
     );
@@ -248,7 +335,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
             horizontal: 16.0,
             vertical: 12.0,
           ).copyWith(bottom: MediaQuery.of(context).padding.bottom + 12.0),
-          color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+          color: theme.colorScheme.surfaceVariant.withOpacity(0.9),
           child: AnimatedSize(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
@@ -266,7 +353,11 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
     );
   }
 
-  Widget _buildRestControls(ThemeData theme, String timerText, bool isCompact) {
+  Widget _buildRestControls(
+    ThemeData theme,
+    String timerText,
+    bool isCompact,
+  ) {
     final skipButton = TextButton(
       onPressed: _cancelRestTimer,
       child: const Text('Saltar'),
@@ -291,6 +382,9 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
         side: BorderSide(color: theme.colorScheme.secondary.withOpacity(0.5)),
       ),
     );
+
+    final bool canGoNext =
+        _isLastSetRest && _currentExerciseIndex < _exercises.length - 1;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -344,6 +438,23 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
               ),
               increaseButton,
             ],
+          ),
+        ],
+        if (canGoNext) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.arrow_forward),
+              label: const Text('Siguiente ejercicio'),
+              onPressed: () {
+                _cancelRestTimer();
+                _pageController.nextPage(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeIn,
+                );
+              },
+            ),
           ),
         ],
       ],
@@ -430,6 +541,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
               }
             },
       style: ElevatedButton.styleFrom(
+        minimumSize: const Size(140, 44),
         backgroundColor: isLastPage
             ? theme.colorScheme.secondary
             : theme.colorScheme.primary,
@@ -451,19 +563,20 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
   }
 }
 
-/// --- Tarjeta de Ejercicio (ConsumerWidget para el Historial) ---
+/// --- Tarjeta de Ejercicio ---
 class _WorkoutExerciseCard extends ConsumerWidget {
   final WorkoutExercise exercise;
   final List<SetLog?> loggedSets;
   final Function(int, SetLog) onSetLogged;
+  final String sectionLabel;
 
   const _WorkoutExerciseCard({
     required this.exercise,
     required this.loggedSets,
     required this.onSetLogged,
+    required this.sectionLabel,
   });
 
-  // --- AÑADIDO: Helper para formatear reps ---
   String _formatReps(WorkoutExercise ex) {
     final min = ex.reps.min;
     final max = ex.reps.max;
@@ -471,17 +584,15 @@ class _WorkoutExerciseCard extends ConsumerWidget {
     return '$min-$max';
   }
 
-  // --- AÑADIDO: Helper para formatear intensidad ---
   String _formatPrescription(Intensity p) {
     switch (p.type) {
       case IntensityType.rpe:
         return 'RPE ${p.value.toInt()}';
-      case IntensityType.percent1rm: // <- sin guión bajo
+      case IntensityType.percent1rm:
         return '${(p.value * 100).toInt()}% 1RM';
       case IntensityType.loadkg:
-        final weight = p.value % 1 == 0
-            ? p.value.toInt()
-            : p.value.toStringAsFixed(1);
+        final weight =
+            p.value % 1 == 0 ? p.value.toInt() : p.value.toStringAsFixed(1);
         return '$weight kg';
       case IntensityType.rpeRange:
         return 'RPE ${p.value.toInt()}-${p.valueMax?.toInt()}';
@@ -490,7 +601,6 @@ class _WorkoutExerciseCard extends ConsumerWidget {
     }
   }
 
-  /// Widget para "Última vez"
   Widget _buildLastTime(BuildContext context, WidgetRef ref, ThemeData theme) {
     final historyAsync = ref.watch(sessionLogHistoryProvider);
 
@@ -506,26 +616,20 @@ class _WorkoutExerciseCard extends ConsumerWidget {
       data: (history) {
         String lastTimeText = "¡A por un récord!";
 
-        // --- CAMBIO: Lógica actualizada para List<LoggedExercise> ---
         for (final log in history) {
-          // 1. Busca el ejercicio logueado por su ID
           final loggedEx = log.loggedExercises.firstWhereOrNull(
             (ex) => ex.exerciseId == exercise.exerciseId,
           );
-
-          // 2. Si existe y tiene series, encuentra la mejor
           if (loggedEx != null) {
-            final sets = loggedEx.sets; // Es List<SetLog>
+            final sets = loggedEx.sets;
             if (sets.isNotEmpty) {
-              final bestSet = sets.reduce(
-                (a, b) => a.weight > b.weight ? a : b,
-              );
+              final bestSet =
+                  sets.reduce((a, b) => a.weight > b.weight ? a : b);
               lastTimeText = "${bestSet.weight} kg x ${bestSet.reps} reps";
-              break; // Rompe el bucle 'for'
+              break;
             }
           }
         }
-        // --- FIN DEL CAMBIO ---
 
         return Row(
           children: [
@@ -552,19 +656,12 @@ class _WorkoutExerciseCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
-    // --- CAMBIO: Formatea los nuevos valores ---
     final String repsLabel = _formatReps(exercise);
     final String intensityLabel = _formatPrescription(exercise.prescription);
 
-    // Determina los valores iniciales para _SetRow
     final bool isFixedLoad = exercise.prescription.type == IntensityType.loadkg;
-    final double initialWeight = isFixedLoad
-        ? exercise.prescription.value
-        : 0.0;
-
+    final double initialWeight = isFixedLoad ? exercise.prescription.value : 0.0;
     final int initialReps = exercise.reps.min;
-
-    // --- FIN DEL CAMBIO ---
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -574,38 +671,49 @@ class _WorkoutExerciseCard extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Chip(
+                label: Text(
+                  sectionLabel,
+                  style: TextStyle(
+                    color: theme.colorScheme.onSecondaryContainer,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                backgroundColor:
+                    theme.colorScheme.secondaryContainer.withOpacity(0.6),
+                side: BorderSide.none,
+              ),
+              const SizedBox(height: 8),
               Text(
                 exercise.name,
-                style: theme.textTheme.headlineMedium?.copyWith(
+                style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 8),
               Chip(
-                // --- CAMBIO: Usa los labels formateados ---
                 label: Text(
-                  'OBJETIVO: ${exercise.sets} series x $repsLabel @ $intensityLabel',
+                  'OBJETIVO: ${exercise.sets} x $repsLabel @ $intensityLabel',
                   style: TextStyle(
                     color: theme.colorScheme.onSecondaryContainer,
                   ),
                 ),
-                backgroundColor: theme.colorScheme.secondaryContainer
-                    .withOpacity(0.6),
+                backgroundColor:
+                    theme.colorScheme.secondaryContainer.withOpacity(0.6),
                 side: BorderSide.none,
               ),
               const SizedBox(height: 8),
               _buildLastTime(context, ref, theme),
               const Divider(height: 24),
-
               if (!isCompact) ...[
                 Row(
                   children: [
                     Expanded(
-                      flex: 1, // Columna angosta
+                      flex: 1,
                       child: Text('Set', style: theme.textTheme.bodySmall),
                     ),
                     Expanded(
-                      flex: 3, // Columna ancha
+                      flex: 3,
                       child: Center(
                         child: Text(
                           'Peso (kg)',
@@ -614,13 +722,13 @@ class _WorkoutExerciseCard extends ConsumerWidget {
                       ),
                     ),
                     Expanded(
-                      flex: 3, // Columna ancha
+                      flex: 3,
                       child: Center(
                         child: Text('Reps', style: theme.textTheme.bodySmall),
                       ),
                     ),
                     Expanded(
-                      flex: 1, // Columna angosta
+                      flex: 1,
                       child: Center(
                         child: Icon(
                           Icons.check,
@@ -634,7 +742,7 @@ class _WorkoutExerciseCard extends ConsumerWidget {
                 const SizedBox(height: 8),
               ] else ...[
                 Text(
-                  'Registra peso y repeticiones para cada set debajo.',
+                  'Registra peso y repeticiones para cada set.',
                   style: theme.textTheme.bodySmall,
                 ),
                 const SizedBox(height: 12),
@@ -647,12 +755,10 @@ class _WorkoutExerciseCard extends ConsumerWidget {
                   return _SetRow(
                     key: ValueKey('${exercise.exerciseId}_$setIndex'),
                     setIndex: setIndex,
-                    // --- CAMBIO: Pasa los nuevos props ---
                     targetRepsLabel: repsLabel,
                     targetIntensityLabel: intensityLabel,
                     initialReps: initialReps,
                     initialWeight: initialWeight,
-                    // --- FIN DEL CAMBIO ---
                     completedLog: loggedSets[setIndex],
                     isCompact: isCompact,
                     onSetLogged: (log) {
@@ -669,17 +775,12 @@ class _WorkoutExerciseCard extends ConsumerWidget {
   }
 }
 
-/// --- MEJORA DE UX: Fila de Set con Contadores Verticales (Amigables) ---
-/// --- MEJORA: Fila de Set ahora es StatefulWidget (no necesita Consumer) ---
 class _SetRow extends StatefulWidget {
   final int setIndex;
-  // --- CAMBIO: Propiedades de String actualizadas ---
   final String targetRepsLabel;
   final String targetIntensityLabel;
-  // --- AÑADIDO: Propiedades para pre-llenar ---
   final int initialReps;
   final double initialWeight;
-  // --- FIN DE CAMBIOS ---
   final SetLog? completedLog;
   final bool isCompact;
   final Function(SetLog) onSetLogged;
@@ -687,12 +788,10 @@ class _SetRow extends StatefulWidget {
   const _SetRow({
     Key? key,
     required this.setIndex,
-    // --- CAMBIO: Constructor actualizado ---
     required this.targetRepsLabel,
     required this.targetIntensityLabel,
     required this.initialReps,
     required this.initialWeight,
-    // --- FIN DE CAMBIOS ---
     this.completedLog,
     required this.isCompact,
     required this.onSetLogged,
@@ -719,7 +818,6 @@ class __SetRowState extends State<_SetRow> {
       _currentWeight = widget.completedLog!.weight;
       _currentReps = widget.completedLog!.reps;
     } else {
-      // --- CAMBIO: Usar los nuevos props para inicializar ---
       _currentWeight = widget.initialWeight;
       _currentReps = widget.initialReps;
     }
@@ -744,142 +842,146 @@ class __SetRowState extends State<_SetRow> {
     final theme = Theme.of(context);
     final isCompact = widget.isCompact;
 
+    final content = isCompact
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'Set ${widget.setIndex + 1}',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: _isCompleted
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.secondary,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: Icon(
+                      _isCompleted
+                          ? Icons.check_circle
+                          : Icons.check_circle_outline,
+                      color: theme.colorScheme.primary,
+                      size: 24,
+                    ),
+                    onPressed: _isCompleted ? _unlogSet : _logSet,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _buildLabeledStepper(
+                theme,
+                label: 'Peso (kg)',
+                child: _buildCompactStepper(
+                  theme,
+                  value: _currentWeight,
+                  increment: _weightIncrement,
+                  isEnabled: !_isCompleted,
+                  onChanged: (newValue) =>
+                      setState(() => _currentWeight = newValue),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildLabeledStepper(
+                theme,
+                label: 'Reps',
+                child: _buildCompactStepper(
+                  theme,
+                  value: _currentReps,
+                  increment: _repsIncrement,
+                  isEnabled: !_isCompleted,
+                  onChanged: (newValue) =>
+                      setState(() => _currentReps = newValue.toInt()),
+                ),
+              ),
+            ],
+          )
+        : Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                flex: 1,
+                child: Center(
+                  child: Text(
+                    '${widget.setIndex + 1}',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: _isCompleted
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.secondary,
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 3,
+                child: _buildCompactStepper(
+                  theme,
+                  value: _currentWeight,
+                  increment: _weightIncrement,
+                  isEnabled: !_isCompleted,
+                  onChanged: (newValue) =>
+                      setState(() => _currentWeight = newValue),
+                ),
+              ),
+              Expanded(
+                flex: 3,
+                child: _buildCompactStepper(
+                  theme,
+                  value: _currentReps,
+                  increment: _repsIncrement,
+                  isEnabled: !_isCompleted,
+                  onChanged: (newValue) =>
+                      setState(() => _currentReps = newValue.toInt()),
+                ),
+              ),
+              Expanded(
+                flex: 1,
+                child: Center(
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: Icon(
+                      _isCompleted
+                          ? Icons.check_circle
+                          : Icons.check_circle_outline,
+                      color: theme.colorScheme.primary,
+                      size: 28,
+                    ),
+                    onPressed: _isCompleted ? _unlogSet : _logSet,
+                  ),
+                ),
+              ),
+            ],
+          );
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      height: isCompact ? null : 60, // Altura adaptable en pantallas compactas
-      decoration: BoxDecoration(
-        color: _isCompleted
-            ? theme.colorScheme.primary.withOpacity(0.1)
-            : theme.colorScheme.surface,
+      child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _isCompleted
-              ? theme.colorScheme.primary
-              : theme.colorScheme.surfaceVariant,
-          width: 1,
+        onTap: _isCompleted ? _unlogSet : _logSet,
+        child: Container(
+          height: isCompact ? null : 60,
+          decoration: BoxDecoration(
+            color: _isCompleted
+                ? theme.colorScheme.primary.withOpacity(0.1)
+                : theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _isCompleted
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.surfaceVariant,
+              width: 1,
+            ),
+          ),
+          padding: isCompact
+              ? const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12.0)
+              : const EdgeInsets.symmetric(horizontal: 12.0),
+          child: content,
         ),
       ),
-      padding: isCompact
-          ? const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12.0)
-          : null,
-      child: isCompact
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'Set ${widget.setIndex + 1}',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: _isCompleted
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.secondary,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: Icon(
-                        _isCompleted
-                            ? Icons.check_circle
-                            : Icons.check_circle_outline,
-                        color: theme.colorScheme.primary,
-                        size: 24,
-                      ),
-                      onPressed: _isCompleted ? _unlogSet : _logSet,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildLabeledStepper(
-                  theme,
-                  label: 'Peso (kg)',
-                  child: _buildCompactStepper(
-                    theme,
-                    value: _currentWeight,
-                    increment: _weightIncrement,
-                    isEnabled: !_isCompleted,
-                    onChanged: (newValue) =>
-                        setState(() => _currentWeight = newValue),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _buildLabeledStepper(
-                  theme,
-                  label: 'Reps',
-                  child: _buildCompactStepper(
-                    theme,
-                    value: _currentReps,
-                    increment: _repsIncrement,
-                    isEnabled: !_isCompleted,
-                    onChanged: (newValue) =>
-                        setState(() => _currentReps = newValue.toInt()),
-                  ),
-                ),
-              ],
-            )
-          : Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // --- MEJORA DE UI/UX: Layout Responsivo con Expanded/Flex ---
-                Expanded(
-                  flex: 1, // Columna angosta
-                  child: Center(
-                    child: Text(
-                      '${widget.setIndex + 1}',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: _isCompleted
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.secondary,
-                      ),
-                    ),
-                  ),
-                ),
-
-                Expanded(
-                  flex: 3, // Columna ancha
-                  child: _buildCompactStepper(
-                    theme,
-                    value: _currentWeight,
-                    increment: _weightIncrement,
-                    isEnabled: !_isCompleted,
-                    onChanged: (newValue) =>
-                        setState(() => _currentWeight = newValue),
-                  ),
-                ),
-
-                Expanded(
-                  flex: 3, // Columna ancha
-                  child: _buildCompactStepper(
-                    theme,
-                    value: _currentReps,
-                    increment: _repsIncrement,
-                    isEnabled: !_isCompleted,
-                    onChanged: (newValue) =>
-                        setState(() => _currentReps = newValue.toInt()),
-                  ),
-                ),
-
-                Expanded(
-                  flex: 1, // Columna angosta
-                  child: Center(
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: Icon(
-                        _isCompleted
-                            ? Icons.check_circle
-                            : Icons.check_circle_outline,
-                        color: theme.colorScheme.primary, // Volt
-                        size: 28,
-                      ),
-                      onPressed: _isCompleted ? _unlogSet : _logSet,
-                    ),
-                  ),
-                ),
-              ],
-            ),
     );
   }
 
@@ -903,7 +1005,6 @@ class __SetRowState extends State<_SetRow> {
     );
   }
 
-  /// --- MEJORA DE UI/UX: Stepper Híbrido SÚPER COMPACTO ---
   Widget _buildCompactStepper(
     ThemeData theme, {
     required num value,
@@ -918,7 +1019,6 @@ class __SetRowState extends State<_SetRow> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // --- Botón de Restar ---
         IconButton(
           padding: EdgeInsets.zero,
           icon: Icon(
@@ -933,8 +1033,6 @@ class __SetRowState extends State<_SetRow> {
                   HapticFeedback.lightImpact();
                 },
         ),
-
-        // --- Valor (Botón para entrada manual) ---
         ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 60),
           child: TextButton(
@@ -944,7 +1042,8 @@ class __SetRowState extends State<_SetRow> {
             onPressed: !isEnabled
                 ? null
                 : () async {
-                    final newValue = await _showNumberPad(value.toDouble());
+                    final newValue =
+                        await _showNumberPad(value.toDouble());
                     if (newValue != null) {
                       onChanged(newValue);
                     }
@@ -963,8 +1062,6 @@ class __SetRowState extends State<_SetRow> {
             ),
           ),
         ),
-
-        // --- Botón de Sumar ---
         IconButton(
           padding: EdgeInsets.zero,
           icon: Icon(Icons.add, size: 20, color: theme.colorScheme.secondary),
@@ -979,7 +1076,6 @@ class __SetRowState extends State<_SetRow> {
     );
   }
 
-  /// Helper para mostrar un NumberPad para entrada manual
   Future<double?> _showNumberPad(double initialValue) {
     return Navigator.push<double>(
       context,
@@ -988,7 +1084,7 @@ class __SetRowState extends State<_SetRow> {
       ),
     );
   }
-  }
+}
 
 class _FeedbackScreen extends StatefulWidget {
   const _FeedbackScreen();
@@ -1061,13 +1157,10 @@ class _FeedbackScreenState extends State<_FeedbackScreen> {
                 const SizedBox(width: 12),
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.pop<Map<String, dynamic>>(
-                      context,
-                      {
-                        'rpe': _rpeValue.round(),
-                        'notes': _notesController.text.trim(),
-                      },
-                    );
+                    Navigator.pop<Map<String, dynamic>>(context, {
+                      'rpe': _rpeValue.round(),
+                      'notes': _notesController.text.trim(),
+                    });
                   },
                   child: const Text('Guardar y Terminar'),
                 ),

@@ -55,15 +55,7 @@ class HomeScreen extends ConsumerWidget {
             tooltip: 'Cerrar Sesión',
             onPressed: isLoggingOut ? null : () => _handleLogout(context, ref),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              await seedMobilityWarmupCooldownExercises();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Seeder ejecutado correctamente')),
-              );
-            },
-            child: const Text('Cargar ejercicios'),
-          ),
+
         ],
       ),
       // --- BODY MODIFICADO: Ahora es un ListView ---
