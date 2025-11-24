@@ -49,15 +49,9 @@ class TrainingSession {
       DayOfWeek.mon,
     ),
     load: (json['load'] as num?)?.toDouble() ?? 0,
-    warmUpExercises: ((json['warmUpExercises'] as List?) ?? [])
-        .whereType<Map<String, dynamic>>()
-        .map(WorkoutExercise.fromJson)
-        .toList(),
+    warmUpExercises: _parseExerciseList(json['warmUpExercises']),
     trainingExercises: _parseTrainingExercises(json),
-    coolDownExercises: ((json['coolDownExercises'] as List?) ?? [])
-        .whereType<Map<String, dynamic>>()
-        .map(WorkoutExercise.fromJson)
-        .toList(),
+    coolDownExercises: _parseExerciseList(json['coolDownExercises']),
   );
 
   TrainingSession copyWith({
@@ -110,6 +104,15 @@ List<WorkoutExercise> _parseTrainingExercises(Map<String, dynamic> json) {
 
   // Retrocompatibilidad con datos antiguos que guardaban todo en 'exercises'
   return ((json['exercises'] as List?) ?? [])
+      .whereType<Map<String, dynamic>>()
+      .map(WorkoutExercise.fromJson)
+      .toList();
+}
+
+List<WorkoutExercise> _parseExerciseList(dynamic value) {
+  if (value is! List) return const [];
+
+  return value
       .whereType<Map<String, dynamic>>()
       .map(WorkoutExercise.fromJson)
       .toList();

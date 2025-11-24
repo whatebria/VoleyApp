@@ -89,4 +89,4 @@ enum ContraindicationId { rodilla, tobillo, hombro, lumbar, impactoAlto, cardio 
 enum VolleyballPositionId { outsideHitter, middleBlocker, setter, libero, opposite }
 
 // Fases de temporada
-enum TrainingPhaseId { preSeason, inSeason, taper, offSeason, rehab }
+enum TrainingPhaseId { preSeason, inSeason, taper, offSeason, rehab, }

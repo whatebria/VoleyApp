@@ -57,7 +57,7 @@ class HomeScreen extends ConsumerWidget {
           ),
           ElevatedButton(
             onPressed: () async {
-              await seedGymExercises();
+              await seedMobilityWarmupCooldownExercises();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Seeder ejecutado correctamente')),
               );
