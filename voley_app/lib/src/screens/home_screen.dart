@@ -50,6 +50,7 @@ class HomeScreen extends ConsumerWidget {
             tooltip: 'Cerrar Sesión',
             onPressed: isLoggingOut ? null : () => _handleLogout(context, ref),
           ),
+          
         ],
       ),
       // --- BODY MODIFICADO: Ahora es un ListView ---
