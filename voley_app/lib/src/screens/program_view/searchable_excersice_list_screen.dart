@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
-import 'package:voley_app/src/models/bd/exercise.dart'; // <- V4 con enums (tu clase se llama Exercise)
+import 'package:voley_app/src/models/bd/exercise.dart';
 import 'package:voley_app/src/models/player_profile/injury.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
 import 'package:voley_app/src/screens/program_view/workout_exercise_editor_screen.dart';
+
+// 👇 Importa los enums para poder iterar sobre ellos en los filtros
+import 'package:voley_app/src/catalogos/enums.dart';
 
 /// Pantalla para buscar y seleccionar un ejercicio (compatible con Exercise V4/enums).
 class SearchableExerciseListScreen extends ConsumerStatefulWidget {
@@ -21,6 +24,18 @@ class _SearchableExerciseListScreenState
     extends ConsumerState<SearchableExerciseListScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+
+  // 🔎 Filtros simples por enums
+  LevelId? _filterLevel;
+  CategoryId? _filterCategory;
+  MovementPatternId? _filterPattern;
+  VolleyballTransferId? _filterVbTransfer;
+
+  bool get _hasFilters =>
+      _filterLevel != null ||
+      _filterCategory != null ||
+      _filterPattern != null ||
+      _filterVbTransfer != null;
 
   @override
   void initState() {
@@ -88,9 +103,8 @@ class _SearchableExerciseListScreenState
     }
 
     // Compara con las contraindicaciones por name del enum
-    final contras = ex.contraindicationIds
-        .map((c) => c.name.toLowerCase())
-        .toSet();
+    final contras =
+        ex.contraindicationIds.map((c) => c.name.toLowerCase()).toSet();
     // Si hay intersección, NO pasa
     return contras.intersection(normalizedInj).isEmpty;
   }
@@ -104,11 +118,150 @@ class _SearchableExerciseListScreenState
           exerciseId: exercise.id,
           exerciseName: exercise.name,
         ),
-      ));
+      ),
+    );
 
-      if (result != null && mounted) {
+    if (result != null && mounted) {
       Navigator.pop(context, result);
     }
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _filterLevel = null;
+      _filterCategory = null;
+      _filterPattern = null;
+      _filterVbTransfer = null;
+    });
+  }
+
+  Widget _buildFilters(ThemeData theme) {
+    final labelStyle = theme.textTheme.labelMedium;
+
+    return ExpansionTile(
+      title: Text(
+        _hasFilters ? 'Filtros ($_activeFiltersCount activos)' : 'Filtros',
+        style: theme.textTheme.titleMedium,
+      ),
+      subtitle: Text(
+        _hasFilters ? 'Toca "Limpiar" para volver a ver todo' : 'Sin filtros',
+        style: theme.textTheme.bodySmall
+            ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+      ),
+      childrenPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      children: [
+        // Nivel
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Nivel', style: labelStyle),
+        ),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 8,
+          children: LevelId.values.map((level) {
+            final selected = _filterLevel == level;
+            return ChoiceChip(
+              label: Text(_pretty(level.name)),
+              selected: selected,
+              onSelected: (_) {
+                setState(() {
+                  _filterLevel = selected ? null : level;
+                });
+              },
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+
+        // Categoría
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Categoría', style: labelStyle),
+        ),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 8,
+          children: CategoryId.values.map((cat) {
+            final selected = _filterCategory == cat;
+            return ChoiceChip(
+              label: Text(_pretty(cat.name)),
+              selected: selected,
+              onSelected: (_) {
+                setState(() {
+                  _filterCategory = selected ? null : cat;
+                });
+              },
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+
+        // Patrón de movimiento
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Patrón de movimiento', style: labelStyle),
+        ),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 8,
+          children: MovementPatternId.values.map((mp) {
+            final selected = _filterPattern == mp;
+            return ChoiceChip(
+              label: Text(_pretty(mp.name)),
+              selected: selected,
+              onSelected: (_) {
+                setState(() {
+                  _filterPattern = selected ? null : mp;
+                });
+              },
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+
+        // Transferencia al vóley
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Transferencia al vóley', style: labelStyle),
+        ),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 8,
+          children: VolleyballTransferId.values.map((vt) {
+            final selected = _filterVbTransfer == vt;
+            return ChoiceChip(
+              label: Text(_pretty(vt.name)),
+              selected: selected,
+              onSelected: (_) {
+                setState(() {
+                  _filterVbTransfer = selected ? null : vt;
+                });
+              },
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 8),
+
+        // Botón limpiar
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: _hasFilters ? _clearFilters : null,
+            icon: const Icon(Icons.filter_alt_off),
+            label: const Text('Limpiar filtros'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  int get _activeFiltersCount {
+    int count = 0;
+    if (_filterLevel != null) count++;
+    if (_filterCategory != null) count++;
+    if (_filterPattern != null) count++;
+    if (_filterVbTransfer != null) count++;
+    return count;
   }
 
   @override
@@ -140,6 +293,9 @@ class _SearchableExerciseListScreenState
       ),
       body: Column(
         children: [
+          // 🧠 Bloque de filtros de baja carga cognitiva
+          _buildFilters(theme),
+
           Expanded(
             child: exercisesAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -151,11 +307,26 @@ class _SearchableExerciseListScreenState
                     .map((i) => i.id) // asegúrate que Injury.id es String
                     .toSet();
 
-                // Filtrado por búsqueda + seguridad (lesiones/contraindicaciones)
+                // Filtrado por búsqueda + seguridad (lesiones/contraindicaciones) + filtros de usuario
                 final filteredList = allExercises.where((ex) {
                   final matchesSearch = _matchesSearch(ex, _searchQuery);
                   final safe = _passesInjurySafety(ex, activeInjuryIds);
-                  return matchesSearch && safe;
+
+                  final matchesLevel =
+                      _filterLevel == null || ex.levelId == _filterLevel;
+                  final matchesCategory =
+                      _filterCategory == null || ex.categoryId == _filterCategory;
+                  final matchesPattern = _filterPattern == null ||
+                      ex.movementPatternId == _filterPattern;
+                  final matchesTransfer = _filterVbTransfer == null ||
+                      ex.vbTransferIds.contains(_filterVbTransfer);
+
+                  return matchesSearch &&
+                      safe &&
+                      matchesLevel &&
+                      matchesCategory &&
+                      matchesPattern &&
+                      matchesTransfer;
                 }).toList();
 
                 if (filteredList.isEmpty) {

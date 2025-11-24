@@ -13,11 +13,11 @@ class ProgramExplorerScreen extends ConsumerStatefulWidget {
   const ProgramExplorerScreen({Key? key}) : super(key: key);
 
   @override
-  ConsumerState<ProgramExplorerScreen> createState() => _ProgramExplorerScreenState();
+  ConsumerState<ProgramExplorerScreen> createState() =>
+      _ProgramExplorerScreenState();
 }
 
 class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
-
   @override
   void initState() {
     super.initState();
@@ -31,32 +31,29 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
 
     final currentUser = ref.read(currentUserAppUserProvider).valueOrNull;
     if (currentUser == null) {
-      return; 
+      return;
     }
 
     final selectedPlayerCombo = ref.read(explorerSelectedPlayerProvider);
-    
+
     if (selectedPlayerCombo != null) {
       return;
     }
 
     if (currentUser.isCoach) {
       final playersAsync = ref.read(coachPlayersWithProfilesProvider);
-      
+
       playersAsync.whenData((players) {
         if (players.isNotEmpty) {
-          ref.read(explorerSelectedPlayerProvider.notifier).state = players.first;
+          ref.read(explorerSelectedPlayerProvider.notifier).state =
+              players.first;
         }
       });
-
     } else if (currentUser.isPlayer) {
       final playerProfile = ref.read(playerProfileProvider).valueOrNull;
 
       if (playerProfile != null) {
-        final playerCombo = PlayerWithProfile(
-          currentUser,
-          playerProfile,
-        );
+        final playerCombo = PlayerWithProfile(currentUser, playerProfile);
         ref.read(explorerSelectedPlayerProvider.notifier).state = playerCombo;
       }
     }
@@ -75,20 +72,43 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
   @override
   Widget build(BuildContext context) {
     // --- CAMBIO: Ya no se escucha 'selectedProgramProvider' aquí ---
-    // La auto-selección de programa se elimina, 
+    // La auto-selección de programa se elimina,
     // ya que ahora mostramos una lista.
     ref.listen<AsyncValue<List<Program>>>(explorerProgramsProvider, (_, __) {
       // Solo nos interesa que se refresque
     });
 
+    final currentUser = ref.watch(currentUserAppUserProvider).valueOrNull;
     final selectedPlayerCombo = ref.watch(explorerSelectedPlayerProvider);
     final selectedProfile = ref.watch(selectedPlayerProfileProvider);
+    final coachPlayersAsync = ref.watch(coachPlayersWithProfilesProvider);
     final programsAsync = ref.watch(explorerProgramsProvider);
-    
+
     return Scaffold(
       appBar: AppBar(title: const Text('Explorador de Programas')),
       body: selectedPlayerCombo == null
-          ? const Center(child: CircularProgressIndicator())
+          ? coachPlayersAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, s) => Center(child: Text('Error: $e')),
+              data: (players) {
+                if (players.isEmpty && currentUser?.isCoach == true) {
+                  return const Center(
+                    child: Text('No tienes jugadores asignados aún.'),
+                  );
+                }
+
+                if (players.isNotEmpty) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (ref.read(explorerSelectedPlayerProvider) == null) {
+                      ref.read(explorerSelectedPlayerProvider.notifier).state =
+                          players.first;
+                    }
+                  });
+                }
+
+                return const Center(child: CircularProgressIndicator());
+              },
+            )
           // --- CAMBIO: El body ahora llama a _buildProgramList ---
           : programsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -98,9 +118,9 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
                   return Center(
                     child: Text(
                       'Este jugador no tiene programas.',
-                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Theme.of(context).textTheme.bodySmall?.color,
-                       ),
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                      ),
                     ),
                   );
                 }
@@ -110,21 +130,21 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
 
       floatingActionButton: FloatingActionButton(
         tooltip: 'Crear Programa Manual',
-        child: const Icon(Icons.edit), 
+        child: const Icon(Icons.edit),
         onPressed: () {
-                final profile = selectedProfile;
-                if (profile != null) {
-                  _runManualEditor(context, profile);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Selecciona un jugador con un perfil de evaluación.',
-                      ),
-                    ),
-                  );
-                }
-              },
+          final profile = selectedProfile;
+          if (profile != null) {
+            _runManualEditor(context, profile);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Selecciona un jugador con un perfil de evaluación.',
+                ),
+              ),
+            );
+          }
+        },
       ),
     );
   }
@@ -132,7 +152,11 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
   // --- CAMBIO: _buildProgramSelector y _buildProgramDetails eliminados ---
 
   // --- AÑADIDO: Nueva función para construir la lista de Programas ---
-  Widget _buildProgramList(BuildContext context, List<Program> programs, PlayerProfile? profile) {
+  Widget _buildProgramList(
+    BuildContext context,
+    List<Program> programs,
+    PlayerProfile? profile,
+  ) {
     final theme = Theme.of(context);
 
     return ListView.builder(
@@ -140,15 +164,23 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
       itemCount: programs.length,
       itemBuilder: (context, index) {
         final program = programs[index];
-        final totalWeeks = program.mesocycles.fold<int>(0, (sum, meso) => sum + meso.weeks);
-        
+        final totalWeeks = program.mesocycles.fold<int>(
+          0,
+          (sum, meso) => sum + meso.weeks,
+        );
+
         return Card(
           margin: const EdgeInsets.only(bottom: 12.0),
           color: theme.colorScheme.surface, // grisPro
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           clipBehavior: Clip.antiAlias,
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 12.0,
+              horizontal: 16.0,
+            ),
             leading: CircleAvatar(
               backgroundColor: theme.colorScheme.primary, // voltNeon
               foregroundColor: theme.colorScheme.onPrimary, // negroEnfocado
@@ -156,18 +188,22 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
             ),
             title: Text(
               program.title,
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             subtitle: Text(
               '${program.mesocycles.length} bloques • $totalWeeks semanas totales\n'
-              'Inicia: ${DateFormat('dd/MM/yy').format(program.startDate)}'
+              'Inicia: ${DateFormat('dd/MM/yy').format(program.startDate)}',
             ),
             trailing: const Icon(Icons.chevron_right),
             isThreeLine: true,
             onTap: () {
               if (profile == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('No se pudo cargar el perfil del jugador.')),
+                  const SnackBar(
+                    content: Text('No se pudo cargar el perfil del jugador.'),
+                  ),
                 );
                 return;
               }
