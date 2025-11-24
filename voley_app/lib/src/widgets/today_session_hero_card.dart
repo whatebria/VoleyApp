@@ -4,6 +4,18 @@ import 'package:voley_app/src/models/program/session_log.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
 
+class SessionVisuals {
+  const SessionVisuals({
+    required this.icon,
+    required this.color,
+    required this.label,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String label;
+}
+
 class TodaySessionHeroCard extends StatelessWidget {
   const TodaySessionHeroCard({
     super.key,
@@ -12,6 +24,8 @@ class TodaySessionHeroCard extends StatelessWidget {
     required this.completedLog,
     required this.onStart,
     required this.onViewLog,
+    required this.isToday,
+    this.sessionVisuals,
   });
 
   final DateTime date;
@@ -19,6 +33,8 @@ class TodaySessionHeroCard extends StatelessWidget {
   final SessionLog? completedLog;
   final VoidCallback? onStart;
   final VoidCallback? onViewLog;
+  final bool isToday;
+  final SessionVisuals? sessionVisuals;
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +42,7 @@ class TodaySessionHeroCard extends StatelessWidget {
     final dateLabel = DateFormat('dd/MM').format(date);
     final hasSession = session != null;
     final isCompleted = completedLog != null;
+    final iconData = sessionVisuals?.icon ?? Icons.fitness_center_rounded;
 
     return Container(
       padding: const EdgeInsets.all(18.0),
@@ -61,25 +78,44 @@ class TodaySessionHeroCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Sesión de hoy',
+                  isToday ? 'Sesión de hoy' : 'Sesión seleccionada',
                   style: theme.textTheme.headlineSmall?.copyWith(
                     color: theme.colorScheme.onPrimary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  'Día $dateLabel',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onPrimary.withOpacity(0.9),
-                  ),
+                Row(
+                  children: [
+                    if (!isToday)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.onPrimary.withOpacity(0.14),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Día seleccionado',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onPrimary,
+                          ),
+                        ),
+                      ),
+                    if (!isToday) const SizedBox(width: 6),
+                    Text(
+                      '${isToday ? 'Hoy • ' : ''}Día $dateLabel',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.onPrimary.withOpacity(0.9),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 if (hasSession)
-                  _SessionDetails(
-                    session: session!,
-                    theme: theme,
-                  )
+                  _SessionDetails(session: session!, theme: theme)
                 else
                   Text(
                     'No tienes entrenamiento para hoy. Disfruta tu descanso 👟',
@@ -107,7 +143,9 @@ class TodaySessionHeroCard extends StatelessWidget {
                       elevation: 0,
                     ),
                     icon: Icon(
-                      isCompleted ? Icons.visibility_rounded : Icons.play_arrow_rounded,
+                      isCompleted
+                          ? Icons.visibility_rounded
+                          : Icons.play_arrow_rounded,
                     ),
                     label: Text(
                       hasSession
@@ -121,7 +159,7 @@ class TodaySessionHeroCard extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Icon(
-            hasSession ? Icons.fitness_center_rounded : Icons.coffee_rounded,
+            hasSession ? iconData : Icons.coffee_rounded,
             size: 42,
             color: theme.colorScheme.onPrimary,
           ),
@@ -132,10 +170,7 @@ class TodaySessionHeroCard extends StatelessWidget {
 }
 
 class _SessionDetails extends StatelessWidget {
-  const _SessionDetails({
-    required this.session,
-    required this.theme,
-  });
+  const _SessionDetails({required this.session, required this.theme});
 
   final TrainingSession session;
   final ThemeData theme;
@@ -189,22 +224,20 @@ class _StatusChip extends StatelessWidget {
     final label = !hasSession
         ? 'Descanso'
         : isCompleted
-            ? 'Completada'
-            : 'Planificada';
+        ? 'Completada'
+        : 'Planificada';
     final color = !hasSession
         ? theme.colorScheme.surfaceTint
         : isCompleted
-            ? theme.colorScheme.tertiary
-            : theme.colorScheme.onPrimary;
+        ? theme.colorScheme.tertiary
+        : theme.colorScheme.onPrimary;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: color.withOpacity(0.5),
-        ),
+        border: Border.all(color: color.withOpacity(0.5)),
       ),
       child: Text(
         label,

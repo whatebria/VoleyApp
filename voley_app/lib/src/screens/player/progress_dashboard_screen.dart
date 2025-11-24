@@ -25,7 +25,7 @@ class ProgressDashboardScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16.0),
         children: [
           // Tarjeta 1: El Héroe
-          _buildHeroCard(context, theme, 'Salto Vertical', '82.5 cm', '+1.5 cm'),
+          _buildHeroCard(context, theme, 'Salto Vertical', '42.5 cm', '+1.5 cm'),
           const SizedBox(height: 16),
           
           // Tarjeta 2: Adherencia

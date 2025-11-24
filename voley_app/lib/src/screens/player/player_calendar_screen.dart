@@ -104,53 +104,93 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
                           )
                         : null;
 
-                    final today = DateTime.now();
-                    final todaySessions = _getEventsForDay(today, events);
-                    final todayLog = todaySessions.isNotEmpty
+                    final selectedDate = normalizedDay ?? DateTime.now();
+
+                    final selectedEvents = _getEventsForDay(
+                      selectedDate,
+                      events,
+                    );
+
+                    final selectedLog = selectedEvents.isNotEmpty
                         ? historyList.firstWhereOrNull(
-                            (log) => log.sessionId == todaySessions.first.id,
+                            (log) => log.sessionId == selectedEvents.first.id,
                           )
                         : null;
 
-                    final selectedEvents =
-                        (normalizedDay != null &&
-                            events.containsKey(normalizedDay))
-                        ? events[normalizedDay]!
-                        : <TrainingSession>[];
+                    final isTodaySelected = isSameDay(
+                      selectedDate,
+                      DateTime.now(),
+                    );
 
                     return Column(
                       children: [
                         _buildTopBar(theme, programs, selectedProgram),
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                          child: TodaySessionHeroCard(
-                            date: DateTime(today.year, today.month, today.day),
-                            session: todaySessions.isNotEmpty
-                                ? todaySessions.first
-                                : null,
-                            completedLog: todayLog,
-                            onStart: todaySessions.isNotEmpty
-                                ? () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            WorkoutSessionScreen(
-                                              session: todaySessions.first,
-                                            ),
-                                      ),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 250),
+                                  child: TodaySessionHeroCard(
+                                    key: ValueKey(
+                                      selectedDate.toIso8601String(),
+                                    ),
+                                    date: selectedDate,
+                                    session: selectedEvents.isNotEmpty
+                                        ? selectedEvents.first
+                                        : null,
+                                    completedLog: selectedLog,
+                                    onStart: selectedEvents.isNotEmpty
+                                        ? () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    WorkoutSessionScreen(
+                                                      session:
+                                                          selectedEvents.first,
+                                                    ),
+                                              ),
+                                            );
+                                          }
+                                        : null,
+                                    onViewLog:
+                                        selectedEvents.isNotEmpty &&
+                                            selectedLog != null
+                                        ? () => _showLogBottomSheet(
+                                            context,
+                                            theme,
+                                            selectedEvents.first,
+                                            selectedLog,
+                                          )
+                                        : null,
+                                    isToday: isTodaySelected,
+                                    sessionVisuals: selectedEvents.isNotEmpty
+                                        ? _resolveSessionVisuals(
+                                            selectedEvents.first,
+                                            theme,
+                                          )
+                                        : null,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              _GoToTodayButton(
+                                isTodaySelected: isTodaySelected,
+                                onTap: () {
+                                  final now = DateTime.now();
+                                  setState(() {
+                                    _focusedDay = now;
+                                    _selectedDay = DateTime(
+                                      now.year,
+                                      now.month,
+                                      now.day,
                                     );
-                                  }
-                                : null,
-                            onViewLog:
-                                todaySessions.isNotEmpty && todayLog != null
-                                ? () => _showLogBottomSheet(
-                                    context,
-                                    theme,
-                                    todaySessions.first,
-                                    todayLog,
-                                  )
-                                : null,
+                                  });
+                                },
+                              ),
+                            ],
                           ),
                         ),
                         Padding(
@@ -169,11 +209,20 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
                           ),
                         ),
                         Expanded(
-                          child: _buildEventList(
-                            context,
-                            theme,
-                            historyList,
-                            selectedEvents,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            child: _buildEventList(
+                              context,
+                              theme,
+                              historyList,
+                              selectedEvents,
+                              selectedDate,
+                              key: ValueKey(
+                                'event-list-${selectedDate.toIso8601String()}',
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -347,6 +396,49 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
     );
   }
 
+  SessionVisuals _resolveSessionVisuals(
+    TrainingSession session,
+    ThemeData theme,
+  ) {
+    final allExercises = session.trainingExercises.isNotEmpty
+        ? session.trainingExercises
+        : (session.allExercises);
+
+    final firstName = allExercises.isNotEmpty
+        ? allExercises.first.name.toLowerCase()
+        : '';
+
+    if (firstName.contains('movil')) {
+      return SessionVisuals(
+        icon: Icons.self_improvement_rounded,
+        color: theme.colorScheme.secondary,
+        label: 'Movilidad',
+      );
+    }
+
+    if (firstName.contains('cond') || firstName.contains('cardio')) {
+      return SessionVisuals(
+        icon: Icons.directions_run_rounded,
+        color: theme.colorScheme.tertiary,
+        label: 'Acondicionamiento',
+      );
+    }
+
+    if (firstName.contains('potencia') || firstName.contains('plyo')) {
+      return SessionVisuals(
+        icon: Icons.bolt_rounded,
+        color: theme.colorScheme.secondary,
+        label: 'Potencia',
+      );
+    }
+
+    return SessionVisuals(
+      icon: Icons.fitness_center_rounded,
+      color: theme.colorScheme.primary,
+      label: 'Fuerza',
+    );
+  }
+
   // ---------- SIN PROGRAMA ----------
   Widget _buildNoProgramWidget(ThemeData theme) {
     return Center(
@@ -388,40 +480,41 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
     ThemeData theme,
     List<SessionLog> historyList,
     List<TrainingSession> selectedEvents,
+    DateTime selectedDate,
+    {Key? key}
   ) {
-    if (_selectedDay == null) {
-      return const SizedBox.shrink();
-    }
-
     // Día sin sesiones
     if (selectedEvents.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.coffee_outlined,
-                size: 60,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Día de descanso',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'No tienes sesiones planificadas para este día.',
-                style: theme.textTheme.bodyMedium?.copyWith(
+      return KeyedSubtree(
+        key: key,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.coffee_outlined,
+                  size: 60,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+                const SizedBox(height: 12),
+                Text(
+                  'Día de descanso',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'No tienes sesiones planificadas para este día.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -432,9 +525,12 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
       return historyList.any((log) => log.sessionId == session.id);
     });
 
-    final selectedDate = _selectedDay!;
     final selectedDateLabel =
         '${selectedDate.day.toString().padLeft(2, '0')}/${selectedDate.month.toString().padLeft(2, '0')}';
+
+    final isToday = isSameDay(selectedDate, DateTime.now());
+
+    final sessionVisuals = _resolveSessionVisuals(selectedEvents.first, theme);
 
     final statusLabel = anyCompletedForDay
         ? 'Sesión completada'
@@ -448,34 +544,49 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
         ? theme.colorScheme.primary
         : theme.colorScheme.secondary;
 
-    return Column(
-      children: [
-        // Resumen del día seleccionado
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(statusIcon, color: statusColor, size: 22),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Día $selectedDateLabel',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+    return KeyedSubtree(
+      key: key,
+      child: Column(
+        children: [
+          // Resumen del día seleccionado
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: isToday
+                    ? theme.colorScheme.primary.withOpacity(0.1)
+                    : theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isToday
+                      ? theme.colorScheme.primary.withOpacity(0.6)
+                      : Colors.transparent,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    statusIcon,
+                    color: statusColor,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isToday
+                              ? 'Hoy • $selectedDateLabel'
+                              : 'Día $selectedDateLabel',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        statusLabel,
+                        '${sessionVisuals.label} • $statusLabel',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
@@ -495,6 +606,7 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final session = selectedEvents[index];
+              final visuals = _resolveSessionVisuals(session, theme);
 
               final SessionLog? completedLog = historyList.firstWhereOrNull(
                 (log) => log.sessionId == session.id,
@@ -504,6 +616,7 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
               if (isCompleted) {
                 return _CompletedSessionCard(
                   session: session,
+                  visuals: visuals,
                   log: completedLog!,
                   onTap: () => _showLogBottomSheet(
                     context,
@@ -516,6 +629,7 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
                 return _PlannedSessionCard(
                   session: session,
                   theme: theme,
+                  visuals: visuals,
                   onTap: () {
                     Navigator.push(
                       context,
@@ -531,7 +645,7 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
           ),
         ),
       ],
-    );
+    ));
   }
 
   // ---------- SECCIÓN CHIPS (se usa en el resumen largo, la dejo por si la quieres reutilizar) ----------
@@ -763,92 +877,161 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
   }
 }
 
+class _GoToTodayButton extends StatelessWidget {
+  const _GoToTodayButton({required this.isTodaySelected, required this.onTap});
+
+  final bool isTodaySelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      children: [
+        IconButton.filledTonal(
+          onPressed: isTodaySelected ? null : onTap,
+          icon: const Icon(Icons.calendar_today_rounded),
+          tooltip: 'Ir a hoy',
+          style: IconButton.styleFrom(
+            backgroundColor: isTodaySelected
+                ? theme.colorScheme.surfaceVariant
+                : theme.colorScheme.primary.withOpacity(0.15),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Ir a hoy',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // Tarjeta de sesión pendiente (planificada)
-class _PlannedSessionCard extends StatelessWidget {
+class _PlannedSessionCard extends StatefulWidget {
   const _PlannedSessionCard({
     required this.session,
     required this.theme,
+    required this.visuals,
     required this.onTap,
   });
 
   final TrainingSession session;
   final ThemeData theme;
+  final SessionVisuals visuals;
   final VoidCallback onTap;
 
   @override
+  State<_PlannedSessionCard> createState() => _PlannedSessionCardState();
+}
+
+class _PlannedSessionCardState extends State<_PlannedSessionCard> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed != value) {
+      setState(() {
+        _pressed = value;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final totalExercises = session.allExercises.length;
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
+    final totalExercises = widget.session.allExercises.length;
+
+    return AnimatedScale(
+      scale: _pressed ? 0.98 : 1.0,
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+      child: Material(
+        color: widget.theme.colorScheme.surfaceVariant.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          color: theme.colorScheme.surfaceVariant.withOpacity(0.4),
-        ),
-        padding: const EdgeInsets.all(14.0),
-        child: Row(
-          children: [
-            // Etiqueta día
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                color: theme.colorScheme.primary.withOpacity(0.12),
-              ),
-              child: Text(
-                _dayShortLabel(session.day),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.primary,
+          onTap: widget.onTap,
+          onHighlightChanged: _setPressed,
+          child: Padding(
+            padding: const EdgeInsets.all(14.0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: widget.visuals.color.withOpacity(0.14),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        widget.visuals.icon,
+                        size: 18,
+                        color: widget.visuals.color,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _dayShortLabel(widget.session.day),
+                        style: widget.theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: widget.visuals.color,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Info sesión
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Sesión planificada',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.visuals.label,
+                        style: widget.theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$totalExercises ejercicios totales',
+                        style: widget.theme.textTheme.bodySmall?.copyWith(
+                          color: widget.theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      if (widget.session.trainingExercises.isNotEmpty)
+                        Text(
+                          'Foco: ${widget.session.trainingExercises.first.name}',
+                          style: widget.theme.textTheme.bodySmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$totalExercises ejercicios totales',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: widget.theme.colorScheme.primary,
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: 6),
-                  if (session.trainingExercises.isNotEmpty)
-                    Text(
-                      'Foco: ${session.trainingExercises.first.name}',
-                      style: theme.textTheme.bodySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                ],
-              ),
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(
+                    Icons.play_arrow_rounded,
+                    size: 28,
+                    color: widget.theme.colorScheme.onPrimary,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            // Botón play redondo
-            Container(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                shape: BoxShape.circle,
-              ),
-              padding: const EdgeInsets.all(8),
-              child: Icon(
-                Icons.play_arrow_rounded,
-                size: 28,
-                color: theme.colorScheme.onPrimary,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -875,64 +1058,87 @@ class _PlannedSessionCard extends StatelessWidget {
 }
 
 // Tarjeta sesión completada (resumen corto)
-class _CompletedSessionCard extends StatelessWidget {
+class _CompletedSessionCard extends StatefulWidget {
   const _CompletedSessionCard({
     required this.session,
+    required this.visuals,
     required this.log,
     required this.onTap,
   });
 
   final TrainingSession session;
+  final SessionVisuals visuals;
   final SessionLog log;
   final VoidCallback onTap;
+
+  @override
+  State<_CompletedSessionCard> createState() => _CompletedSessionCardState();
+}
+
+class _CompletedSessionCardState extends State<_CompletedSessionCard> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed != value) {
+      setState(() {
+        _pressed = value;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
+    return AnimatedScale(
+      scale: _pressed ? 0.98 : 1.0,
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+      child: Material(
+        color: theme.colorScheme.primary.withOpacity(0.16),
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          color: theme.colorScheme.primary.withOpacity(0.16),
-        ),
-        padding: const EdgeInsets.all(14.0),
-        child: Row(
-          children: [
-            Icon(
-              Icons.check_circle_rounded,
-              color: theme.colorScheme.primary,
-              size: 30,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Sesión completada',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+          onTap: widget.onTap,
+          onHighlightChanged: _setPressed,
+          child: Padding(
+            padding: const EdgeInsets.all(14.0),
+            child: Row(
+              children: [
+                Icon(
+                  widget.visuals.icon,
+                  color: widget.visuals.color,
+                  size: 30,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sesión completada',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'RPE ${widget.log.rpe}/10 • toca para ver detalles',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'RPE ${log.rpe}/10 • toca para ver detalles',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ],
+          ),
         ),
       ),
     );

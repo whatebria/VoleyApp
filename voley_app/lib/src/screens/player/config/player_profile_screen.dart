@@ -23,17 +23,6 @@ class PlayerProfileScreen extends ConsumerWidget {
               title: const Text('Mi Perfil de Atleta'),
               actions: [
                 IconButton(
-                  tooltip: 'Cerrar sesión',
-                  icon: const Icon(Icons.logout),
-                  onPressed: () async {
-                    final signOut = ref.read(signOutActionProvider);
-                    await signOut();
-                    if (context.mounted) {
-                      Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
-                    }
-                  },
-                ),
-                IconButton(
                   icon: const Icon(Icons.settings_outlined),
                   onPressed: () => Navigator.pushNamed(context, '/profile_settings'),
                 ),
