@@ -71,11 +71,7 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
   // --- WIDGET BUILD ---
   @override
   Widget build(BuildContext context) {
-    // --- CAMBIO: Ya no se escucha 'selectedProgramProvider' aquí ---
-    // La auto-selección de programa se elimina,
-    // ya que ahora mostramos una lista.
     ref.listen<AsyncValue<List<Program>>>(explorerProgramsProvider, (_, __) {
-      // Solo nos interesa que se refresque
     });
 
     final currentUser = ref.watch(currentUserAppUserProvider).valueOrNull;
@@ -85,7 +81,6 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
     final programsAsync = ref.watch(explorerProgramsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Explorador de Programas')),
       body: selectedPlayerCombo == null
           ? coachPlayersAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),

@@ -30,4 +30,11 @@ class EvaluationResult {
         date: date ?? this.date,
         testScores: testScores ?? this.testScores,
       );
+
+      String get displayLabel {
+    if (testScores.isEmpty) return 'Evaluación';
+    if (testScores.length == 1) return testScores.first.testId;
+    final remaining = testScores.length - 1;
+    return '${testScores.first.testId} +$remaining pruebas';
+  }
 }

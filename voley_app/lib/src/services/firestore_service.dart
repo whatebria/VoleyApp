@@ -393,6 +393,16 @@ class FirestoreService {
         .set(program.toJson());
   }
 
+  /// Guarda el mismo [program] para múltiples jugadores a la vez.
+  Future<void> saveProgramForPlayers(
+    List<String> playerIds,
+    Program program,
+  ) async {
+    if (playerIds.isEmpty) return;
+
+    await Future.wait(playerIds.map((id) => saveProgram(id, program)));
+  }
+
   Future<List<Program>> getProgramsByPlayer(String playerId) async {
     final snap = await _db
         .collection('players')

@@ -4,13 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/permission_provider.dart';
 import 'package:voley_app/src/models/coach_player_permission.dart';
 
-// --- CAMBIO: Convertido a ConsumerWidget ---
 class PermissionManagementScreen extends ConsumerWidget {
   const PermissionManagementScreen({Key? key}) : super(key: key);
 
-  // --- CAMBIO: Toda la lógica y estado se movieron al Notifier ---
-
-  // --- CAMBIO: Helper de SnackBar ---
   void _showFeedback(
     BuildContext context,
     String message, {
@@ -24,7 +20,6 @@ class PermissionManagementScreen extends ConsumerWidget {
     );
   }
 
-  // --- CAMBIO: _linkWithCode ahora es un wrapper ---
   Future<void> _linkWithCode(
     WidgetRef ref,
     TextEditingController controller,
@@ -32,7 +27,6 @@ class PermissionManagementScreen extends ConsumerWidget {
   ) async {
     final code = controller.text;
 
-    // Llama al notifier para que haga la lógica
     final result = await ref
         .read(permissionControllerProvider.notifier)
         .linkWithCode(code);
@@ -58,27 +52,6 @@ class PermissionManagementScreen extends ConsumerWidget {
     _showFeedback(context, result, isError: result.startsWith('Error'));
   }
 
-  // --- CAMBIO: _handleDeletePermission movido y simplificado ---
-  Future<void> _handleDeletePermission(
-    BuildContext context,
-    WidgetRef ref,
-    String permissionId,
-  ) async {
-    final confirm = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const _PermissionConfirmationScreen(),
-
-      ),
-    );
-
-    if (confirm != true) return;
-
-    final result = await ref
-        .read(permissionControllerProvider.notifier)
-        .deletePermission(permissionId);
-    _showFeedback(context, result, isError: result.startsWith('Error'));
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

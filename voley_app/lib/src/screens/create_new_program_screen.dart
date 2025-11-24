@@ -25,6 +25,7 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
   late Program _program;
   bool _isSaving = false;
   final Uuid _uuid = const Uuid();
+  late Set<String> _selectedProfileIds;
 
   // --- AÑADIDO: Controlador para el título del programa ---
   late TextEditingController _programNameCtrl;
@@ -44,6 +45,7 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
       endDate: DateTime.now(), 
       mesocycles: [],
     );
+    _selectedProfileIds = {widget.profile.id};
     // --- AÑADIDO: Inicializar controlador de título ---
     _programNameCtrl = TextEditingController(text: _program.title);
   }
@@ -81,7 +83,11 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
 
     try {
       final firestore = ref.read(firestoreProvider);
-      await firestore.saveProgram(widget.profile.id, _program);
+      final targetProfileIds = _selectedProfileIds.isNotEmpty
+          ? _selectedProfileIds.toList()
+          : [widget.profile.id];
+
+      await firestore.saveProgramForPlayers(targetProfileIds, _program);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -486,6 +492,76 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
     );
   }
 
+  Widget _buildPlayerAssignment(ThemeData theme) {
+    final currentUser = ref.watch(currentUserAppUserProvider).valueOrNull;
+
+    if (currentUser == null || !currentUser.isCoach) {
+      return const SizedBox.shrink();
+    }
+
+    final playersAsync = ref.watch(coachPlayersWithProfilesProvider);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: playersAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, s) => Text('Error al cargar jugadores: $e'),
+        data: (players) {
+          final profiles = players
+              .map((p) => p.profile)
+              .whereType<PlayerProfile>()
+              .toList();
+
+          if (!profiles.any((p) => p.id == widget.profile.id)) {
+            profiles.insert(0, widget.profile);
+          }
+
+          if (profiles.isEmpty) {
+            return const SizedBox.shrink();
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Asignar a jugadores',
+                style:
+                    theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: profiles.map((profile) {
+                  final isSelected = _selectedProfileIds.contains(profile.id);
+
+                  return FilterChip(
+                    label: Text(profile.name),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedProfileIds.add(profile.id);
+                        } else if (_selectedProfileIds.length > 1) {
+                          _selectedProfileIds.remove(profile.id);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Selecciona todos los jugadores que recibirán este programa.',
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+
   Future<void> _pickStartDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -563,6 +639,8 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
           // 1. Editor de nombre de programa
           _buildProgramNameEditor(theme),
 
+          // 1c. Selector de jugadores (solo coach)
+          _buildPlayerAssignment(theme),
           
           // 1b. Selector de fecha de inicio
           _buildStartDatePicker(theme),

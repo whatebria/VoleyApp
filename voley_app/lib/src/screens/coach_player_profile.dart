@@ -9,13 +9,10 @@ import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
 import 'package:intl/intl.dart'; // Para formateo de fechas
 
-// --- CAMBIO ---
-// Renombrado de 'CoachPlayerProfile' a 'CoachPlayerProfile' para
-// coincidir con la pantalla que 'user_management_screen.dart' espera.
 class CoachPlayerProfile extends StatelessWidget {
   final PlayerProfile profile;
 
-  const CoachPlayerProfile({Key? key, required this.profile}) : super(key: key);
+  const CoachPlayerProfile({super.key, required this.profile});
 
   @override
   Widget build(BuildContext context) {
@@ -521,26 +518,4 @@ class CoachPlayerProfile extends StatelessWidget {
         .join(' ');
   }
 
-  // --- AÑADIDO: Helper para formatear números ---
-  String _formatNumber(double value) {
-    final isInt = value % 1 == 0;
-    return isInt ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
-  }
-
-  // --- AÑADIDO: Helper para etiquetas de eventos ---
-  String _eventLabel(String type) {
-    switch (type) {
-      case 'cup':
-        return 'Copa';
-      case 'playoff':
-        return 'Play-offs';
-      case 'national_team':
-        return 'Selección';
-      case 'travel':
-        return 'Viaje';
-      case 'league':
-      default:
-        return 'Liga';
-    }
-  }
 }
