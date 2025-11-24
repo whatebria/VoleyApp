@@ -5,6 +5,7 @@ import 'package:voley_app/src/models/program/mesocycle.dart';
 import 'package:voley_app/src/models/program/microcycle.dart';
 import 'package:voley_app/src/screens/program_view/week_detail_screen.dart'; // Importa la siguiente pantalla
 import 'package:voley_app/src/screens/program_view/create_block_screen.dart'; // Importa la pantalla de edición
+import 'package:voley_app/providers/providers.dart';
 
 /// Muestra los Microciclos (Semanas) de un Mesociclo (Bloque)
 /// AÑADIDO: Convertido a ConsumerStatefulWidget para manejar la edición
@@ -46,6 +47,7 @@ class _BlockDetailScreenState extends ConsumerState<BlockDetailScreen> {
     );
 
     if (updatedMeso != null && mounted) {
+      ref.read(programEditorProvider.notifier).updateBlock(updatedMeso);
       // Actualiza la UI de esta pantalla con los datos modificados
       setState(() {
         _currentMeso = updatedMeso;

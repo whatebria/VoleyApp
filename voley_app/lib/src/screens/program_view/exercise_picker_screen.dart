@@ -24,18 +24,14 @@ class ExercisePickerScreen extends ConsumerStatefulWidget {
 }
 
 class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
-  // [CORRECCIÓN]: ESTADO LOCAL. Mantenemos una lista mutable localmente.
-  late TrainingSession _currentSession;
+  late DayOfWeek _editableDay;
+  late List<WorkoutExercise> _exercises;
 
-late DayOfWeek _editableDay;
-late List<WorkoutExercise> _exercises;
-
-@override
-void initState() {
-  super.initState();
-  _editableDay = widget.session.day;
-  _exercises = List.of(widget.session.exercises);
-    _currentSession = widget.session;
+  @override
+  void initState() {
+    super.initState();
+    _editableDay = widget.session.day;
+    _exercises = List.of(widget.session.exercises);
   }
 
   @override
@@ -56,46 +52,43 @@ void initState() {
     // Si el usuario seleccionó un ejercicio, lo añade al estado local
     if (newExercise != null && mounted) {
       setState(() {
-        final newExercises = List<WorkoutExercise>.from(
-          _currentSession.exercises,
-        );
-        newExercises.add(newExercise);
-        _currentSession = _currentSession.copyWith(exercises: newExercises);
+        _exercises = List<WorkoutExercise>.from(_exercises)..add(newExercise);
       });
     }
   }
 
-  /// [NUEVO MÉTODO]: Devuelve la sesión modificada y cierra
   void _handleSaveAndClose() {
-    // Devuelve la sesión actualizada e inmutable al ProgramEditorScreen
-    Navigator.pop(context, _currentSession);
+    Navigator.pop(
+      context,
+      widget.session.copyWith(day: _editableDay, exercises: _exercises),
+    );
   }
 
-String _formatReps(WorkoutExercise ex) {
-  final min = ex.reps.min;
-  final max = ex.reps.max;
-  if (max == 0 || max == min) return '$min';
-  return '$min-$max';
-}
-
+  String _formatReps(WorkoutExercise ex) {
+    final min = ex.reps.min;
+    final max = ex.reps.max;
+    if (max == 0 || max == min) return '$min';
+    return '$min-$max';
+  }
 
   // --- AÑADIDO: Helper para formatear intensidad ---
-String _formatPrescription(Intensity p) {
-  switch (p.type) {
-    case IntensityType.rpe:
-      return 'RPE ${p.value.toInt()}';
-    case IntensityType.percent1rm:
-      return '${(p.value * 100).toInt()}% 1RM';
-    case IntensityType.loadkg:
-      final w = p.value % 1 == 0 ? p.value.toInt() : p.value.toStringAsFixed(1);
-      return '$w kg';
-    case IntensityType.rpeRange:
-      return 'RPE ${p.value.toInt()}-${p.valueMax?.toInt()}';
-    case IntensityType.open:
-      return p.label ?? 'N/A';
+  String _formatPrescription(Intensity p) {
+    switch (p.type) {
+      case IntensityType.rpe:
+        return 'RPE ${p.value.toInt()}';
+      case IntensityType.percent1rm:
+        return '${(p.value * 100).toInt()}% 1RM';
+      case IntensityType.loadkg:
+        final w = p.value % 1 == 0
+            ? p.value.toInt()
+            : p.value.toStringAsFixed(1);
+        return '$w kg';
+      case IntensityType.rpeRange:
+        return 'RPE ${p.value.toInt()}-${p.valueMax?.toInt()}';
+      case IntensityType.open:
+        return p.label ?? 'N/A';
+    }
   }
-}
-
 
   // --- AÑADIDO: Helper para pre-llenar el diálogo de edición ---
   String _formatPrescriptionForEdit(Intensity p) {
@@ -132,19 +125,15 @@ String _formatPrescription(Intensity p) {
     if (updatedExercise != null && mounted) {
       // Actualiza el ejercicio en el estado local
       setState(() {
-        final newExercises = List<WorkoutExercise>.from(
-          _currentSession.exercises,
-        );
-        newExercises[index] = updatedExercise;
-        _currentSession = _currentSession.copyWith(exercises: newExercises);
+        _exercises = List<WorkoutExercise>.from(_exercises)
+          ..[index] = updatedExercise;
       });
     }
-
   }
 
   /// [NUEVO WIDGET]: Construye la lista principal de ejercicios de la sesión
   Widget _buildExerciseList(ThemeData theme) {
-    final exercises = _currentSession.exercises;
+    final exercises = _exercises;
 
     if (exercises.isEmpty) {
       return Center(
@@ -209,13 +198,8 @@ String _formatPrescription(Intensity p) {
                   tooltip: 'Eliminar ejercicio',
                   onPressed: () {
                     setState(() {
-                      final newList = List<WorkoutExercise>.from(
-                        _currentSession.exercises,
-                      );
-                      newList.removeAt(index);
-                      _currentSession = _currentSession.copyWith(
-                        exercises: newList,
-                      );
+                      _exercises = List<WorkoutExercise>.from(_exercises)
+                        ..removeAt(index);
                     });
                   },
                 ),
@@ -231,11 +215,14 @@ String _formatPrescription(Intensity p) {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     String _dayLabel(DayOfWeek d) => {
-  DayOfWeek.mon:'Lun', DayOfWeek.tue:'Mar', DayOfWeek.wed:'Mié',
-  DayOfWeek.thu:'Jue', DayOfWeek.fri:'Vie', DayOfWeek.sat:'Sáb',
-  DayOfWeek.sun:'Dom',
-}[d]!;
-
+      DayOfWeek.mon: 'Lun',
+      DayOfWeek.tue: 'Mar',
+      DayOfWeek.wed: 'Mié',
+      DayOfWeek.thu: 'Jue',
+      DayOfWeek.fri: 'Vie',
+      DayOfWeek.sat: 'Sáb',
+      DayOfWeek.sun: 'Dom',
+    }[d]!;
 
     return Scaffold(
       appBar: AppBar(
@@ -264,7 +251,7 @@ String _formatPrescription(Intensity p) {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Text(
-              'Ejercicios en Sesión (${_currentSession.exercises.length})',
+              'Ejercicios en Sesión (${_exercises.length})',
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),

@@ -105,6 +105,10 @@ class _SearchableExerciseListScreenState
           exerciseName: exercise.name,
         ),
       ));
+
+      if (result != null && mounted) {
+      Navigator.pop(context, result);
+    }
   }
 
   @override
