@@ -336,29 +336,11 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
   
   /// Muestra un diálogo de confirmación antes de aplicar la plantilla
   Future<void> _showApplyTemplateDialog(Mesocycle meso, Microcycle templateMicro) async {
-    final theme = Theme.of(context);
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: theme.colorScheme.surface,
-          title: Text('Aplicar Plantilla de Semana', style: TextStyle(color: theme.colorScheme.primary)),
-          content: Text(
-            '¿Estás seguro de que quieres usar la "Semana ${templateMicro.weekNumber}" '
-            'como plantilla?\n\nEsto sobrescribirá todas las demás semanas de este bloque.'
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context, rootNavigator: false).maybePop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context, rootNavigator: true).maybePop(),
-              child: const Text('Aplicar'),
-            ),
-          ],
-        );
-      }
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _ApplyTemplateScreen(weekNumber: templateMicro.weekNumber),
+      ),
     );
 
     if (result == true) {
@@ -571,3 +553,43 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
   }
 }
 
+class _ApplyTemplateScreen extends StatelessWidget {
+  final int weekNumber;
+
+  const _ApplyTemplateScreen({required this.weekNumber});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Aplicar Plantilla de Semana')),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '¿Usar la semana $weekNumber como plantilla?\n\nEsto sobrescribirá todas las demás semanas de este bloque.',
+              style: theme.textTheme.bodyLarge,
+            ),
+            const Spacer(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Aplicar'),
+                )
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}

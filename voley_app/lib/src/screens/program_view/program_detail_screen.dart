@@ -21,39 +21,18 @@ class ProgramDetailScreen extends ConsumerWidget {
 
   // --- AÑADIDO: Lógica para editar el título ---
   Future<void> _showTitleDialog(BuildContext context, WidgetRef ref, Program currentProgram) async {
-    final theme = Theme.of(context);
-    final titleCtrl = TextEditingController(text: currentProgram.title);
-    
-    final newTitle = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: theme.colorScheme.surface,
-          title: Text('Editar Nombre del Programa', style: TextStyle(color: theme.colorScheme.primary)),
-          content: TextField(
-            controller: titleCtrl,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: 'Nombre del Programa'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context, rootNavigator: true).maybePop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context, rootNavigator: true).maybePop(),
-              child: const Text('Guardar'),
-            ),
-          ],
-        );
-      },
+    final newTitle = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _ProgramTitleEditScreen(initialValue: currentProgram.title),
+      ),
+
     );
 
     if (newTitle != null && newTitle != currentProgram.title) {
       // --- CAMBIO: Llama al provider para actualizar el estado ---
       ref.read(programEditorProvider.notifier).updateTitle(newTitle);
     }
-    titleCtrl.dispose();
   }
   
   // --- AÑADIDO: Navegación para Añadir Bloque ---
@@ -195,3 +174,67 @@ class ProgramDetailScreen extends ConsumerWidget {
   }
 }
 
+class _ProgramTitleEditScreen extends StatefulWidget {
+  final String initialValue;
+
+  const _ProgramTitleEditScreen({required this.initialValue});
+
+  @override
+  State<_ProgramTitleEditScreen> createState() => _ProgramTitleEditScreenState();
+}
+
+class _ProgramTitleEditScreenState extends State<_ProgramTitleEditScreen> {
+  late final TextEditingController _titleCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Editar Nombre del Programa')),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _titleCtrl,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Nombre del Programa'),
+            ),
+            const Spacer(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, _titleCtrl.text.trim()),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                  ),
+                  child: const Text('Guardar'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

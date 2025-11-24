@@ -5,6 +5,7 @@ import 'package:voley_app/src/models/bd/exercise.dart'; // <- V4 con enums (tu c
 import 'package:voley_app/src/models/player_profile/injury.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
+import 'package:voley_app/src/screens/program_view/voley_app/lib/src/screens/program_view/workout_exercise_editor_screen.dart';
 
 /// Pantalla para buscar y seleccionar un ejercicio (compatible con Exercise V4/enums).
 class SearchableExerciseListScreen extends ConsumerStatefulWidget {
@@ -96,79 +97,14 @@ class _SearchableExerciseListScreenState
 
   /// Diálogo para añadir series, reps e intensidad (RPE/%/kg) y devolver WorkoutExercise.
   Future<void> _showAddExerciseDialog(Exercise exercise) async {
-    final theme = Theme.of(context);
-    final setsCtrl = TextEditingController(text: '3');
-    final repsCtrl = TextEditingController(text: '8-10'); // 10 o 8-10
-    final intensityCtrl = TextEditingController(
-      text: 'RPE 7',
-    ); // RPE 7 / 80% / 100kg
-
-    final result = await showDialog<WorkoutExercise>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: theme.colorScheme.surface,
-          title: Text(
-            exercise.name,
-            style: TextStyle(color: theme.colorScheme.primary),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: setsCtrl,
-                decoration: const InputDecoration(labelText: 'Series'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: repsCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Repeticiones (Ej: 10 o 8-10)',
-                ),
-              ),
-              TextField(
-                controller: intensityCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Intensidad (Ej: RPE 7, 80%, 100kg)',
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(context, rootNavigator: true).maybePop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                // 1) Parseo de reps
-                final String oldReps = repsCtrl.text.trim();
-                if (oldReps.contains('-')) {
-                  final parts = oldReps.split('-');
-                } else {
-                }
-
-                // 3) Crear objeto WorkoutExercise
-                String formatReps(WorkoutExercise ex) {
-                  final min = ex.reps.min;
-                  final max = ex.reps.max;
-                  if (max == 0 || max == min) return '$min';
-                  return '$min-$max';
-                }
-
-                Navigator.of(context, rootNavigator: true).pop(formatReps);
-              },
-              child: const Text('Añadir'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (result != null && mounted) {
-      Navigator.pop(context, result);
-    }
+    final result = await Navigator.push<WorkoutExercise>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WorkoutExerciseEditorScreen(
+          exerciseId: exercise.id,
+          exerciseName: exercise.name,
+        ),
+      ));
   }
 
   @override

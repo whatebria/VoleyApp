@@ -7,6 +7,7 @@ import 'package:voley_app/src/models/program/workout_exercise.dart';
 import 'package:voley_app/src/models/program/intensity.dart';
 import 'package:voley_app/src/screens/program_view/searchable_excersice_list_screen.dart';
 import 'package:voley_app/src/models/shared/day_of_week.dart';
+import 'package:voley_app/src/screens/program_view/voley_app/lib/src/screens/program_view/workout_exercise_editor_screen.dart';
 
 // --- WIDGETS HELPER DE FORMATO ---
 // Se añaden al archivo para mantener la pantalla limpia.
@@ -156,78 +157,11 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
     WorkoutExercise exercise,
     int index,
   ) async {
-    final theme = Theme.of(context);
-    // Pre-llenar con los valores actuales del objeto WorkoutExercise
-    final setsCtrl = TextEditingController(text: exercise.sets.toString());
-    final repsCtrl = TextEditingController(text: _formatReps(exercise));
-    final intensityCtrl = TextEditingController(
-      text: _formatPrescriptionForEdit(exercise.prescription),
-    );
-    final updatedExercise = await showDialog<WorkoutExercise>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: theme.colorScheme.surface,
-          title: Text(
-            'Editar ${exercise.name}',
-            style: TextStyle(color: theme.colorScheme.primary),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: setsCtrl,
-                decoration: const InputDecoration(labelText: 'Series'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: repsCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Repeticiones (Ej: 10 o 8-10)',
-                ),
-                keyboardType: TextInputType.text,
-              ),
-              TextField(
-                controller: intensityCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Intensidad (Ej: RPE 7, 80%, 100kg)',
-                ),
-                keyboardType: TextInputType.text,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(dialogContext, rootNavigator: true).maybePop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                // --- LÓGICA DE PARSEO DE VUELTA AL MODELO ---
-                final String rawReps = repsCtrl.text.trim();
-                if (rawReps.contains('-')) {
-                  rawReps.split('-');
-                } else {
-                }
-                final updatedSession = widget.session.copyWith(
-                  day: _editableDay,
-                  exercises: _exercises,
-                );
-                Navigator.pop(context, updatedSession);
-
-                // --- FIN LÓGICA ---
-
-                Navigator.of(
-                  dialogContext,
-                  rootNavigator: true,
-                ).pop(updatedSession);
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
-        );
-      },
+    final updatedExercise = await Navigator.push<WorkoutExercise>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WorkoutExerciseEditorScreen(initial: exercise),
+      ),
     );
 
     if (updatedExercise != null) {
@@ -237,9 +171,6 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
       });
     }
 
-    setsCtrl.dispose();
-    repsCtrl.dispose();
-    intensityCtrl.dispose();
   }
 
   /// Guarda la sesión actualizada y la devuelve a la pantalla anterior

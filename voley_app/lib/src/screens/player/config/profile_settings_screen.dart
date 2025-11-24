@@ -8,21 +8,10 @@ class ProfileSettingsScreen extends ConsumerWidget {
 
   Future<void> _confirmAndSignOut(BuildContext context, WidgetRef ref) async {
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Cerrar sesión'),
-        content: const Text('¿Seguro que quieres cerrar tu sesión en este dispositivo?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Cerrar sesión'),
-          ),
-        ],
+    final confirmed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const _LogoutConfirmationScreen(),
       ),
     );
 
@@ -132,6 +121,47 @@ class ProfileSettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
         ],
+      ),
+    );
+  }
+}
+class _LogoutConfirmationScreen extends StatelessWidget {
+  const _LogoutConfirmationScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Cerrar sesión')),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '¿Seguro que quieres cerrar tu sesión en este dispositivo?',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Podrás volver a iniciar sesión cuando quieras con tus credenciales.',
+            ),
+            const Spacer(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 12),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Cerrar sesión'),
+                ),
+              ],
+            )
+          ],
+        ),
       ),
     );
   }

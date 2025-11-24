@@ -64,23 +64,11 @@ class PermissionManagementScreen extends ConsumerWidget {
     WidgetRef ref,
     String permissionId,
   ) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmar'),
-        content: const Text('¿Estás seguro de revocar este permiso?'),
-        actions: [
-          TextButton(
-            onPressed: () =>
-                Navigator.of(context, rootNavigator: true).maybePop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () =>
-                Navigator.of(context, rootNavigator: true).pop(true),
-            child: const Text('Revocar'),
-          ),
-        ],
+    final confirm = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const _PermissionConfirmationScreen(),
+
       ),
     );
 
@@ -503,5 +491,46 @@ class PermissionManagementScreen extends ConsumerWidget {
       case PermissionStatus.rejected:
         return Colors.red;
     }
+  }
+}
+class _PermissionConfirmationScreen extends StatelessWidget {
+  const _PermissionConfirmationScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Confirmar acción')),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '¿Estás seguro de revocar este permiso?',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Se quitará el acceso del atleta y deberá volver a ser invitado para recuperar los permisos.',
+            ),
+            const Spacer(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Revocar'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

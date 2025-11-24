@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:voley_app/src/screens/program_view/voley_app/lib/src/screens/program_view/workout_exercise_editor_screen.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
@@ -121,81 +122,11 @@ String _formatPrescription(Intensity p) {
     WorkoutExercise exercise,
     int index,
   ) async {
-    final theme = Theme.of(context);
-
-    // --- CAMBIO: Pre-llena los controladores desde el modelo ---
-    final setsCtrl = TextEditingController(text: exercise.sets.toString());
-    final repsCtrl = TextEditingController(text: _formatReps(exercise));
-    final intensityCtrl = TextEditingController(
-      text: _formatPrescriptionForEdit(exercise.prescription),
-    );
-    // --- FIN DEL CAMBIO ---
-
-    final updatedExercise = await showDialog<WorkoutExercise>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: theme.colorScheme.surface,
-          title: Text(
-            'Editar ${exercise.name}',
-            style: TextStyle(color: theme.colorScheme.primary),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: setsCtrl,
-                decoration: const InputDecoration(labelText: 'Series'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: repsCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Repeticiones (Ej: 10 o 8-10)',
-                ),
-                keyboardType: TextInputType.text,
-              ),
-              TextField(
-                controller: intensityCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Intensidad (Ej: RPE 7, 80%, 100kg)',
-                ),
-                keyboardType: TextInputType.text,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(dialogContext, rootNavigator: true).maybePop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                // --- CAMBIO: Lógica de parseo igual a la de la pantalla de búsqueda ---
-                final String oldReps = repsCtrl.text.trim();
-                if (oldReps.contains('-')) {
-                  oldReps.split('-');
-                } else {
-                }
-
-
-                // --- CAMBIO: Usa los nuevos campos en copyWith ---
-                final updatedSession = widget.session.copyWith(
-  day: _editableDay,
-  exercises: _exercises,
-);
-Navigator.pop(context, updatedSession);
-
-                // --- FIN DEL CAMBIO ---
-
-                Navigator.of(dialogContext, rootNavigator: true).pop(updatedSession);
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
-        );
-      },
+    final updatedExercise = await Navigator.push<WorkoutExercise>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WorkoutExerciseEditorScreen(initial: exercise),
+      ),
     );
 
     if (updatedExercise != null && mounted) {
@@ -209,9 +140,6 @@ Navigator.pop(context, updatedSession);
       });
     }
 
-    setsCtrl.dispose();
-    repsCtrl.dispose();
-    intensityCtrl.dispose();
   }
 
   /// [NUEVO WIDGET]: Construye la lista principal de ejercicios de la sesión
