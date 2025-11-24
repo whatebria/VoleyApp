@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
+import 'package:voley_app/src/models/player_profile/evaluation_with_profile.dart';
 import 'package:voley_app/src/models/program/program.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:intl/intl.dart';
@@ -10,7 +11,10 @@ import 'package:voley_app/src/screens/program_view/program_detail_screen.dart';
 
 // --- CAMBIO: Nombre de la clase ---
 class ProgramExplorerScreen extends ConsumerStatefulWidget {
-  const ProgramExplorerScreen({Key? key}) : super(key: key);
+  const ProgramExplorerScreen({Key? key, this.showAllPlayers = false})
+    : super(key: key);
+
+  final bool showAllPlayers;
 
   @override
   ConsumerState<ProgramExplorerScreen> createState() =>
@@ -71,14 +75,35 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
   // --- WIDGET BUILD ---
   @override
   Widget build(BuildContext context) {
-    ref.listen<AsyncValue<List<Program>>>(explorerProgramsProvider, (_, __) {
-    });
+    ref.listen<AsyncValue<List<Program>>>(explorerProgramsProvider, (_, __) {});
 
     final currentUser = ref.watch(currentUserAppUserProvider).valueOrNull;
+    final isAllPlayers = widget.showAllPlayers;
     final selectedPlayerCombo = ref.watch(explorerSelectedPlayerProvider);
     final selectedProfile = ref.watch(selectedPlayerProfileProvider);
     final coachPlayersAsync = ref.watch(coachPlayersWithProfilesProvider);
     final programsAsync = ref.watch(explorerProgramsProvider);
+
+    if (isAllPlayers) {
+      final programsAsync = ref.watch(coachAllProgramsProvider);
+
+      return Scaffold(
+        body: programsAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Center(child: Text('Error: $e')),
+          data: (programs) {
+            if (programs.isEmpty) {
+              return const Center(
+                child: Text('Aún no hay programas para tus jugadores.'),
+              );
+            }
+
+            return _buildAllProgramsList(context, programs);
+          },
+        ),
+        floatingActionButton: _buildFab(context, selectedProfile),
+      );
+    }
 
     return Scaffold(
       body: selectedPlayerCombo == null
@@ -123,25 +148,29 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
               },
             ),
 
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'programExplorerManualFab',
-        tooltip: 'Crear Programa Manual',
-        child: const Icon(Icons.edit),
-        onPressed: () {
-          final profile = selectedProfile;
-          if (profile != null) {
-            _runManualEditor(context, profile);
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Selecciona un jugador con un perfil de evaluación.',
-                ),
+      floatingActionButton: _buildFab(context, selectedProfile),
+    );
+  }
+
+  Widget _buildFab(BuildContext context, PlayerProfile? selectedProfile) {
+    return FloatingActionButton(
+      heroTag: 'programExplorerManualFab',
+      tooltip: 'Crear Programa Manual',
+      child: const Icon(Icons.edit),
+      onPressed: () {
+        final profile = selectedProfile;
+        if (profile != null) {
+          _runManualEditor(context, profile);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Selecciona un jugador con un perfil de evaluación.',
               ),
-            );
-          }
-        },
-      ),
+            ),
+          );
+        }
+      },
     );
   }
 
@@ -220,6 +249,68 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
     );
   }
 
-  // --- _showWeekDetails y _buildMicrocycleList eliminados ---
-  // Esta lógica ahora vive en las nuevas pantallas.
+  Widget _buildAllProgramsList(
+    BuildContext context,
+    List<ProgramWithOwner> programs,
+  ) {
+    final sortedPrograms = [...programs]
+      ..sort((a, b) => b.program.startDate.compareTo(a.program.startDate));
+    final theme = Theme.of(context);
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16.0),
+      itemCount: sortedPrograms.length,
+      itemBuilder: (context, index) {
+        final item = sortedPrograms[index];
+        final program = item.program;
+        final totalWeeks = program.mesocycles.fold<int>(
+          0,
+          (sum, meso) => sum + meso.weeks,
+        );
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12.0),
+          color: theme.colorScheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 12.0,
+              horizontal: 16.0,
+            ),
+            leading: CircleAvatar(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+              child: const Icon(Icons.list_alt, size: 20),
+            ),
+            title: Text(
+              program.title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            subtitle: Text(
+              '${item.owner.name} • ${program.mesocycles.length} bloques • $totalWeeks semanas\n'
+              'Inicia: ${DateFormat('dd/MM/yy').format(program.startDate)}',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            isThreeLine: true,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProgramDetailScreen(
+                    program: program,
+                    profile: item.owner,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
 }

@@ -7,6 +7,6 @@ class CoachProgramsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const ProgramExplorerScreen();
+    return const ProgramExplorerScreen(showAllPlayers: true);
   }
 }

@@ -1,5 +1,6 @@
 // lib/providers.dart
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:async/async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:voley_app/src/auth/auth_provider.dart';
@@ -9,6 +10,7 @@ import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/bd/exercise.dart';
 import 'package:voley_app/src/models/program/program.dart';
 import 'package:voley_app/src/models/program/session_log.dart';
+import 'package:voley_app/src/models/player_profile/evaluation_with_profile.dart';
 import 'package:voley_app/src/models/user.dart' as app_user;
 import 'package:voley_app/src/services/firestore_service.dart';
 
@@ -190,6 +192,41 @@ final selectedPlayerProfileProvider = Provider<PlayerProfile?>((ref) {
   return selected?.profile;
 });
 
+final coachAllProgramsProvider = StreamProvider<List<ProgramWithOwner>>((ref) {
+  final firestore = ref.read(firestoreProvider);
+  final playersAsync = ref.watch(coachPlayersWithProfilesProvider);
+
+  return playersAsync.when(
+    data: (players) {
+      final profiles = players.map((p) => p.profile).whereType<PlayerProfile>().toList();
+      if (profiles.isEmpty) {
+        return Stream.value([]);
+      }
+
+      final streams = profiles
+          .map((profile) => firestore
+              .getAllProgramsStream(profile.id)
+              .map((programs) => programs
+                  .map((program) => ProgramWithOwner(
+                        program: program,
+                        owner: profile,
+                      ))
+                  .toList()))
+          .toList();
+
+      if (streams.length == 1) {
+        return streams.first;
+      }
+
+      return StreamZip<List<ProgramWithOwner>>(streams)
+          .map((programLists) => programLists.expand((p) => p).toList());
+    },
+    loading: () => Stream.value([]),
+    error: (e, s) => Stream.error(e, s),
+  );
+});
+
+
 final explorerProgramsProvider = StreamProvider<List<Program>>((ref) {
   final firestore = ref.read(firestoreProvider);
 
@@ -208,6 +245,27 @@ final explorerProgramsProvider = StreamProvider<List<Program>>((ref) {
 /// Almacena el programa (Program) que el coach selecciona en el 2do Dropdown.
 /// (Sin cambios)
 final explorerSelectedProgramProvider = StateProvider<Program?>((ref) => null);
+
+final coachAllEvaluationsProvider = Provider<AsyncValue<List<EvaluationWithProfile>>>(
+  (ref) {
+    final playersAsync = ref.watch(coachPlayersWithProfilesProvider);
+
+    return playersAsync.when(
+      data: (players) {
+        final evaluations = players
+            .where((p) => p.profile != null)
+            .expand((p) => p.profile!.evaluationHistory
+                .map((e) => EvaluationWithProfile(profile: p.profile!, evaluation: e)))
+            .toList()
+          ..sort((a, b) => b.evaluation.date.compareTo(a.evaluation.date));
+
+        return AsyncData(evaluations);
+      },
+      loading: () => const AsyncLoading(),
+      error: (e, s) => AsyncError(e, s),
+    );
+  },
+);
 
 // --- SECCIÓN 5: ESTADOS GLOBALES DE UI ---
 // (Agrupados para claridad, sin cambios)
