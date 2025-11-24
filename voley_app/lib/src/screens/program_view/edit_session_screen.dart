@@ -90,6 +90,7 @@ class EditSessionScreen extends ConsumerStatefulWidget {
   });
 
   @override
+  // ignore: library_private_types_in_public_api
   _EditSessionScreenState createState() => _EditSessionScreenState();
 }
 
@@ -106,7 +107,7 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
     _exercises = List.of(widget.session.exercises);
 
     DropdownButtonFormField<DayOfWeek>(
-      value: _editableDay,
+      initialValue: _editableDay,
       decoration: const InputDecoration(labelText: 'Día de la semana'),
       items: DayOfWeek.values
           .map((d) => DropdownMenuItem(value: d, child: Text(_dayLabel(d))))
@@ -205,15 +206,9 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
               onPressed: () {
                 // --- LÓGICA DE PARSEO DE VUELTA AL MODELO ---
                 final String rawReps = repsCtrl.text.trim();
-                int repsMin = 0;
-                int repsMax = 0;
                 if (rawReps.contains('-')) {
-                  final parts = rawReps.split('-');
-                  repsMin = int.tryParse(parts.first.trim()) ?? 0;
-                  repsMax = int.tryParse(parts.last.trim()) ?? 0;
+                  rawReps.split('-');
                 } else {
-                  repsMin = int.tryParse(rawReps) ?? 0;
-                  repsMax = repsMin;
                 }
                 final updatedSession = widget.session.copyWith(
                   day: _editableDay,

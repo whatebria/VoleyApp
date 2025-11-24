@@ -174,15 +174,9 @@ String _formatPrescription(Intensity p) {
               onPressed: () {
                 // --- CAMBIO: Lógica de parseo igual a la de la pantalla de búsqueda ---
                 final String oldReps = repsCtrl.text.trim();
-                int repsMin = 0;
-                int repsMax = 0;
                 if (oldReps.contains('-')) {
-                  final parts = oldReps.split('-');
-                  repsMin = int.tryParse(parts.first.trim()) ?? 0;
-                  repsMax = int.tryParse(parts.last.trim()) ?? 0;
+                  oldReps.split('-');
                 } else {
-                  repsMin = int.tryParse(oldReps.trim()) ?? 0;
-                  repsMax = repsMin;
                 }
 
 
