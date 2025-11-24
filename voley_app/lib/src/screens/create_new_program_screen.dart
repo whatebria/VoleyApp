@@ -402,7 +402,7 @@ class _CreateNewProgramScreenState extends ConsumerState<CreateNewProgramScreen>
             ),
             // --- CAMBIO: Muestra el número de ejercicios ---
             subtitle: Text(
-              '${session.exercises.length} ejercicios',
+              '${session.totalExercises} ejercicios',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurface.withOpacity(0.7)
               ),

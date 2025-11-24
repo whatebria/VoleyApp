@@ -62,7 +62,7 @@ String _dayLabel(DayOfWeek d) => {
           style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
-          '${session.exercises.length} ejercicios • Carga: ${session.load}',
+          '${session.totalExercises} ejercicios • Carga: ${session.load}',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurface.withOpacity(0.7)
           ),

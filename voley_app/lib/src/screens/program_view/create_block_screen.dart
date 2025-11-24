@@ -99,7 +99,6 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
         id: _uuid.v4(),
         day: dayFromIndex(sIndex), // ✅ enum
         load: generator.suggestedLoadFor(0, _mesoWeeks),
-        exercises: [],
       );
     });
 
@@ -328,10 +327,12 @@ class _CreateBlockScreenState extends ConsumerState<CreateBlockScreen> {
                         size: 20,
                       ),
                     ),
-                    title: Text(session.day.shortEs, style: theme.textTheme.titleMedium,
+                    title: Text(
+                      session.day.shortEs,
+                      style: theme.textTheme.titleMedium,
                     ),
                     subtitle: Text(
-                      '${session.exercises.length} ejercicios',
+                      '${session.totalExercises} ejercicios',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurface.withOpacity(0.7),
                       ),

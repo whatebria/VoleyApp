@@ -58,7 +58,7 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
   void initState() {
     super.initState();
     _pageController = PageController();
-    _exercises = widget.session.exercises;
+    _exercises = widget.session.allExercises;
     _workoutData = {
       for (var ex in _exercises)
         ex.exerciseId: List.generate(ex.sets, (_) => null),

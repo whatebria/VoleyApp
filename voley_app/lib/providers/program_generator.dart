@@ -1,6 +1,7 @@
 import 'package:voley_app/src/models/program/mesocycle.dart';
 import 'package:voley_app/src/models/program/microcycle.dart';
 import 'package:uuid/uuid.dart';
+import 'package:voley_app/src/models/program/workout_exercise.dart';
 
 /// Clase de lógica de negocio para generar y manipular estructuras de programas.
 class ProgramGenerator {
@@ -23,16 +24,27 @@ class ProgramGenerator {
 
     return List.generate(weeks, (i) {
       final newSessions = templateSessions.map((templateSession) {
-        // Copia profunda de ejercicios
-        final newExercises = templateSession.exercises
-            .map((e) => e.copyWith(exerciseId: _uuid.v4()))
-            .toList();
+        // Copia profunda de cada sección de ejercicios
+        List<WorkoutExercise> cloneExercises(List<WorkoutExercise> source) =>
+            source
+                .map((exercise) =>
+                    exercise.copyWith(exerciseId: _uuid.v4()))
+                .toList();
+
+        final newWarmUpExercises =
+            cloneExercises(templateSession.warmUpExercises);
+        final newTrainingExercises =
+            cloneExercises(templateSession.trainingExercises);
+        final newCoolDownExercises =
+            cloneExercises(templateSession.coolDownExercises);
 
         // Copia la sesión, pero actualiza ID y Carga
         return templateSession.copyWith(
           id: _uuid.v4(),
           load: suggestedLoadFor(i, totalWeeks), // Recalcula la carga
-          exercises: newExercises,
+          warmUpExercises: newWarmUpExercises,
+          trainingExercises: newTrainingExercises,
+          coolDownExercises: newCoolDownExercises,
         );
       }).toList();
 

@@ -94,7 +94,9 @@ class EditSessionScreen extends ConsumerStatefulWidget {
 
 class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
   late TextEditingController _sessionNameCtrl;
-  late List<WorkoutExercise> _exercises;
+  late List<WorkoutExercise> _warmUpExercises;
+  late List<WorkoutExercise> _trainingExercises;
+  late List<WorkoutExercise> _coolDownExercises;
   late DayOfWeek _editableDay;
 
   @override
@@ -104,7 +106,9 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
       text: _dayLabel(widget.session.day),
     );
     _editableDay = widget.session.day;
-    _exercises = List.of(widget.session.exercises);
+    _warmUpExercises = List.of(widget.session.warmUpExercises);
+    _trainingExercises = List.of(widget.session.trainingExercises);
+    _coolDownExercises = List.of(widget.session.coolDownExercises);
   }
 
   @override
@@ -114,7 +118,9 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
   }
 
   /// Navega a la pantalla de búsqueda de ejercicios
-  Future<void> _navigateToExercisePicker() async {
+  Future<void> _navigateToExercisePicker(
+    void Function(WorkoutExercise) onAdd,
+  ) async {
     // Navega a la pantalla de búsqueda
     final newExercise = await Navigator.push<WorkoutExercise>(
       context,
@@ -126,9 +132,7 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
 
     if (newExercise != null && mounted) {
       setState(() {
-        final newExercises = List<WorkoutExercise>.from(_exercises);
-        newExercises.add(newExercise);
-        _exercises = newExercises; // Actualiza el estado
+        onAdd(newExercise);
       });
     }
   }
@@ -138,6 +142,8 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
   Future<void> _showEditExerciseDialog(
     WorkoutExercise exercise,
     int index,
+    List<WorkoutExercise> targetList,
+    void Function(List<WorkoutExercise>) onListUpdated,
   ) async {
     final updatedExercise = await Navigator.push<WorkoutExercise>(
       context,
@@ -149,7 +155,9 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
     if (updatedExercise != null) {
       setState(() {
         // Actualiza la lista inmutablemente
-        _exercises[index] = updatedExercise;
+        final updatedList = List<WorkoutExercise>.from(targetList)
+          ..[index] = updatedExercise;
+        onListUpdated(updatedList);
       });
     }
   }
@@ -159,7 +167,9 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
     // Crea una nueva sesión con el nombre de sesión y la lista de ejercicios actualizada
     final updatedSession = widget.session.copyWith(
       day: _editableDay, // ✅ enum
-      exercises: _exercises,
+      warmUpExercises: _warmUpExercises,
+      trainingExercises: _trainingExercises,
+      coolDownExercises: _coolDownExercises,
     );
 
     // Devuelve el objeto inmutable actualizado
@@ -174,12 +184,6 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
       appBar: AppBar(
         title: Text(_dayLabel(widget.session.day)),
         actions: [
-          // Botón de Añadir Ejercicio
-          IconButton(
-            icon: Icon(Icons.add, color: theme.colorScheme.primary),
-            tooltip: 'Añadir Ejercicio',
-            onPressed: _navigateToExercisePicker,
-          ),
           // Botón de Guardar
           IconButton(
             icon: const Icon(Icons.check),
@@ -209,28 +213,152 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
           Text('Ejercicios de la Sesión', style: theme.textTheme.titleLarge),
           const SizedBox(height: 8),
 
-          // 3. Lista de ejercicios
-          if (_exercises.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Center(
-                child: Text('No hay ejercicios. Presiona "+" para añadir.'),
-              ),
-            )
-          else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _exercises.length,
-              itemBuilder: (context, index) {
-                final ex = _exercises[index];
+          // 3. Lista de ejercicios dividida por secciones
+          _buildExerciseSection(
+            context,
+            title: 'Movilidad / Calentamiento',
+            subtitle: 'Prepara el cuerpo antes de la carga.',
+            exercises: _warmUpExercises,
+            onAdd: () => _navigateToExercisePicker(
+              (exercise) => _warmUpExercises = [..._warmUpExercises, exercise],
+            ),
+            onEdit: (index) => _showEditExerciseDialog(
+              _warmUpExercises[index],
+              index,
+              _warmUpExercises,
+              (list) => _warmUpExercises = list,
+            ),
+            onDelete: (index) {
+              setState(() {
+                final newList = List<WorkoutExercise>.from(_warmUpExercises)
+                  ..removeAt(index);
+                _warmUpExercises = newList;
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          _buildExerciseSection(
+            context,
+            title: 'Entrenamiento',
+            subtitle: 'Bloque principal de trabajo.',
+            exercises: _trainingExercises,
+            onAdd: () => _navigateToExercisePicker(
+              (exercise) =>
+                  _trainingExercises = [..._trainingExercises, exercise],
+            ),
+            onEdit: (index) => _showEditExerciseDialog(
+              _trainingExercises[index],
+              index,
+              _trainingExercises,
+              (list) => _trainingExercises = list,
+            ),
+            onDelete: (index) {
+              setState(() {
+                final newList = List<WorkoutExercise>.from(_trainingExercises)
+                  ..removeAt(index);
+                _trainingExercises = newList;
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          _buildExerciseSection(
+            context,
+            title: 'Enfriamiento',
+            subtitle: 'Vuelve a la calma y facilita la recuperación.',
+            exercises: _coolDownExercises,
+            onAdd: () => _navigateToExercisePicker(
+              (exercise) =>
+                  _coolDownExercises = [..._coolDownExercises, exercise],
+            ),
+            onEdit: (index) => _showEditExerciseDialog(
+              _coolDownExercises[index],
+              index,
+              _coolDownExercises,
+              (list) => _coolDownExercises = list,
+            ),
+            onDelete: (index) {
+              setState(() {
+                final newList = List<WorkoutExercise>.from(_coolDownExercises)
+                  ..removeAt(index);
+                _coolDownExercises = newList;
+              });
+            },
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExerciseSection(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required List<WorkoutExercise> exercises,
+    required VoidCallback onAdd,
+    required void Function(int) onEdit,
+    required void Function(int) onDelete,
+  }) {
+    final theme = Theme.of(context);
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add_circle_outline),
+                  color: theme.colorScheme.secondary,
+                  tooltip: 'Añadir ejercicio',
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (exercises.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12.0),
+                child: Text(
+                  'Aún no hay ejercicios en esta sección.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+              )
+            else
+              ...List.generate(exercises.length, (index) {
+                final ex = exercises[index];
 
                 // --- CAMBIO: Formatea el subtítulo ---
                 final repsLabel = _formatReps(ex);
                 final intensityLabel = _formatPrescription(ex.prescription);
 
                 return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: const EdgeInsets.symmetric(vertical: 4),
                   color: theme.colorScheme.surface,
                   child: ListTile(
                     leading: CircleAvatar(
@@ -238,7 +366,6 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
                       child: Text('${index + 1}'),
                     ),
                     title: Text(ex.name),
-                    // --- CAMBIO: Subtítulo actualizado ---
                     subtitle: Text('${ex.sets}x$repsLabel @ $intensityLabel'),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -249,7 +376,7 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
                             color: theme.colorScheme.secondary,
                           ),
                           tooltip: 'Editar series/reps',
-                          onPressed: () => _showEditExerciseDialog(ex, index),
+                          onPressed: () => onEdit(index),
                         ),
                         IconButton(
                           icon: Icon(
@@ -257,23 +384,15 @@ class _EditSessionScreenState extends ConsumerState<EditSessionScreen> {
                             color: theme.colorScheme.error,
                           ),
                           tooltip: 'Eliminar ejercicio',
-                          onPressed: () {
-                            setState(() {
-                              final newList = List<WorkoutExercise>.from(
-                                _exercises,
-                              );
-                              newList.removeAt(index);
-                              _exercises = newList;
-                            });
-                          },
+                          onPressed: () => onDelete(index),
                         ),
                       ],
                     ),
                   ),
                 );
-              },
-            ),
-        ],
+              }),
+          ],
+        ),
       ),
     );
   }

@@ -412,7 +412,7 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
                   Wrap(
                     spacing: 6,
                     runSpacing: 4,
-                    children: session.exercises
+                    children: session.allExercises
                         .map(
                           (e) => Chip(
                             label: Text(e.name),
@@ -542,7 +542,7 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
                 ...log.loggedExercises.map((loggedEx) {
                   // Encuentra el nombre del ejercicio original
                   final exerciseName =
-                      session.exercises
+                      session.allExercises
                           .firstWhereOrNull(
                             (ex) => ex.exerciseId == loggedEx.exerciseId,
                           )
