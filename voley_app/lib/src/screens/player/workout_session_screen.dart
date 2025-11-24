@@ -35,17 +35,22 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
   bool _isResting = false;
   bool _isLastSetRest = false;
 
-  final _notesController = TextEditingController();
-  double _rpeValue = 5;
-    String _dayLabel(DayOfWeek d) {
+  String _dayLabel(DayOfWeek d) {
     switch (d) {
-      case DayOfWeek.mon: return 'Lun';
-      case DayOfWeek.tue: return 'Mar';
-      case DayOfWeek.wed: return 'Mié';
-      case DayOfWeek.thu: return 'Jue';
-      case DayOfWeek.fri: return 'Vie';
-      case DayOfWeek.sat: return 'Sáb';
-      case DayOfWeek.sun: return 'Dom';
+      case DayOfWeek.mon:
+        return 'Lun';
+      case DayOfWeek.tue:
+        return 'Mar';
+      case DayOfWeek.wed:
+        return 'Mié';
+      case DayOfWeek.thu:
+        return 'Jue';
+      case DayOfWeek.fri:
+        return 'Vie';
+      case DayOfWeek.sat:
+        return 'Sáb';
+      case DayOfWeek.sun:
+        return 'Dom';
     }
   }
 
@@ -64,7 +69,6 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
   void dispose() {
     _pageController.dispose();
     _restTimer?.cancel();
-    _notesController.dispose();
     super.dispose();
   }
 
@@ -136,14 +140,13 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
   Future<void> _finishWorkout() async {
     _restTimer?.cancel();
 
-    final feedback = await _showFeedbackDialog();
+    final feedback = await _navigateToFeedbackScreen();
     if (feedback == null) return; // El usuario canceló
 
     ref.read(isSubmittingWorkoutProvider.notifier).state = true;
     final profile = ref.read(playerProfileProvider).value;
 
     if (profile == null) {
-      _showError('Error: No se encontró el perfil');
       ref.read(isSubmittingWorkoutProvider.notifier).state = false;
       return;
     }
@@ -155,10 +158,9 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
       final loggedSets = sets.whereType<SetLog>().toList();
       if (loggedSets.isNotEmpty) {
         // Añade un nuevo LoggedExercise a la lista
-        finalLoggedExercises.add(LoggedExercise(
-          exerciseId: exerciseId,
-          sets: loggedSets,
-        ));
+        finalLoggedExercises.add(
+          LoggedExercise(exerciseId: exerciseId, sets: loggedSets),
+        );
       }
     });
     // --- FIN DEL CAMBIO ---
@@ -181,7 +183,6 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
 
       if (mounted) Navigator.of(context, rootNavigator: true).maybePop();
     } catch (e) {
-      _showError('Error al guardar: $e');
     } finally {
       if (mounted) {
         ref.read(isSubmittingWorkoutProvider.notifier).state = false;
@@ -190,96 +191,11 @@ class _WorkoutSessionScreenState extends ConsumerState<WorkoutSessionScreen> {
   }
 
   /// Diálogo de Feedback
-  Future<Map<String, dynamic>?> _showFeedbackDialog() async {
-    _rpeValue = 5;
-    _notesController.clear();
-
-    return await showModalBottomSheet<Map<String, dynamic>>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 16,
-                right: 16,
-                top: 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Feedback de la Sesión',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '¿Qué tan difícil fue? (RPE)',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Slider(
-                          value: _rpeValue,
-                          min: 1,
-                          max: 10,
-                          divisions: 9,
-                          label: _rpeValue.round().toString(),
-                          onChanged: (value) =>
-                              setModalState(() => _rpeValue = value),
-                        ),
-                      ),
-                      Text(
-                        _rpeValue.round().toString(),
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ],
-                  ),
-                  TextField(
-                    controller: _notesController,
-                    decoration: const InputDecoration(
-                      labelText: 'Notas de la sesión (opcional)',
-                      hintText: '¿Cómo te sentiste? ¿Algún dolor?',
-                    ),
-                    textCapitalization: TextCapitalization.sentences,
-                    maxLines: 3,
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      child: const Text('Guardar y Terminar'),
-                      onPressed: () {
-                        Navigator.pop(context, {
-                          'rpe': _rpeValue.round(),
-                          'notes': _notesController.text.trim(),
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              ),
-            );
-          },
-        );
-      },
+  Future<Map<String, dynamic>?> _navigateToFeedbackScreen() async {
+    return Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(builder: (_) => const _FeedbackScreen()),
     );
-  }
-
-  void _showError(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-    }
   }
 
   @override
@@ -548,31 +464,31 @@ class _WorkoutExerciseCard extends ConsumerWidget {
   });
 
   // --- AÑADIDO: Helper para formatear reps ---
-String _formatReps(WorkoutExercise ex) {
-  final min = ex.reps.min;
-  final max = ex.reps.max;
-  if (max == 0 || max == min) return '$min';
-  return '$min-$max';
-}
-
+  String _formatReps(WorkoutExercise ex) {
+    final min = ex.reps.min;
+    final max = ex.reps.max;
+    if (max == 0 || max == min) return '$min';
+    return '$min-$max';
+  }
 
   // --- AÑADIDO: Helper para formatear intensidad ---
-String _formatPrescription(Intensity p) {
-  switch (p.type) {
-    case IntensityType.rpe:
-      return 'RPE ${p.value.toInt()}';
-    case IntensityType.percent1rm: // <- sin guión bajo
-      return '${(p.value * 100).toInt()}% 1RM';
-    case IntensityType.loadkg:
-      final weight = p.value % 1 == 0 ? p.value.toInt() : p.value.toStringAsFixed(1);
-      return '$weight kg';
-    case IntensityType.rpeRange:
-      return 'RPE ${p.value.toInt()}-${p.valueMax?.toInt()}';
-    case IntensityType.open:
-    return p.label ?? 'N/A';
+  String _formatPrescription(Intensity p) {
+    switch (p.type) {
+      case IntensityType.rpe:
+        return 'RPE ${p.value.toInt()}';
+      case IntensityType.percent1rm: // <- sin guión bajo
+        return '${(p.value * 100).toInt()}% 1RM';
+      case IntensityType.loadkg:
+        final weight = p.value % 1 == 0
+            ? p.value.toInt()
+            : p.value.toStringAsFixed(1);
+        return '$weight kg';
+      case IntensityType.rpeRange:
+        return 'RPE ${p.value.toInt()}-${p.valueMax?.toInt()}';
+      case IntensityType.open:
+        return p.label ?? 'N/A';
+    }
   }
-}
-
 
   /// Widget para "Última vez"
   Widget _buildLastTime(BuildContext context, WidgetRef ref, ThemeData theme) {
@@ -594,7 +510,7 @@ String _formatPrescription(Intensity p) {
         for (final log in history) {
           // 1. Busca el ejercicio logueado por su ID
           final loggedEx = log.loggedExercises.firstWhereOrNull(
-            (ex) => ex.exerciseId == exercise.exerciseId
+            (ex) => ex.exerciseId == exercise.exerciseId,
           );
 
           // 2. Si existe y tiene series, encuentra la mejor
@@ -635,14 +551,16 @@ String _formatPrescription(Intensity p) {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    
+
     // --- CAMBIO: Formatea los nuevos valores ---
     final String repsLabel = _formatReps(exercise);
     final String intensityLabel = _formatPrescription(exercise.prescription);
-    
+
     // Determina los valores iniciales para _SetRow
     final bool isFixedLoad = exercise.prescription.type == IntensityType.loadkg;
-final double initialWeight = isFixedLoad ? exercise.prescription.value : 0.0;
+    final double initialWeight = isFixedLoad
+        ? exercise.prescription.value
+        : 0.0;
 
     final int initialReps = exercise.reps.min;
 
@@ -1068,7 +986,96 @@ class __SetRowState extends State<_SetRow> {
       MaterialPageRoute(
         builder: (_) => NumberPadScreen(initialValue: initialValue),
       ),
+    );
+  }
+  }
 
+class _FeedbackScreen extends StatefulWidget {
+  const _FeedbackScreen();
+
+  @override
+  State<_FeedbackScreen> createState() => _FeedbackScreenState();
+}
+
+class _FeedbackScreenState extends State<_FeedbackScreen> {
+  double _rpeValue = 5;
+  final TextEditingController _notesController = TextEditingController();
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Feedback de la Sesión')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '¿Qué tan difícil fue? (RPE)',
+              style: theme.textTheme.titleMedium,
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: Slider(
+                    value: _rpeValue,
+                    min: 1,
+                    max: 10,
+                    divisions: 9,
+                    label: _rpeValue.round().toString(),
+                    onChanged: (value) => setState(() => _rpeValue = value),
+                  ),
+                ),
+                Text(
+                  _rpeValue.round().toString(),
+                  style: theme.textTheme.titleLarge,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _notesController,
+              decoration: const InputDecoration(
+                labelText: 'Notas de la sesión (opcional)',
+                hintText: '¿Cómo te sentiste? ¿Algún dolor?',
+              ),
+              textCapitalization: TextCapitalization.sentences,
+              maxLines: 4,
+            ),
+            const Spacer(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop<Map<String, dynamic>>(
+                      context,
+                      {
+                        'rpe': _rpeValue.round(),
+                        'notes': _notesController.text.trim(),
+                      },
+                    );
+                  },
+                  child: const Text('Guardar y Terminar'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

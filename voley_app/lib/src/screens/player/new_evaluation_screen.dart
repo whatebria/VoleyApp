@@ -5,114 +5,23 @@ import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/test_score.dart';
 import 'package:voley_app/src/models/user.dart';
+import 'package:voley_app/src/screens/forms/player_form_screens.dart';
 
 // --- CAMBIO: Convertido a ConsumerWidget ---
 class NewEvaluationScreen extends ConsumerWidget {
   const NewEvaluationScreen({super.key});
 
-  Future<void> _showAddTestBottomSheet(BuildContext context, WidgetRef ref) async {
-    final theme = Theme.of(context);
-    // --- CAMBIO: Controladores para el nuevo modelo TestScore ---
-    final idController = TextEditingController();
-    final valueController = TextEditingController();
-    final unitController = TextEditingController();
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 24,
-            right: 24,
-            top: 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Añadir Nuevo Test',
-                style: theme.textTheme.headlineMedium
-                    ?.copyWith(color: theme.colorScheme.primary), // voltNeon
-              ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: idController,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre/ID del Test',
-                  helperText: 'Ej: Salto Vertical (ID: vertical_jump)',
-                ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: TextField(
-                      controller: valueController,
-                      decoration: const InputDecoration(
-                        labelText: 'Resultado',
-                        helperText: 'Ej: 55.5',
-                      ),
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 1,
-                    child: TextField(
-                      controller: unitController,
-                      decoration: const InputDecoration(
-                        labelText: 'Unidad',
-                        helperText: 'Ej: cm',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () {
-                  final value = double.tryParse(valueController.text);
-                  final testId = idController.text.trim().toLowerCase().replaceAll(' ', '_');
-                  final unit = unitController.text.trim();
-
-                  if (testId.isNotEmpty && value != null && unit.isNotEmpty) {
-                    // --- CAMBIO: Crea un objeto TestScore ---
-                    final newTest = TestScore(
-                      testId: testId,
-                      value: value,
-                      unit: unit,
-                    );
-                    // --- CAMBIO: Llama al provider para añadir el test ---
-                    ref.read(evaluationEditorProvider.notifier).addTest(newTest);
-                    Navigator.of(context, rootNavigator: true).maybePop();
-                  } else {
-                    // Opcional: Mostrar error en el sheet
-                  }
-                },
-                child: const Text('Guardar Test'),
-              ),
-              const SizedBox(height: 24), // Espacio inferior
-            ],
-          ),
-        );
-      },
+  Future<void> _navigateToAddTestScreen(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final newTest = await Navigator.push<TestScore>(
+      context,
+      MaterialPageRoute(builder: (_) => const TestScoreFormScreen()),
     );
-    
-    // Dispose controllers
-    idController.dispose();
-    valueController.dispose();
-    unitController.dispose();
+    if (newTest != null) {
+      ref.read(evaluationEditorProvider.notifier).addTest(newTest);
+    }
   }
 
   void _showError(BuildContext context, String message) {
@@ -122,35 +31,37 @@ class NewEvaluationScreen extends ConsumerWidget {
   }
 
   /// [REFACTORIZADO] Llama al provider para guardar
-Future<void> _handleSubmit(BuildContext context, WidgetRef ref) async {
-  try {
-    final selectedPlayerCombo = ref.read(explorerSelectedPlayerProvider);
-    if (selectedPlayerCombo == null) {
-      _showError(context, 'Debes seleccionar un jugador.');
-      return;
-    }
+  Future<void> _handleSubmit(BuildContext context, WidgetRef ref) async {
+    try {
+      final selectedPlayerCombo = ref.read(explorerSelectedPlayerProvider);
+      if (selectedPlayerCombo == null) {
+        _showError(context, 'Debes seleccionar un jugador.');
+        return;
+      }
 
-    final User player = selectedPlayerCombo.player; // ajusta si tu tipo no es FirebaseAuth.User
-    final PlayerProfile? currentProfile = ref.read(selectedPlayerProfileProvider);
-
-    await ref
-        .read(evaluationEditorProvider.notifier)
-        .saveEvaluation(player, currentProfile);
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Evaluación guardada con éxito'),
-          backgroundColor: Colors.green,
-        ),
+      final User player = selectedPlayerCombo
+          .player; // ajusta si tu tipo no es FirebaseAuth.User
+      final PlayerProfile? currentProfile = ref.read(
+        selectedPlayerProfileProvider,
       );
-      Navigator.pop(context);
-    }
-  } catch (e) {
-    _showError(context, 'Error al guardar: $e');
-  }
-}
 
+      await ref
+          .read(evaluationEditorProvider.notifier)
+          .saveEvaluation(player, currentProfile);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Evaluación guardada con éxito'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      _showError(context, 'Error al guardar: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -169,7 +80,7 @@ Future<void> _handleSubmit(BuildContext context, WidgetRef ref) async {
     // Observa el jugador seleccionado
     final selectedPlayerCombo = ref.watch(explorerSelectedPlayerProvider);
     final playerName = selectedPlayerCombo?.player.name ?? 'Jugador';
-    
+
     // Observa el estado de carga
     final isSubmitting = ref.watch(evaluationIsSavingProvider);
 
@@ -197,8 +108,12 @@ Future<void> _handleSubmit(BuildContext context, WidgetRef ref) async {
   }
 
   /// [REFACTORIZADO] Construye el formulario
-  Widget _buildEvaluationForm(BuildContext context, WidgetRef ref, ThemeData theme, String playerName) {
-    
+  Widget _buildEvaluationForm(
+    BuildContext context,
+    WidgetRef ref,
+    ThemeData theme,
+    String playerName,
+  ) {
     // --- CAMBIO: Lee el estado del provider ---
     final currentTestScores = ref.watch(evaluationEditorProvider);
     final isCreating = ref.watch(selectedPlayerProfileProvider) == null;
@@ -210,21 +125,25 @@ Future<void> _handleSubmit(BuildContext context, WidgetRef ref) async {
         children: [
           // 1. Título
           Text(
-            isCreating ? 'Creando Evaluación para' : 'Añadiendo Evaluación para',
+            isCreating
+                ? 'Creando Evaluación para'
+                : 'Añadiendo Evaluación para',
             style: theme.textTheme.headlineMedium,
           ),
           Text(
             playerName,
-            style: theme.textTheme.headlineMedium
-                ?.copyWith(color: theme.colorScheme.primary), // voltNeon
+            style: theme.textTheme.headlineMedium?.copyWith(
+              color: theme.colorScheme.primary,
+            ), // voltNeon
           ),
           if (isCreating)
             Padding(
               padding: const EdgeInsets.only(top: 8.0),
               child: Text(
                 'Este jugador aún no tiene perfil. Al guardar, se creará uno nuevo con estos datos.',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.7)),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                ),
               ),
             ),
           const SizedBox(height: 24),
@@ -234,7 +153,7 @@ Future<void> _handleSubmit(BuildContext context, WidgetRef ref) async {
             'Puntuaciones de Test',
             style: theme.textTheme.titleLarge?.copyWith(
               color: theme.colorScheme.secondary, // azulPro
-              fontWeight: FontWeight.bold
+              fontWeight: FontWeight.bold,
             ),
           ),
           const Divider(),
@@ -250,21 +169,21 @@ Future<void> _handleSubmit(BuildContext context, WidgetRef ref) async {
             child: OutlinedButton.icon(
               icon: const Icon(Icons.add_circle_outline),
               label: const Text('Añadir Test'),
-              onPressed: () => _showAddTestBottomSheet(context, ref),
+              onPressed: () => _navigateToAddTestScreen(context, ref),
               style: OutlinedButton.styleFrom(
-                foregroundColor: theme.colorScheme.onSurface.withOpacity(0.8)
+                foregroundColor: theme.colorScheme.onSurface.withOpacity(0.8),
               ),
             ),
           ),
-          
+
           const SizedBox(height: 32),
 
           // 3. Botón de Enviar
           ElevatedButton(
             // --- CAMBIO: Observa el provider de carga ---
-            onPressed: ref.watch(evaluationIsSavingProvider) 
-              ? null 
-              : () => _handleSubmit(context, ref),
+            onPressed: ref.watch(evaluationIsSavingProvider)
+                ? null
+                : () => _handleSubmit(context, ref),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
@@ -280,8 +199,12 @@ Future<void> _handleSubmit(BuildContext context, WidgetRef ref) async {
   }
 
   /// [REFACTORIZADO] Construye la lista de tests
-  Widget _buildTestList(BuildContext context, WidgetRef ref, ThemeData theme, List<TestScore> testScores) {
-
+  Widget _buildTestList(
+    BuildContext context,
+    WidgetRef ref,
+    ThemeData theme,
+    List<TestScore> testScores,
+  ) {
     if (testScores.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -304,7 +227,9 @@ Future<void> _handleSubmit(BuildContext context, WidgetRef ref) async {
       runSpacing: 8.0, // Espacio vertical entre filas
       children: testScores.map((test) {
         return Chip(
-          backgroundColor: theme.colorScheme.secondary.withOpacity(0.8), // azulPro
+          backgroundColor: theme.colorScheme.secondary.withOpacity(
+            0.8,
+          ), // azulPro
           label: Text(
             // --- CAMBIO: Muestra el TestScore ---
             '${test.testId}: ${test.value.toStringAsFixed(1)} ${test.unit}',
