@@ -14,6 +14,7 @@ enum CategoryId {
   acondicionamiento,
   movilidad,
   prevencion,
+  hipertrofia
 }
 
 // Patrones de movimiento
@@ -40,10 +41,14 @@ enum MuscleGroupId {
   delts,
   rotatorCuff,
   core,
+  chest,
+  triceps,
+  upperBack,
+  biceps,
 }
 
 // Cualidades físicas
-enum QualityId { strength, power, speed, agility, endurance, mobility, stability }
+enum QualityId { strength, power, speed, agility, endurance, mobility, stability, hipertrofia, estabilidad }
 
 // Planos de movimiento
 enum PlaneId { sagittal, frontal, transverse }
@@ -74,6 +79,7 @@ enum EquipmentId {
   cajonBajo,
   banco,
   slider,
+  polea
 }
 
 // Contraindicaciones
@@ -83,4 +89,4 @@ enum ContraindicationId { rodilla, tobillo, hombro, lumbar, impactoAlto, cardio 
 enum VolleyballPositionId { outsideHitter, middleBlocker, setter, libero, opposite }
 
 // Fases de temporada
-enum TrainingPhaseId { preseason, inSeason, taper, offSeason }
+enum TrainingPhaseId { preSeason, inSeason, taper, offSeason, rehab }

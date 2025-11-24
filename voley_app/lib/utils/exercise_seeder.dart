@@ -2,161 +2,95 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:voley_app/src/catalogos/enums.dart';
 import 'package:voley_app/src/models/bd/exercise.dart';
 
-// ===========================================================
-// SEEDER COMPLETO DE EJERCICIOS
-// Para fuerza, hipertrofia y transferencia al vóleibol.
-// ===========================================================
+/// ===============================================================
+/// 🚀 SEEDER OFICIAL MAAP — Fuerza, Hipertrofia, Potencia y Vóley
+/// ===============================================================
 
 final List<Exercise> exerciseSeed = [
 
   // ===========================================================
-  // SENTADILLAS Y CUÁDRICEPS
+  // 🦵 SENTADILLAS Y CUÁDRICEPS
   // ===========================================================
 
   Exercise(
     id: 'ex_back_squat',
     slug: 'back_squat',
-    name: 'Sentadilla con barra (Back Squat)',
+    name: 'Back Squat (Sentadilla con barra)',
     description: 'Ejercicio base de fuerza para piernas y salto.',
     videoUrl: '',
     levelId: LevelId.intermediate,
     categoryId: CategoryId.fuerza,
     movementPatternId: MovementPatternId.squat,
-    muscleGroupIds: [
-      MuscleGroupId.quads,
-      MuscleGroupId.glutes,
-      MuscleGroupId.core,
-    ],
-    qualityIds: [
-      QualityId.fuerzaMaxima,
-      QualityId.hipertrofia,
-    ],
+    muscleGroupIds: [MuscleGroupId.quads, MuscleGroupId.glutes, MuscleGroupId.core],
+    qualityIds: [QualityId.strength, QualityId.power],
     planeId: PlaneId.sagittal,
     dominanceId: DominanceId.bilateral,
-    vbTransferIds: [
-      VolleyballTransferId.saltoVertical,
-      VolleyballTransferId.bloqueo,
-    ],
+    vbTransferIds: [VolleyballTransferId.jump, VolleyballTransferId.block],
     positions: VolleyballPositionId.values,
-    phases: [
-      TrainingPhaseId.offSeason,
-      TrainingPhaseId.preSeason,
-    ],
+    phases: [TrainingPhaseId.offSeason, TrainingPhaseId.preSeason],
     equipmentIds: [EquipmentId.barra],
   ),
 
   Exercise(
     id: 'ex_front_squat',
     slug: 'front_squat',
-    name: 'Sentadilla frontal',
-    description: 'Mayor énfasis en cuádriceps y core. Excelente para remate.',
+    name: 'Front Squat (Sentadilla frontal)',
+    description: 'Mayor énfasis en cuádriceps y core. Excelente transferencia al salto.',
     videoUrl: '',
     levelId: LevelId.intermediate,
     categoryId: CategoryId.fuerza,
     movementPatternId: MovementPatternId.squat,
-    muscleGroupIds: [
-      MuscleGroupId.quads,
-      MuscleGroupId.glutes,
-      MuscleGroupId.core,
-    ],
-    qualityIds: [QualityId.fuerzaMaxima, QualityId.hipertrofia],
+    muscleGroupIds: [MuscleGroupId.quads, MuscleGroupId.glutes, MuscleGroupId.core],
+    qualityIds: [QualityId.strength, QualityId.power],
     planeId: PlaneId.sagittal,
     dominanceId: DominanceId.bilateral,
-    vbTransferIds: [VolleyballTransferId.saltoVertical],
+    vbTransferIds: [VolleyballTransferId.jump],
     positions: VolleyballPositionId.values,
-    phases: [
-      TrainingPhaseId.offSeason,
-    ],
+    phases: [TrainingPhaseId.preSeason],
     equipmentIds: [EquipmentId.barra],
   ),
 
   Exercise(
     id: 'ex_goblet_squat',
     slug: 'goblet_squat',
-    name: 'Sentadilla Goblet',
-    description: 'Gran ejercicio para técnica y volumen.',
+    name: 'Goblet Squat',
+    description: 'Gran ejercicio para técnica, estabilidad y volumen.',
     videoUrl: '',
     levelId: LevelId.beginner,
-    categoryId: CategoryId.hipertrofia,
+    categoryId: CategoryId.fuerza,
     movementPatternId: MovementPatternId.squat,
-    muscleGroupIds: [
-      MuscleGroupId.quads,
-      MuscleGroupId.glutes,
-      MuscleGroupId.core
-    ],
-    qualityIds: [
-      QualityId.hipertrofia,
-      QualityId.controlMotor,
-    ],
+    muscleGroupIds: [MuscleGroupId.quads, MuscleGroupId.glutes],
+    qualityIds: [QualityId.stability, QualityId.strength],
     planeId: PlaneId.sagittal,
     dominanceId: DominanceId.bilateral,
-    vbTransferIds: [VolleyballTransferId.saltoVertical],
+    vbTransferIds: [VolleyballTransferId.jump],
     positions: VolleyballPositionId.values,
-    phases: [
-      TrainingPhaseId.offSeason,
-      TrainingPhaseId.rehab,
-    ],
-    equipmentIds: [EquipmentId.kettlebell, EquipmentId.mancuernas],
+    phases: [TrainingPhaseId.offSeason, TrainingPhaseId.rehab],
+    equipmentIds: [EquipmentId.kettlebell],
   ),
 
   Exercise(
     id: 'ex_bulgarian_split_squat',
     slug: 'bulgarian_split_squat',
-    name: 'Sentadilla búlgara',
-    description: 'Unilateral y extremadamente transferible a salto y COD.',
+    name: 'Bulgarian Split Squat',
+    description: 'Unilateral, extremadamente transferible a salto y cambios de dirección.',
     videoUrl: '',
     levelId: LevelId.intermediate,
     categoryId: CategoryId.hipertrofia,
     movementPatternId: MovementPatternId.lunge,
-    muscleGroupIds: [
-      MuscleGroupId.quads,
-      MuscleGroupId.glutes,
-      MuscleGroupId.hamstrings,
-    ],
-    qualityIds: [
-      QualityId.hipertrofia,
-      QualityId.estabilidad,
-    ],
+    muscleGroupIds: [MuscleGroupId.quads, MuscleGroupId.glutes, MuscleGroupId.hamstrings],
+    qualityIds: [QualityId.strength, QualityId.stability],
     planeId: PlaneId.sagittal,
     dominanceId: DominanceId.unilateral,
-    vbTransferIds: [
-      VolleyballTransferId.saltoVertical,
-      VolleyballTransferId.cambioDeDireccion
-    ],
+    vbTransferIds: [VolleyballTransferId.jump, VolleyballTransferId.defenseShuffle],
     positions: VolleyballPositionId.values,
-    phases: [
-      TrainingPhaseId.offSeason,
-      TrainingPhaseId.preSeason,
-    ],
-    equipmentIds: [EquipmentId.banco, EquipmentId.mancuernas],
-  ),
-
-  Exercise(
-    id: 'ex_walking_lunge',
-    slug: 'walking_lunge',
-    name: 'Zancadas caminando',
-    description: 'Gran volumen para cuádriceps y glúteos.',
-    videoUrl: '',
-    levelId: LevelId.beginner,
-    categoryId: CategoryId.hipertrofia,
-    movementPatternId: MovementPatternId.lunge,
-    muscleGroupIds: [
-      MuscleGroupId.quads,
-      MuscleGroupId.glutes,
-      MuscleGroupId.hamstrings,
-    ],
-    qualityIds: [QualityId.hipertrofia],
-    planeId: PlaneId.sagittal,
-    dominanceId: DominanceId.unilateral,
-    vbTransferIds: [VolleyballTransferId.desplazamientoLateral],
-    positions: VolleyballPositionId.values,
-    phases: [TrainingPhaseId.preSeason],
-    equipmentIds: [EquipmentId.mancuernas],
+    phases: [TrainingPhaseId.offSeason, TrainingPhaseId.preSeason],
+    equipmentIds: [EquipmentId.mancuernas, EquipmentId.banco],
   ),
 
 
   // ===========================================================
-  // BISAGRA – CADENA POSTERIOR
+  // 🔥 CADENA POSTERIOR – BISAGRA
   // ===========================================================
 
   Exercise(
@@ -168,23 +102,13 @@ final List<Exercise> exerciseSeed = [
     levelId: LevelId.intermediate,
     categoryId: CategoryId.fuerza,
     movementPatternId: MovementPatternId.hinge,
-    muscleGroupIds: [
-      MuscleGroupId.hamstrings,
-      MuscleGroupId.glutes,
-      MuscleGroupId.core
-    ],
-    qualityIds: [
-      QualityId.fuerzaMaxima,
-      QualityId.hipertrofia,
-    ],
+    muscleGroupIds: [MuscleGroupId.hamstrings, MuscleGroupId.glutes, MuscleGroupId.core],
+    qualityIds: [QualityId.strength, QualityId.power],
     planeId: PlaneId.sagittal,
     dominanceId: DominanceId.bilateral,
-    vbTransferIds: [VolleyballTransferId.saltoVertical],
+    vbTransferIds: [VolleyballTransferId.jump],
     positions: VolleyballPositionId.values,
-    phases: [
-      TrainingPhaseId.offSeason,
-      TrainingPhaseId.preSeason,
-    ],
+    phases: [TrainingPhaseId.offSeason, TrainingPhaseId.preSeason],
     equipmentIds: [EquipmentId.barra],
   ),
 
@@ -192,64 +116,49 @@ final List<Exercise> exerciseSeed = [
     id: 'ex_hip_thrust',
     slug: 'hip_thrust',
     name: 'Hip Thrust',
-    description: 'Top 1 para glúteos. Transferencia directa al remate.',
+    description: 'Máxima activación de glúteos. Transferencia directa al salto.',
     videoUrl: '',
     levelId: LevelId.intermediate,
     categoryId: CategoryId.hipertrofia,
     movementPatternId: MovementPatternId.hinge,
-    muscleGroupIds: [
-      MuscleGroupId.glutes,
-      MuscleGroupId.hamstrings,
-      MuscleGroupId.core
-    ],
-    qualityIds: [
-      QualityId.hipertrofia,
-      QualityId.potencia
-    ],
+    muscleGroupIds: [MuscleGroupId.glutes, MuscleGroupId.hamstrings],
+    qualityIds: [QualityId.strength, QualityId.power],
     planeId: PlaneId.sagittal,
     dominanceId: DominanceId.bilateral,
     vbTransferIds: [
-      VolleyballTransferId.saltoVertical,
-      VolleyballTransferId.remate
+      VolleyballTransferId.jump,
+      VolleyballTransferId.approach,
     ],
     positions: VolleyballPositionId.values,
-    phases: [
-      TrainingPhaseId.offSeason,
-      TrainingPhaseId.preSeason
-    ],
+    phases: [TrainingPhaseId.preSeason],
     equipmentIds: [EquipmentId.barra, EquipmentId.banco],
   ),
 
+
   // ===========================================================
-  // EMPUJES – PECTORAL / HOMBRO
+  // 🏋️‍♂️ EMPUJES – PECTORAL / HOMBRO
   // ===========================================================
 
   Exercise(
     id: 'ex_bench_press',
     slug: 'bench_press',
-    name: 'Press banca',
-    description: 'Clásico de fuerza en tren superior.',
+    name: 'Bench Press',
+    description: 'Clásico ejercicio de empuje para fuerza máxima.',
     videoUrl: '',
     levelId: LevelId.intermediate,
     categoryId: CategoryId.fuerza,
-    movementPatternId: MovementPatternId.horizontalPush,
+    movementPatternId: MovementPatternId.push,
     muscleGroupIds: [
+      MuscleGroupId.delts,
       MuscleGroupId.chest,
       MuscleGroupId.triceps,
-      MuscleGroupId.shoulders
     ],
-    qualityIds: [
-      QualityId.fuerzaMaxima,
-      QualityId.hipertrofia
-    ],
+    qualityIds: [QualityId.strength],
     planeId: PlaneId.sagittal,
     dominanceId: DominanceId.bilateral,
-    vbTransferIds: [VolleyballTransferId.remate],
+    vbTransferIds: [VolleyballTransferId.armSwing],
     positions: VolleyballPositionId.values,
-    phases: [
-      TrainingPhaseId.offSeason,
-      TrainingPhaseId.preSeason
-    ],
+    phases: [TrainingPhaseId.offSeason],
     equipmentIds: [EquipmentId.barra],
   ),
 
@@ -261,164 +170,100 @@ final List<Exercise> exerciseSeed = [
     videoUrl: '',
     levelId: LevelId.beginner,
     categoryId: CategoryId.hipertrofia,
-    movementPatternId: MovementPatternId.horizontalPush,
+    movementPatternId: MovementPatternId.push,
     muscleGroupIds: [
+      MuscleGroupId.delts,
       MuscleGroupId.chest,
-      MuscleGroupId.shoulders,
       MuscleGroupId.triceps,
     ],
     qualityIds: [QualityId.hipertrofia],
     planeId: PlaneId.sagittal,
     dominanceId: DominanceId.bilateral,
-    vbTransferIds: [VolleyballTransferId.remate],
+    vbTransferIds: [VolleyballTransferId.armSwing],
     positions: VolleyballPositionId.values,
     phases: [TrainingPhaseId.preSeason],
     equipmentIds: [EquipmentId.mancuernas],
   ),
 
+
   // ===========================================================
-  // TIRONES – ESPALDA
+  // 🏋️‍♀️ TIRONES – ESPALDA
   // ===========================================================
 
   Exercise(
     id: 'ex_lat_pulldown',
     slug: 'lat_pulldown',
     name: 'Jalón en polea',
-    description: 'Excelente para espalda y control escapular',
+    description: 'Excelente para espalda y control escapular.',
     videoUrl: '',
     levelId: LevelId.beginner,
     categoryId: CategoryId.hipertrofia,
-    movementPatternId: MovementPatternId.verticalPull,
+    movementPatternId: MovementPatternId.pull,
     muscleGroupIds: [
       MuscleGroupId.lats,
-      MuscleGroupId.biceps,
-      MuscleGroupId.upperBack,
+      MuscleGroupId.delts,
+      MuscleGroupId.core,
     ],
     qualityIds: [QualityId.hipertrofia],
     planeId: PlaneId.sagittal,
     dominanceId: DominanceId.bilateral,
-    vbTransferIds: [VolleyballTransferId.remate],
+    vbTransferIds: [VolleyballTransferId.armSwing],
     positions: VolleyballPositionId.values,
+    phases: [TrainingPhaseId.inSeason],
     equipmentIds: [EquipmentId.polea],
   ),
 
   Exercise(
     id: 'ex_seated_row',
     slug: 'seated_row',
-    name: 'Remo sentado en polea',
-    description: 'Tren superior fuerte para bloqueo y remate.',
+    name: 'Remo sentado',
+    description: 'Remo horizontal para control escapular y fuerza del tronco.',
     videoUrl: '',
     levelId: LevelId.beginner,
     categoryId: CategoryId.hipertrofia,
-    movementPatternId: MovementPatternId.horizontalPull,
+    movementPatternId: MovementPatternId.pull,
     muscleGroupIds: [
       MuscleGroupId.upperBack,
       MuscleGroupId.biceps,
-      MuscleGroupId.lats,
-    ],
-    qualityIds: [QualityId.hipertrofia],
-    planeId: PlaneId.sagittal,
-    dominanceId: DominanceId.bilateral,
-    vbTransferIds: [
-      VolleyballTransferId.bloqueo,
-      VolleyballTransferId.remate
-    ],
-    positions: VolleyballPositionId.values,
-    equipmentIds: [EquipmentId.polea],
-  ),
-
-  // ===========================================================
-  // HOMBRO / ESTABILIDAD
-  // ===========================================================
-
-  Exercise(
-    id: 'ex_landmine_press',
-    slug: 'landmine_press',
-    name: 'Landmine Press',
-    description: 'Seguro y excelente para hombro y estabilidad del core.',
-    videoUrl: '',
-    levelId: LevelId.intermediate,
-    categoryId: CategoryId.fuerza,
-    movementPatternId: MovementPatternId.verticalPush,
-    muscleGroupIds: [
-      MuscleGroupId.shoulders,
-      MuscleGroupId.triceps,
       MuscleGroupId.core,
     ],
-    qualityIds: [
-      QualityId.fuerzaMaxima,
-      QualityId.estabilidad
-    ],
+    qualityIds: [QualityId.hipertrofia],
     planeId: PlaneId.sagittal,
-    dominanceId: DominanceId.unilateral,
+    dominanceId: DominanceId.bilateral,
     vbTransferIds: [
-      VolleyballTransferId.remate,
-      VolleyballTransferId.saquePotente
+      VolleyballTransferId.block,
+      VolleyballTransferId.armSwing,
     ],
     positions: VolleyballPositionId.values,
-    phases: [TrainingPhaseId.preSeason],
-    equipmentIds: [EquipmentId.barra],
-  ),
-
-  // ===========================================================
-  // BRAZOS
-  // ===========================================================
-
-  Exercise(
-    id: 'ex_bicep_curl',
-    slug: 'bicep_curl',
-    name: 'Curl de bíceps con mancuernas',
-    description: 'Ejercicio simple para brazos.',
-    videoUrl: '',
-    levelId: LevelId.beginner,
-    categoryId: CategoryId.hipertrofia,
-    movementPatternId: MovementPatternId.horizontalPull,
-    muscleGroupIds: [MuscleGroupId.biceps],
-    qualityIds: [QualityId.hipertrofia],
-    planeId: PlaneId.sagittal,
-    dominanceId: DominanceId.bilateral,
-    positions: VolleyballPositionId.values,
-    equipmentIds: [EquipmentId.mancuernas],
-  ),
-
-  Exercise(
-    id: 'ex_triceps_pushdown',
-    slug: 'triceps_pushdown',
-    name: 'Extensión de tríceps en polea',
-    description: 'Aísla tríceps y ayuda al remate.',
-    videoUrl: '',
-    levelId: LevelId.beginner,
-    categoryId: CategoryId.hipertrofia,
-    movementPatternId: MovementPatternId.verticalPush,
-    muscleGroupIds: [MuscleGroupId.triceps],
-    qualityIds: [QualityId.hipertrofia],
-    planeId: PlaneId.sagittal,
-    dominanceId: DominanceId.bilateral,
     equipmentIds: [EquipmentId.polea],
   ),
 
   // ===========================================================
-  // CORE
+  // 💥 CORE / ESTABILIDAD
   // ===========================================================
 
   Exercise(
     id: 'ex_plank',
     slug: 'plank',
     name: 'Plancha',
-    description: 'Control anti-extensión y base para salto.',
+    description: 'Control anti-extensión y base para salto y bloqueo.',
     videoUrl: '',
     levelId: LevelId.beginner,
-    categoryId: CategoryId.estabilidad,
-    movementPatternId: MovementPatternId.coreAntiExtension,
+    categoryId: CategoryId.core,
+    movementPatternId: MovementPatternId.antiRotation,
     muscleGroupIds: [MuscleGroupId.core],
-    qualityIds: [QualityId.estabilidad],
+    qualityIds: [QualityId.stability],
     planeId: PlaneId.sagittal,
     dominanceId: DominanceId.bilateral,
+    vbTransferIds: [
+      VolleyballTransferId.landing,
+      VolleyballTransferId.block,
+    ],
     positions: VolleyballPositionId.values,
     phases: [
       TrainingPhaseId.offSeason,
       TrainingPhaseId.preSeason,
-      TrainingPhaseId.rehab
+      TrainingPhaseId.rehab,
     ],
     equipmentIds: [EquipmentId.colchoneta],
   ),
@@ -426,9 +271,9 @@ final List<Exercise> exerciseSeed = [
 ];
 
 
-/// ===========================================================
-///  🔥 FUNCIÓN PARA EJECUTAR EL SEEDER
-/// ===========================================================
+/// ===============================================================
+/// 🚀 FUNCIÓN PARA EJECUTAR EL SEEDER
+/// ===============================================================
 
 Future<void> runExerciseSeeder() async {
   final db = FirebaseFirestore.instance;
@@ -437,5 +282,5 @@ Future<void> runExerciseSeeder() async {
     await db.collection('exercises').doc(ex.id).set(ex.toJson());
   }
 
-  print('SEEDER COMPLETADO → ${exerciseSeed.length} ejercicios subidos.');
+  print('🔥 SEEDER COMPLETADO: ${exerciseSeed.length} ejercicios subidos.');
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/src/auth/auth_provider.dart';
 import 'package:voley_app/providers/providers.dart';
+import 'package:voley_app/utils/exercise_seeder.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -22,7 +23,10 @@ class HomeScreen extends ConsumerWidget {
             children: [
               Text(
                 '¡Hola, ${appUser?.name ?? 'Coach'}!',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               Text(
                 'Bienvenido a tu panel de control.',
@@ -40,7 +44,8 @@ class HomeScreen extends ConsumerWidget {
           IconButton(
             icon: isLoggingOut
                 ? SizedBox(
-                    width: 24, height: 24,
+                    width: 24,
+                    height: 24,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
                       color: theme.colorScheme.onPrimary,
@@ -50,7 +55,15 @@ class HomeScreen extends ConsumerWidget {
             tooltip: 'Cerrar Sesión',
             onPressed: isLoggingOut ? null : () => _handleLogout(context, ref),
           ),
-          
+          ElevatedButton(
+            onPressed: () async {
+              await runExerciseSeeder();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Seeder ejecutado correctamente')),
+              );
+            },
+            child: const Text('Cargar ejercicios'),
+          ),
         ],
       ),
       // --- BODY MODIFICADO: Ahora es un ListView ---
@@ -99,7 +112,7 @@ class HomeScreen extends ConsumerWidget {
         subtitle: 'Administrar, crear y evaluar',
         // (Asegúrate de que '/user_management' exista en main.dart y lleve
         // a una pantalla que muestre la lista de jugadores)
-        route: '/user_management', 
+        route: '/user_management',
       ),
     ];
   }
@@ -137,20 +150,25 @@ class HomeScreen extends ConsumerWidget {
                   children: [
                     Text(
                       title,
-                      style: theme.textTheme.titleLarge
-                          ?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(color: theme.textTheme.bodySmall?.color),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.textTheme.bodySmall?.color,
+                      ),
                     ),
                   ],
                 ),
               ),
               // Icono de flecha
-              Icon(Icons.arrow_forward_ios, color: theme.colorScheme.primary.withOpacity(0.7)),
+              Icon(
+                Icons.arrow_forward_ios,
+                color: theme.colorScheme.primary.withOpacity(0.7),
+              ),
             ],
           ),
         ),
