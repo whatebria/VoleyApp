@@ -232,68 +232,78 @@ class _SearchableExerciseListScreenState
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final exercisesAsync = ref.watch(exercisesProvider);
+@override
+Widget build(BuildContext context) {
+  final theme = Theme.of(context);
+  final exercisesAsync = ref.watch(exercisesProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: TextField(
-          controller: _searchController,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: 'Buscar ejercicio...',
-            border: InputBorder.none,
-            hintStyle: TextStyle(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
-            ),
+  return Scaffold(
+    resizeToAvoidBottomInset: true, // <-- IMPORTANTE PARA TECLADO
+    appBar: AppBar(
+      title: TextField(
+        controller: _searchController,
+        autofocus: true,
+        decoration: InputDecoration(
+          hintText: 'Buscar ejercicio...',
+          border: InputBorder.none,
+          hintStyle: TextStyle(
+            color: theme.colorScheme.onSurface.withOpacity(0.6),
           ),
-          style: TextStyle(color: theme.colorScheme.onSurface),
-          textInputAction: TextInputAction.search,
         ),
-        actions: [
-          if (_searchQuery.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () => _searchController.clear(),
-              tooltip: 'Borrar búsqueda',
-            ),
-        ],
+        style: TextStyle(color: theme.colorScheme.onSurface),
+        textInputAction: TextInputAction.search,
       ),
-      body: Column(
-        children: [
-          // Filtros pensados para mobile
-          _buildFilters(theme),
+      actions: [
+        if (_searchQuery.isNotEmpty)
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => _searchController.clear(),
+          ),
+      ],
+    ),
 
-          Expanded(
-            child: exercisesAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
-              error: (e, s) =>
-                  Center(child: Text('Error al cargar ejercicios: $e')),
-              data: (allExercises) {
-                final activeInj = widget.profile.injuries
-                    .where((i) => i.status == InjuryStatus.active)
-                    .map((i) => i.id)
-                    .toSet();
+    body: SafeArea(
+      child: exercisesAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, s) =>
+            Center(child: Text('Error al cargar ejercicios: $e')),
+        data: (allExercises) {
+          final activeInj = widget.profile.injuries
+              .where((i) => i.status == InjuryStatus.active)
+              .map((i) => i.id)
+              .toSet();
 
-                final filtered = allExercises.where((ex) {
-                  final search = _matchesSearch(ex, _searchQuery);
-                  final safe = _passesInjurySafety(ex, activeInj);
+          final filtered = allExercises.where((ex) {
+            final search = _matchesSearch(ex, _searchQuery);
+            final safe = _passesInjurySafety(ex, activeInj);
 
-                  final byCategory = _filterCategory == null ||
-                      ex.categoryId == _filterCategory;
-                  final byTransfer = _filterVbTransfer == null ||
-                      ex.vbTransferIds.contains(_filterVbTransfer);
-                  final byLevel =
-                      _filterLevel == null || ex.levelId == _filterLevel;
+            final byCategory = _filterCategory == null ||
+                ex.categoryId == _filterCategory;
+            final byTransfer = _filterVbTransfer == null ||
+                ex.vbTransferIds.contains(_filterVbTransfer);
+            final byLevel = _filterLevel == null ||
+                ex.levelId == _filterLevel;
 
-                  return search && safe && byCategory && byTransfer && byLevel;
-                }).toList();
+            return search && safe && byCategory && byTransfer && byLevel;
+          }).toList();
 
-                if (filtered.isEmpty) {
-                  return const Center(
+          return CustomScrollView(
+            slivers: [
+
+              // ---------- FILTROS COMO SLIVER ----------
+              SliverToBoxAdapter(
+                child: _buildFilters(theme),
+              ),
+
+              const SliverPadding(
+                padding: EdgeInsets.only(top: 8),
+              ),
+
+              // ---------- LISTA ----------
+              if (filtered.isEmpty)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
                     child: Padding(
                       padding: EdgeInsets.symmetric(horizontal: 24),
                       child: Text(
@@ -302,38 +312,41 @@ class _SearchableExerciseListScreenState
                         textAlign: TextAlign.center,
                       ),
                     ),
-                  );
-                }
-
-                return ListView.builder(
-                  itemCount: filtered.length,
-                  itemBuilder: (_, i) {
-                    final ex = filtered[i];
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 4,
-                      ),
-                      title: Text(
-                        ex.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        '${_pretty(ex.categoryId.name)} • ${_pretty(ex.levelId.name)}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: const Icon(Icons.add_circle_outline),
-                      onTap: () => _showAddExerciseDialog(ex),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+                  ),
+                )
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final ex = filtered[index];
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        title: Text(
+                          ex.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          '${_pretty(ex.categoryId.name)} • ${_pretty(ex.levelId.name)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: const Icon(Icons.add_circle_outline),
+                        onTap: () => _showAddExerciseDialog(ex),
+                      );
+                    },
+                    childCount: filtered.length,
+                  ),
+                ),
+            ],
+          );
+        },
       ),
-    );
-  }
+    ),
+  );
+}
+
 }
