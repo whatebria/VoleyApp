@@ -124,6 +124,7 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
             ),
 
       floatingActionButton: FloatingActionButton(
+        heroTag: 'programExplorerManualFab',
         tooltip: 'Crear Programa Manual',
         child: const Icon(Icons.edit),
         onPressed: () {

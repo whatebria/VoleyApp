@@ -18,6 +18,7 @@ class EditTournamentsScreen extends ConsumerWidget {
         title: const Text('Historial de Torneos'),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'editTournamentsAddFab',
         child: const Icon(Icons.add),
         tooltip: 'Añadir Torneo',
         onPressed: () {

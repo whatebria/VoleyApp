@@ -168,6 +168,7 @@ class ProgramDetailScreen extends ConsumerWidget {
       ),
       // --- AÑADIDO: Floating Action Button ---
       floatingActionButton: FloatingActionButton(
+        heroTag: 'programDetailAddBlockFab',
         tooltip: 'Añadir Bloque',
         onPressed: () => _navigateToAddBlock(context, ref),
         child: const Icon(Icons.add),

@@ -24,6 +24,7 @@ class EditKeyEventsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Fechas clave')),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'editKeyEventsAddFab',
         onPressed: () async {
           final created = await Navigator.pushNamed(context, '/profile_settings/add_key_event');
           if (created != null) {

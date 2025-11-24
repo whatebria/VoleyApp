@@ -44,6 +44,7 @@ class UserManagementScreen extends ConsumerWidget {
       ),
       // --- MEJORA DE UX: FAB para la acción de "Crear" ---
       floatingActionButton: FloatingActionButton(
+        heroTag: 'userManagementCreatePlayerFab',
         onPressed: () {
           // Navega a la nueva pantalla de formulario
           Navigator.push(
