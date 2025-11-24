@@ -10,6 +10,7 @@ import 'package:voley_app/src/models/program/training_session.dart';
 import 'package:voley_app/src/models/program/session_log.dart';
 import 'package:voley_app/src/models/program/workout_exercise.dart';
 import 'package:voley_app/src/models/shared/day_of_week.dart';
+import 'package:voley_app/src/widgets/today_session_hero_card.dart';
 import 'package:voley_app/src/screens/player/workout_session_screen.dart';
 
 class PlayerCalendarScreen extends ConsumerStatefulWidget {
@@ -24,14 +25,14 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
   DateTime? _selectedDay;
 
   String _dayLabel(DayOfWeek d) => {
-        DayOfWeek.mon: 'Lun',
-        DayOfWeek.tue: 'Mar',
-        DayOfWeek.wed: 'Mié',
-        DayOfWeek.thu: 'Jue',
-        DayOfWeek.fri: 'Vie',
-        DayOfWeek.sat: 'Sáb',
-        DayOfWeek.sun: 'Dom',
-      }[d]!;
+    DayOfWeek.mon: 'Lun',
+    DayOfWeek.tue: 'Mar',
+    DayOfWeek.wed: 'Mié',
+    DayOfWeek.thu: 'Jue',
+    DayOfWeek.fri: 'Vie',
+    DayOfWeek.sat: 'Sáb',
+    DayOfWeek.sun: 'Dom',
+  }[d]!;
 
   @override
   void initState() {
@@ -55,18 +56,14 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final userAsync = ref.watch(currentUserAppUserProvider);
+    final historyAsync = ref.watch(sessionLogHistoryProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mi entrenamiento'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Mi entrenamiento'), centerTitle: true),
       body: SafeArea(
         child: userAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, s) => Center(
-            child: Text('Error al cargar usuario: $e'),
-          ),
+          error: (e, s) => Center(child: Text('Error al cargar usuario: $e')),
           data: (user) {
             if (user == null || user.isCoach) {
               return const Center(
@@ -93,51 +90,95 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
                   return _buildNoProgramWidget(theme);
                 }
 
-                return Column(
-                  children: [
-                    _buildTopBar(theme, programs, selectedProgram),
-                    const SizedBox(height: 4),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: _buildWeekCalendar(theme, selectedProgram, events),
-                    ),
-                    const SizedBox(height: 4),
-                    Divider(
-                      height: 1,
-                      color: theme.colorScheme.outlineVariant.withOpacity(0.4),
-                    ),
-                    Expanded(
-                      child: ref.watch(sessionLogHistoryProvider).when(
-                            loading: () => const Center(
-                                child: CircularProgressIndicator()),
-                            error: (e, s) => Center(
-                              child: Text('Error al cargar historial: $e'),
-                            ),
-                            data: (historyList) {
-                              final normalizedDay = _selectedDay != null
-                                  ? DateTime(
-                                      _selectedDay!.year,
-                                      _selectedDay!.month,
-                                      _selectedDay!.day,
-                                    )
-                                  : null;
-                                
+                return historyAsync.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, s) =>
+                      Center(child: Text('Error al cargar historial: $e')),
+                  data: (historyList) {
+                    final normalizedDay = _selectedDay != null
+                        ? DateTime(
+                            _selectedDay!.year,
+                            _selectedDay!.month,
+                            _selectedDay!.day,
+                          )
+                        : null;
 
-                              final selectedEvents = (normalizedDay != null &&
-                                      events.containsKey(normalizedDay))
-                                  ? events[normalizedDay]!
-                                  : <TrainingSession>[];
+                    final today = DateTime.now();
+                    final todaySessions = _getEventsForDay(today, events);
+                    final todayLog = todaySessions.isNotEmpty
+                        ? historyList.firstWhereOrNull(
+                            (log) => log.sessionId == todaySessions.first.id,
+                          )
+                        : null;
 
-                              return _buildEventList(
-                                context,
-                                theme,
-                                historyList,
-                                selectedEvents,
-                              );
-                            },
+                    final selectedEvents =
+                        (normalizedDay != null &&
+                            events.containsKey(normalizedDay))
+                        ? events[normalizedDay]!
+                        : <TrainingSession>[];
+
+                    return Column(
+                      children: [
+                        _buildTopBar(theme, programs, selectedProgram),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                          child: TodaySessionHeroCard(
+                            date: DateTime(today.year, today.month, today.day),
+                            session: todaySessions.isNotEmpty
+                                ? todaySessions.first
+                                : null,
+                            completedLog: todayLog,
+                            onStart: todaySessions.isNotEmpty
+                                ? () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            WorkoutSessionScreen(
+                                              session: todaySessions.first,
+                                            ),
+                                      ),
+                                    );
+                                  }
+                                : null,
+                            onViewLog:
+                                todaySessions.isNotEmpty && todayLog != null
+                                ? () => _showLogBottomSheet(
+                                    context,
+                                    theme,
+                                    todaySessions.first,
+                                    todayLog,
+                                  )
+                                : null,
                           ),
-                    ),
-                  ],
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: _buildWeekCalendar(
+                            theme,
+                            selectedProgram,
+                            events,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Divider(
+                          height: 1,
+                          color: theme.colorScheme.outlineVariant.withOpacity(
+                            0.4,
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildEventList(
+                            context,
+                            theme,
+                            historyList,
+                            selectedEvents,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 );
               },
             );
@@ -190,10 +231,7 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
               items: programs.map((program) {
                 return DropdownMenuItem<Program>(
                   value: program,
-                  child: Text(
-                    program.title,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  child: Text(program.title, overflow: TextOverflow.ellipsis),
                 );
               }).toList(),
               onChanged: (Program? newProgram) {
@@ -248,9 +286,7 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
       lastDay: selectedProgram.endDate.add(const Duration(days: 7)),
       focusedDay: _focusedDay,
       calendarFormat: CalendarFormat.week,
-      availableCalendarFormats: const {
-        CalendarFormat.week: 'Semana',
-      },
+      availableCalendarFormats: const {CalendarFormat.week: 'Semana'},
       headerStyle: HeaderStyle(
         titleCentered: true,
         formatButtonVisible: false,
@@ -302,12 +338,8 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
           shape: BoxShape.circle,
         ),
         markersMaxCount: 3,
-        defaultTextStyle: TextStyle(
-          color: theme.colorScheme.onSurface,
-        ),
-        weekendTextStyle: TextStyle(
-          color: theme.colorScheme.secondary,
-        ),
+        defaultTextStyle: TextStyle(color: theme.colorScheme.onSurface),
+        weekendTextStyle: TextStyle(color: theme.colorScheme.secondary),
         outsideTextStyle: TextStyle(
           color: theme.colorScheme.onSurface.withOpacity(0.35),
         ),
@@ -408,11 +440,13 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
         ? 'Sesión completada'
         : 'Sesión planificada';
 
-    final statusIcon =
-        anyCompletedForDay ? Icons.check_circle_rounded : Icons.flash_on;
+    final statusIcon = anyCompletedForDay
+        ? Icons.check_circle_rounded
+        : Icons.flash_on;
 
-    final statusColor =
-        anyCompletedForDay ? theme.colorScheme.primary : theme.colorScheme.secondary;
+    final statusColor = anyCompletedForDay
+        ? theme.colorScheme.primary
+        : theme.colorScheme.secondary;
 
     return Column(
       children: [
@@ -427,11 +461,7 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
             ),
             child: Row(
               children: [
-                Icon(
-                  statusIcon,
-                  color: statusColor,
-                  size: 22,
-                ),
+                Icon(statusIcon, color: statusColor, size: 22),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -535,8 +565,9 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
               ...visible.map(
                 (e) => Chip(
                   label: Text(e.name),
-                  backgroundColor:
-                      theme.colorScheme.surfaceVariant.withOpacity(0.4),
+                  backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(
+                    0.4,
+                  ),
                   labelStyle: theme.textTheme.bodySmall,
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
@@ -546,8 +577,9 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
               if (remaining > 0)
                 Chip(
                   label: Text('+$remaining más'),
-                  backgroundColor:
-                      theme.colorScheme.surfaceVariant.withOpacity(0.2),
+                  backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(
+                    0.2,
+                  ),
                   labelStyle: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -672,7 +704,8 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
           )
         else
           ...log.loggedExercises.map((loggedEx) {
-            final exerciseName = session.allExercises
+            final exerciseName =
+                session.allExercises
                     .firstWhereOrNull(
                       (ex) => ex.exerciseId == loggedEx.exerciseId,
                     )
@@ -694,10 +727,7 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
                   ),
                   ...sets.map((set) {
                     return Padding(
-                      padding: const EdgeInsets.only(
-                        left: 12.0,
-                        top: 2.0,
-                      ),
+                      padding: const EdgeInsets.only(left: 12.0, top: 2.0),
                       child: Text(
                         '• Set ${set.setNumber}: ${set.weight}kg x ${set.reps} reps',
                         style: theme.textTheme.bodyMedium,
@@ -719,20 +749,14 @@ class _PlayerCalendarScreenState extends ConsumerState<PlayerCalendarScreen> {
     required String label,
   }) {
     return Chip(
-      avatar: Icon(
-        icon,
-        size: 16,
-        color: theme.colorScheme.secondary,
-      ),
+      avatar: Icon(icon, size: 16, color: theme.colorScheme.secondary),
       label: Text(label),
       labelStyle: TextStyle(
         color: theme.colorScheme.onSurface,
         fontWeight: FontWeight.w600,
       ),
       backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-      side: BorderSide(
-        color: theme.colorScheme.surfaceVariant,
-      ),
+      side: BorderSide(color: theme.colorScheme.surfaceVariant),
       visualDensity: VisualDensity.compact,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
@@ -767,10 +791,7 @@ class _PlannedSessionCard extends StatelessWidget {
           children: [
             // Etiqueta día
             Container(
-              padding: const EdgeInsets.symmetric(
-                vertical: 8,
-                horizontal: 10,
-              ),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
                 color: theme.colorScheme.primary.withOpacity(0.12),
