@@ -6,6 +6,7 @@ import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/bd/exercise.dart';
 import 'package:voley_app/src/models/program/program.dart';
+import 'package:voley_app/src/models/program/program_template.dart';
 import 'package:voley_app/src/models/program/session_log.dart';
 import 'package:voley_app/src/models/user.dart' as app_user;
 import 'package:voley_app/src/models/coach_player_permission.dart';
@@ -427,7 +428,40 @@ class FirestoreService {
   }
 
 
+// ========== Program Templates ==========
 
+  Stream<List<ProgramTemplate>> getProgramTemplatesStream(String coachId) {
+    return _db
+        .collection('coaches')
+        .doc(coachId)
+        .collection('program_templates')
+        .orderBy('updatedAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => ProgramTemplate.fromFirestore(doc))
+            .toList());
+  }
+
+  Future<void> saveProgramTemplate(
+    String coachId,
+    ProgramTemplate template,
+  ) {
+    return _db
+        .collection('coaches')
+        .doc(coachId)
+        .collection('program_templates')
+        .doc(template.id)
+        .set(template.toJson());
+  }
+
+  Future<void> deleteProgramTemplate(String coachId, String templateId) {
+    return _db
+        .collection('coaches')
+        .doc(coachId)
+        .collection('program_templates')
+        .doc(templateId)
+        .delete();
+  }
 
 
   Future<PlayerProfile?> getPlayerProfileByUserId(String userId) async {

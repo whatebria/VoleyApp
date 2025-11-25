@@ -9,6 +9,7 @@ import 'package:voley_app/providers/program_generator.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/bd/exercise.dart';
 import 'package:voley_app/src/models/program/evaluation_with_profile.dart';
+import 'package:voley_app/src/models/program/program_template.dart';
 import 'package:voley_app/src/models/program/program.dart';
 import 'package:voley_app/src/models/program/session_log.dart';
 import 'package:voley_app/src/models/player_profile/evaluation_with_profile.dart';
@@ -63,6 +64,35 @@ final programGeneratorAction = Provider((ref) {
     return result.data as Map<String, dynamic>;
   };
 });
+
+/// Plantillas de programas creadas por el coach actual.
+final programTemplatesProvider = StreamProvider<List<ProgramTemplate>>((ref) {
+  final currentUser = ref.watch(currentUserAppUserProvider).valueOrNull;
+
+  if (currentUser == null || !currentUser.isCoach) {
+    return Stream.value([]);
+  }
+
+  final firestore = ref.read(firestoreProvider);
+  return firestore.getProgramTemplatesStream(currentUser.id);
+});
+
+/// Acción para guardar una plantilla en Firestore.
+final saveProgramTemplateProvider = Provider<Future<void> Function(ProgramTemplate)>(
+  (ref) {
+    return (ProgramTemplate template) async {
+      final currentUser = ref.read(currentUserAppUserProvider).valueOrNull;
+
+      if (currentUser == null || !currentUser.isCoach) {
+        throw Exception('Solo coaches pueden guardar plantillas');
+      }
+
+      await ref
+          .read(firestoreProvider)
+          .saveProgramTemplate(currentUser.id, template);
+    };
+  },
+);
 
 // --- SECCIÓN 3: DATOS DEL JUGADOR LOGUEADO ---
 
