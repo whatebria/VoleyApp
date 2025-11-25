@@ -80,7 +80,7 @@ class CoachPlayerProfile extends StatelessWidget {
 
           // --- Sección de Evaluación ---
           // --- CAMBIO: Pasa la evaluación MÁS RECIENTE ---
-          _buildEvaluationCard(context, theme, profile.latestEvaluation),
+          _buildEvaluationCard(context, theme, profile.evaluationHistory),
           const SizedBox(height: 16),
 
           // --- Sección de Torneos ---
@@ -372,9 +372,13 @@ class CoachPlayerProfile extends StatelessWidget {
   Widget _buildEvaluationCard(
     BuildContext context,
     ThemeData theme,
-    EvaluationResult? evaluation,
+    List<EvaluationResult> evaluations,
   ) {
-    final scores = evaluation?.testScores ?? [];
+    final sortedEvaluations = [...evaluations]
+      ..sort((a, b) => b.date.compareTo(a.date));
+    final latest = sortedEvaluations.isNotEmpty
+        ? sortedEvaluations.first
+        : null;
 
     return Card(
       child: ExpansionTile(
@@ -384,43 +388,78 @@ class CoachPlayerProfile extends StatelessWidget {
         ),
         title: const Text('Resultados de Evaluación'),
         subtitle: Text(
-          scores.isEmpty
-              ? 'Sin tests registrados'
-              : 'Última evaluación: ${DateFormat('dd/MM/yy').format(evaluation!.date)}',
+          latest == null
+              ? 'Sin evaluaciones registradas'
+              : 'Última: ${DateFormat('dd/MM/yy').format(latest.date)} • ${sortedEvaluations.length} en total',
           style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6)),
         ),
         trailing: Icon(Icons.expand_more, color: theme.colorScheme.primary),
         children: [
-          if (scores.isEmpty)
+          if (sortedEvaluations.isEmpty)
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Text(
-                'No hay tests registrados en esta evaluación.',
+                'No hay evaluaciones registradas para este atleta.',
                 style: TextStyle(
                   color: theme.colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
             )
           else
-            ...scores.map((TestScore test) {
-              return ListTile(
-                title: Text(
-                  _formatTestId(
-                    test.testId,
-                  ), // Formatea 'salto_vertical' a 'Salto Vertical'
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                trailing: Text(
-                  '${test.value.toStringAsFixed(1)} ${test.unit}',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.primary,
+            ...sortedEvaluations.map((evaluation) {
+              final scores = evaluation.testScores;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Card(
+                  color: theme.colorScheme.surfaceVariant,
+                  margin: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: ExpansionTile(
+                    leading: const Icon(Icons.calendar_today_outlined),
+                    title: Text(DateFormat('dd/MM/yy').format(evaluation.date)),
+                    subtitle: Text(
+                      scores.isEmpty
+                          ? 'Sin tests registrados'
+                          : '${scores.length} pruebas registradas',
+                    ),
+                    children: scores.isEmpty
+                        ? [
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Text(
+                                'No hay tests registrados en esta evaluación.',
+                                style: TextStyle(
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacity(0.6),
+                                ),
+                              ),
+                            ),
+                          ]
+                        : scores
+                              .map(
+                                (test) => ListTile(
+                                  title: Text(
+                                    _formatTestId(test.testId),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  trailing: Text(
+                                    '${test.value.toStringAsFixed(1)} ${test.unit}',
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                  dense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 24.0,
+                                  ),
+                                ),
+                              )
+                              .toList(),
                   ),
                 ),
-                dense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 24.0),
               );
             }),
-          // Botón para ir a la pantalla de evaluación
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextButton.icon(
@@ -517,5 +556,4 @@ class CoachPlayerProfile extends StatelessWidget {
         .map((word) => word[0].toUpperCase() + word.substring(1))
         .join(' ');
   }
-
 }

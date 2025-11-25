@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/evaluation_editor_provider.dart';
 import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/player_profile/test_score.dart';
+import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
 import 'package:voley_app/src/models/user.dart';
 import 'package:voley_app/src/screens/forms/player_form_screens.dart';
 
@@ -96,9 +98,8 @@ class NewEvaluationScreen extends ConsumerWidget {
         children: [
           playersAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, s) => Center(
-              child: Text('Error al cargar jugadores: $e'),
-            ),
+            error: (e, s) =>
+                Center(child: Text('Error al cargar jugadores: $e')),
             data: (players) {
               if (players.isEmpty) {
                 return const Center(
@@ -151,10 +152,7 @@ class NewEvaluationScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Jugador a evaluar',
-                    style: theme.textTheme.titleMedium,
-                  ),
+                  Text('Jugador a evaluar', style: theme.textTheme.titleMedium),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<PlayerWithProfile>(
                     value: selectedPlayer,
@@ -189,8 +187,8 @@ class NewEvaluationScreen extends ConsumerWidget {
           Text(
             hasSelectedPlayer
                 ? (isCreating
-                    ? 'Creando Evaluación para'
-                    : 'Añadiendo Evaluación para')
+                      ? 'Creando Evaluación para'
+                      : 'Añadiendo Evaluación para')
                 : 'Selecciona un jugador para iniciar',
             style: theme.textTheme.headlineMedium,
           ),
@@ -242,7 +240,8 @@ class NewEvaluationScreen extends ConsumerWidget {
           ),
 
           const SizedBox(height: 32),
-
+          _EvaluationHistorySection(profile: selectedPlayer?.profile),
+          const SizedBox(height: 32),
           // 3. Botón de Enviar
           ElevatedButton(
             // --- CAMBIO: Observa el provider de carga ---
@@ -312,6 +311,82 @@ class NewEvaluationScreen extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
         );
       }).toList(),
+    );
+  }
+}
+
+class _EvaluationHistorySection extends StatelessWidget {
+  const _EvaluationHistorySection({required this.profile});
+
+  final PlayerProfile? profile;
+
+  List<EvaluationResult> get _sortedHistory {
+    final history = [
+      ...(profile?.evaluationHistory ?? const <EvaluationResult>[]),
+    ];
+    history.sort((a, b) => b.date.compareTo(a.date));
+    return history;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dateFmt = DateFormat('dd MMM yyyy');
+    final history = _sortedHistory;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Historial de Evaluaciones',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (profile == null)
+          Card(
+            color: theme.colorScheme.surfaceVariant,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                'Cuando selecciones un jugador verás aquí su historial de evaluaciones.',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          )
+        else if (history.isEmpty)
+          Card(
+            color: theme.colorScheme.surfaceVariant,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                'Este jugador aún no tiene evaluaciones registradas.',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          )
+        else
+          ...history.map(
+            (evaluation) => Card(
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+                  child: Icon(
+                    Icons.event_note_outlined,
+                    color: theme.colorScheme.secondary,
+                  ),
+                ),
+                title: Text(evaluation.displayLabel),
+                subtitle: Text(dateFmt.format(evaluation.date)),
+                trailing: Text(
+                  '${evaluation.testScores.length} tests',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

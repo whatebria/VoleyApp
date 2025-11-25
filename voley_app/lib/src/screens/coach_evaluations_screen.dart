@@ -92,27 +92,6 @@ class CoachEvaluationsScreen extends ConsumerWidget {
     );
   }
 
-  AsyncValue<List<EvaluationWithProfile>> _selectedPlayerEvaluations(
-    WidgetRef ref,
-  ) {
-    final profile = ref.watch(selectedPlayerProfileProvider);
-
-    if (profile == null) {
-      return const AsyncValue.data([]);
-    }
-
-    final items = profile.evaluationHistory
-        .map(
-          (evaluation) => EvaluationWithProfile(
-            profile: profile,
-            evaluation: evaluation,
-          ),
-        )
-        .toList()
-      ..sort((a, b) => b.evaluation.date.compareTo(a.evaluation.date));
-
-    return AsyncValue.data(items);
-  }
 void _showEvaluationDetails(
     BuildContext context,
     ThemeData theme,
