@@ -5,8 +5,8 @@ import 'package:voley_app/src/models/program/evaluation_with_profile.dart';
 import 'package:voley_app/src/models/program/program.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:intl/intl.dart';
+import 'package:voley_app/src/screens/coach_evaluations_screen.dart';
 import 'package:voley_app/src/screens/create_new_program_screen.dart';
-// --- AÑADIDO: Import de la nueva pantalla de detalle ---
 import 'package:voley_app/src/screens/program_view/program_detail_screen.dart';
 
 // --- CAMBIO: Nombre de la clase ---
@@ -108,7 +108,24 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
     return Scaffold(
       appBar: AppBar(
           title: const Text('Explorador de Programas'),
-        ),
+        actions: [
+          if (!widget.showAllPlayers)
+            IconButton(
+              tooltip: 'Evaluaciones del jugador',
+              icon: const Icon(Icons.assessment_outlined),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CoachEvaluationsScreen(
+                      showAllPlayers: false,
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
       body: selectedPlayerCombo == null
           ? coachPlayersAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),

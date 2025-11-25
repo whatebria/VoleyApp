@@ -5,16 +5,25 @@ import 'package:voley_app/providers/providers.dart';
 import 'package:voley_app/src/models/player_profile/evaluation_with_profile.dart';
 
 class CoachEvaluationsScreen extends ConsumerWidget {
-  const CoachEvaluationsScreen({super.key});
+  const CoachEvaluationsScreen({super.key, this.showAllPlayers = true});
+
+  /// Cuando es `true`, se muestran todas las evaluaciones de todos los atletas
+  /// del coach. En `false`, se filtra por el jugador seleccionado en el
+  /// explorador (útil al navegar desde la vista de programas de un jugador).
+  final bool showAllPlayers;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final evaluationsAsync = ref.watch(coachAllEvaluationsProvider);
+    final evaluationsAsync = showAllPlayers
+        ? ref.watch(coachAllEvaluationsProvider)
+        : _selectedPlayerEvaluations(ref);
     final theme = Theme.of(context);
     final dateFmt = DateFormat('dd MMM yyyy');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Evaluaciones')),
+      appBar: AppBar(
+        title: Text(showAllPlayers ? 'Evaluaciones' : 'Evaluaciones del jugador'),
+      ),
       body: evaluationsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) =>
@@ -82,5 +91,27 @@ class CoachEvaluationsScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  AsyncValue<List<EvaluationWithProfile>> _selectedPlayerEvaluations(
+    WidgetRef ref,
+  ) {
+    final profile = ref.watch(selectedPlayerProfileProvider);
+
+    if (profile == null) {
+      return const AsyncValue.data([]);
+    }
+
+    final items = profile.evaluationHistory
+        .map(
+          (evaluation) => EvaluationWithProfile(
+            profile: profile,
+            evaluation: evaluation,
+          ),
+        )
+        .toList()
+      ..sort((a, b) => b.evaluation.date.compareTo(a.evaluation.date));
+
+    return AsyncValue.data(items);
   }
 }
