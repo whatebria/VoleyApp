@@ -51,15 +51,6 @@ class EvaluationEditorNotifier extends StateNotifier<List<TestScore>> {
     _ref.read(evaluationIsSavingProvider.notifier).state = true;
 
     try {
-      final selectedPlayerCombo = _ref.read(explorerSelectedPlayerProvider);
-      if (selectedPlayerCombo == null) {
-        throw Exception("No hay ningún jugador seleccionado.");
-      }
-
-      final player = selectedPlayerCombo.player;
-      final currentProfile = _ref.read(selectedPlayerProfileProvider);
-
-      // 2. Crear el nuevo objeto EvaluationResult
       final newEvaluation = EvaluationResult(
         date: DateTime.now(),
         testScores: state, // Usa la lista de TestScore del estado actual
@@ -108,8 +99,8 @@ class EvaluationEditorNotifier extends StateNotifier<List<TestScore>> {
       // 4. Invalidar providers para refrescar la app
       _ref.invalidate(selectedPlayerProfileProvider);
       _ref.invalidate(coachPlayersWithProfilesProvider);
+      _ref.invalidate(playerProfileProvider);
     } finally {
-      // 5. Quitar estado de carga
       _ref.read(evaluationIsSavingProvider.notifier).state = false;
     }
   }
