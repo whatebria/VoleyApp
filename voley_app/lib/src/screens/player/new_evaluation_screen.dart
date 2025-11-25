@@ -24,6 +24,11 @@ class NewEvaluationScreen extends ConsumerWidget {
     }
   }
 
+  void _onPlayerSelected(PlayerWithProfile? player, WidgetRef ref) {
+    ref.read(explorerSelectedPlayerProvider.notifier).state = player;
+    ref.invalidate(evaluationEditorProvider);
+  }
+
   void _showError(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: Colors.red),
@@ -67,6 +72,8 @@ class NewEvaluationScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
+    final playersAsync = ref.watch(coachPlayersWithProfilesProvider);
+
     // --- CAMBIO: Escucha el provider 'selectedPlayerProfileProvider' ---
     // Esto asegura que el editor se inicialice/actualice si el jugador cambia.
     ref.listen<PlayerProfile?>(selectedPlayerProfileProvider, (prev, next) {
@@ -79,7 +86,6 @@ class NewEvaluationScreen extends ConsumerWidget {
 
     // Observa el jugador seleccionado
     final selectedPlayerCombo = ref.watch(explorerSelectedPlayerProvider);
-    final playerName = selectedPlayerCombo?.player.name ?? 'Jugador';
 
     // Observa el estado de carga
     final isSubmitting = ref.watch(evaluationIsSavingProvider);
@@ -88,13 +94,27 @@ class NewEvaluationScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Registrar Evaluación')),
       body: Stack(
         children: [
-          // --- CAMBIO: Simplificado ---
-          if (selectedPlayerCombo == null)
-            const Center(
-              child: Text('Por favor, selecciona un jugador primero.'),
-            )
-          else
-            _buildEvaluationForm(context, ref, theme, playerName),
+          playersAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, s) => Center(
+              child: Text('Error al cargar jugadores: $e'),
+            ),
+            data: (players) {
+              if (players.isEmpty) {
+                return const Center(
+                  child: Text('Aún no tienes jugadores asignados.'),
+                );
+              }
+
+              return _buildEvaluationForm(
+                context,
+                ref,
+                theme,
+                players,
+                selectedPlayerCombo,
+              );
+            },
+          ),
 
           // --- Overlay de Carga ---
           if (isSubmitting)
@@ -112,31 +132,76 @@ class NewEvaluationScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     ThemeData theme,
-    String playerName,
+    List<PlayerWithProfile> players,
+    PlayerWithProfile? selectedPlayer,
   ) {
-    // --- CAMBIO: Lee el estado del provider ---
     final currentTestScores = ref.watch(evaluationEditorProvider);
-    final isCreating = ref.watch(selectedPlayerProfileProvider) == null;
+    final isCreating = selectedPlayer?.profile == null;
+    final hasSelectedPlayer = selectedPlayer != null;
+    final displayName = selectedPlayer?.player.name ?? 'Selecciona un jugador';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Jugador a evaluar',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<PlayerWithProfile>(
+                    value: selectedPlayer,
+                    decoration: const InputDecoration(
+                      hintText: 'Selecciona un jugador',
+                    ),
+                    items: players
+                        .map(
+                          (player) => DropdownMenuItem(
+                            value: player,
+                            child: Text(player.player.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (player) => _onPlayerSelected(player, ref),
+                  ),
+                  if (!hasSelectedPlayer)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        'Selecciona un jugador para registrar su evaluación.',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // 1. Título
           Text(
-            isCreating
-                ? 'Creando Evaluación para'
-                : 'Añadiendo Evaluación para',
+            hasSelectedPlayer
+                ? (isCreating
+                    ? 'Creando Evaluación para'
+                    : 'Añadiendo Evaluación para')
+                : 'Selecciona un jugador para iniciar',
             style: theme.textTheme.headlineMedium,
           ),
-          Text(
-            playerName,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              color: theme.colorScheme.primary,
-            ), // voltNeon
-          ),
-          if (isCreating)
+          if (hasSelectedPlayer)
+            Text(
+              displayName,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          if (isCreating && hasSelectedPlayer)
             Padding(
               padding: const EdgeInsets.only(top: 8.0),
               child: Text(

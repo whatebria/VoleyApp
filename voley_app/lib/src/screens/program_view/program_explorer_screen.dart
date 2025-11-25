@@ -118,7 +118,7 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (_) => const CoachEvaluationsScreen(
-                      showAllPlayers: false,
+                      showAppBar: false,
                     ),
                   ),
                 );

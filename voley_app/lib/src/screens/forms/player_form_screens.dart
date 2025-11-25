@@ -4,6 +4,8 @@ import 'package:voley_app/src/models/player_profile/form_peak.dart';
 import 'package:voley_app/src/models/player_profile/goal.dart';
 import 'package:voley_app/src/models/player_profile/injury.dart';
 import 'package:voley_app/src/models/player_profile/player_event.dart';
+import 'package:voley_app/src/models/player_profile/test_definition.dart';
+import 'package:voley_app/src/models/data/test_catalog.dart';
 import 'package:voley_app/src/models/player_profile/test_score.dart';
 import 'package:voley_app/src/models/player_profile/tournament.dart';
 
@@ -164,6 +166,7 @@ class _TestScoreFormScreenState extends State<TestScoreFormScreen> {
   final _nameCtrl = TextEditingController();
   final _valueCtrl = TextEditingController();
   final _unitCtrl = TextEditingController();
+  TestDefinition? _selectedDefinition;
 
   @override
   void dispose() {
@@ -187,6 +190,14 @@ class _TestScoreFormScreenState extends State<TestScoreFormScreen> {
     }
   }
 
+void _onDefinitionSelected(TestDefinition? definition) {
+    setState(() => _selectedDefinition = definition);
+    if (definition != null) {
+      _nameCtrl.text = definition.label;
+      _unitCtrl.text = definition.unit;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -196,12 +207,29 @@ class _TestScoreFormScreenState extends State<TestScoreFormScreen> {
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: _nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre del Test *',
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DropdownButtonFormField<TestDefinition>(
+                  value: _selectedDefinition,
+                  decoration: const InputDecoration(
+                    labelText: 'Selecciona un test',
+                    helperText: 'Elige un test sugerido o ingrésalo manualmente',
+                  ),
+                  items: suggestedTestDefinitions
+                      .map(
+                        (test) => DropdownMenuItem(
+                          value: test,
+                          child: Text(test.label),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _onDefinitionSelected,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre del Test *',
                   helperText: 'Ej: Salto vertical',
                 ),
                 validator: (value) => (value == null || value.trim().isEmpty)

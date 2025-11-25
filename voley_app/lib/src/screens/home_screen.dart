@@ -31,12 +31,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final theme = Theme.of(context);
 
     return appUserAsync.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
-      error: (e, s) => Scaffold(
-        body: Center(child: Text('Error al cargar perfil: $e')),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, s) =>
+          Scaffold(body: Center(child: Text('Error al cargar perfil: $e'))),
       data: (appUser) {
         if (appUser == null) {
           return const Scaffold(
@@ -48,7 +46,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           CoachDashboardScreen(),
           CoachAthletesScreen(),
           CoachProgramsScreen(),
-          CoachEvaluationsScreen(),
+          CoachEvaluationsScreen(showAppBar: false),
         ];
 
         return Scaffold(
@@ -88,14 +86,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       )
                     : const Icon(Icons.logout),
                 tooltip: 'Cerrar Sesión',
-                onPressed: isLoggingOut ? null : () => _handleLogout(context, ref),
+                onPressed: isLoggingOut
+                    ? null
+                    : () => _handleLogout(context, ref),
               ),
             ],
           ),
-          body: IndexedStack(
-            index: _selectedIndex,
-            children: pages,
-          ),
+          body: IndexedStack(index: _selectedIndex, children: pages),
           bottomNavigationBar: NavigationBar(
             onDestinationSelected: _onItemTapped,
             selectedIndex: _selectedIndex,
