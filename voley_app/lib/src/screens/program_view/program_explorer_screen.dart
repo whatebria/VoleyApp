@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voley_app/providers/providers.dart';
-import 'package:voley_app/src/models/player_profile/evaluation_with_profile.dart';
+import 'package:voley_app/src/models/program/evaluation_with_profile.dart';
 import 'package:voley_app/src/models/program/program.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:intl/intl.dart';
@@ -11,8 +11,7 @@ import 'package:voley_app/src/screens/program_view/program_detail_screen.dart';
 
 // --- CAMBIO: Nombre de la clase ---
 class ProgramExplorerScreen extends ConsumerStatefulWidget {
-  const ProgramExplorerScreen({Key? key, this.showAllPlayers = false})
-    : super(key: key);
+  const ProgramExplorerScreen({super.key, this.showAllPlayers = false});
 
   final bool showAllPlayers;
 
@@ -88,6 +87,7 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
       final programsAsync = ref.watch(coachAllProgramsProvider);
 
       return Scaffold(
+        
         body: programsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, s) => Center(child: Text('Error: $e')),
@@ -106,6 +106,9 @@ class _ProgramExplorerScreenState extends ConsumerState<ProgramExplorerScreen> {
     }
 
     return Scaffold(
+      appBar: AppBar(
+          title: const Text('Explorador de Programas'),
+        ),
       body: selectedPlayerCombo == null
           ? coachPlayersAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),

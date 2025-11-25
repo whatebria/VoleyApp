@@ -8,6 +8,7 @@ import 'package:voley_app/providers/program_editor_notifier.dart';
 import 'package:voley_app/providers/program_generator.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
 import 'package:voley_app/src/models/bd/exercise.dart';
+import 'package:voley_app/src/models/program/evaluation_with_profile.dart';
 import 'package:voley_app/src/models/program/program.dart';
 import 'package:voley_app/src/models/program/session_log.dart';
 import 'package:voley_app/src/models/player_profile/evaluation_with_profile.dart';
@@ -227,6 +228,7 @@ final coachAllProgramsProvider = StreamProvider<List<ProgramWithOwner>>((ref) {
 });
 
 
+
 final explorerProgramsProvider = StreamProvider<List<Program>>((ref) {
   final firestore = ref.read(firestoreProvider);
 
@@ -246,24 +248,28 @@ final explorerProgramsProvider = StreamProvider<List<Program>>((ref) {
 /// (Sin cambios)
 final explorerSelectedProgramProvider = StateProvider<Program?>((ref) => null);
 
-final coachAllEvaluationsProvider = Provider<AsyncValue<List<EvaluationWithProfile>>>(
-  (ref) {
-    final playersAsync = ref.watch(coachPlayersWithProfilesProvider);
+final coachAllEvaluationsProvider = StreamProvider<List<EvaluationWithProfile>>(
+  (ref) async* {
+    final playersStream = ref.watch(coachPlayersWithProfilesProvider.stream);
 
-    return playersAsync.when(
-      data: (players) {
-        final evaluations = players
-            .where((p) => p.profile != null)
-            .expand((p) => p.profile!.evaluationHistory
-                .map((e) => EvaluationWithProfile(profile: p.profile!, evaluation: e)))
-            .toList()
-          ..sort((a, b) => b.evaluation.date.compareTo(a.evaluation.date));
+    await for (final players in playersStream) {
+      final evaluations = players
+          .where((p) => p.profile != null)
+          .expand(
+            (p) => (p.profile?.evaluationHistory ?? [])
+                .map(
+                  (e) => EvaluationWithProfile(
+                    profile: p.profile!,
+                    evaluation: e,
+                  ),
+                )
+                .toList(),
+          )
+          .toList()
+        ..sort((a, b) => b.evaluation.date.compareTo(a.evaluation.date));
 
-        return AsyncData(evaluations);
-      },
-      loading: () => const AsyncLoading(),
-      error: (e, s) => AsyncError(e, s),
-    );
+      yield evaluations;
+    }
   },
 );
 

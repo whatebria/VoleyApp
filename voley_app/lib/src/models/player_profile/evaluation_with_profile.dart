@@ -1,14 +1,14 @@
 import 'package:flutter/foundation.dart';
+import 'package:voley_app/src/models/player_profile/evaluation_result.dart';
 import 'package:voley_app/src/models/player_profile/player_profile.dart';
-import 'package:voley_app/src/models/program/program.dart';
 
 @immutable
-class ProgramWithOwner {
-  const ProgramWithOwner({
-    required this.program,
-    required this.owner,
+class EvaluationWithProfile {
+  const EvaluationWithProfile({
+    required this.profile,
+    required this.evaluation,
   });
 
-  final Program program;
-  final PlayerProfile owner;
+  final PlayerProfile profile;
+  final EvaluationResult evaluation;
 }
