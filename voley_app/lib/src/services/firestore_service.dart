@@ -383,6 +383,18 @@ class FirestoreService {
     return PlayerProfile.fromJson(doc.data()!);
   }
 
+  Stream<PlayerProfile?> getPlayerProfileStream(String userId) {
+    return _db
+        .collection('players')
+        .where('userId', isEqualTo: userId)
+        .limit(1)
+        .snapshots()
+        .map((snapshot) {
+      if (snapshot.docs.isEmpty) return null;
+      return PlayerProfile.fromJson(snapshot.docs.first.data());
+    });
+  }
+
   Future<void> saveProgram(String playerId, Program program) {
     // Guardar dentro de colección players/{id}/programs/{programId}
     return _db

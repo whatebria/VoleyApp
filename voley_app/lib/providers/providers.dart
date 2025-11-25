@@ -171,14 +171,21 @@ final coachPlayersWithProfilesProvider =
           continue;
         }
 
-        // 3. Busca todos sus perfiles en paralelo
-        final futures = players.map((player) async {
-          final profile = await firestore.getPlayerProfileByUserId(player.id);
-          return PlayerWithProfile(player, profile);
-        }).toList();
+       // 3. Escucha los perfiles en tiempo real
+        final profileStreams = players
+            .map(
+              (player) => firestore
+                  .getPlayerProfileStream(player.id)
+                  .map((profile) => PlayerWithProfile(player, profile)),
+            )
+            .toList();
 
-        // 4. Espera a que todos se completen y emite la lista combinada
-        yield await Future.wait(futures);
+        // 4. Combina los streams para emitir una lista sincronizada
+        if (profileStreams.length == 1) {
+          yield* profileStreams.first.map((p) => [p]);
+        } else {
+          yield* StreamZip(profileStreams).map((profiles) => profiles.toList());
+        }
       }
     });
 
